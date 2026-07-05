@@ -1,0 +1,4 @@
+# Copy to .dev.vars for local `wrangler dev`. NEVER commit the real .dev.vars.
+# In production these are set via `wrangler secret put`, not this file.
+NOTION_TOKEN="ntn_paste_your_internal_integration_secret"
+NOTION_DATABASE_ID="5eeb24123cb282b19daa019d619d5214"

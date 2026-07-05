@@ -1,0 +1,156 @@
+/* Design tokens + base styles, ported from the original dashboard. Fonts are
+   loaded via app.head in nuxt.config-adjacent config (see app/app.vue head). */
+:root {
+  --bg: #141416; --panel: #1c1c20; --panel-edge: #2a2a31; --card: #232329;
+  --text: #e9e7e2; --muted: #8d8c96; --faint: #5b5a63;
+  --plum: #96688c; --rust: #9c5a52; --stone: #63636d; --olive: #85944f;
+  --teal: #4d8b78; --blue: #517ea6; --green: #57b784; --amber: #c2a24b;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--text);
+  font-family: "Instrument Sans", system-ui, sans-serif;
+  min-height: 100vh; padding: 28px clamp(16px, 4vw, 48px) 48px;
+}
+.mono { font-family: "Spline Sans Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+
+header { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+h1 { font-size: 20px; font-weight: 600; letter-spacing: 0.01em; margin: 0; }
+/* PrimeVue Card containers (.sec) retuned to the original panel look. main.css
+   is un-layered, so these win over PrimeVue's @layer primeui defaults. */
+.sec.p-card {
+  background: var(--panel); border: 1px solid var(--panel-edge);
+  border-radius: 14px; box-shadow: none; color: var(--text);
+}
+.sec .p-card-body { padding: 18px 20px; }
+.sec .p-card-content { padding: 0; }
+.sec h2 { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+
+/* Attention queue */
+.attention.p-card { margin-bottom: 14px; border-color: #3a3323; }
+.attention .attn-title { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--amber); letter-spacing: 0.04em; text-transform: uppercase; }
+.attn-row { display: flex; gap: 10px; overflow-x: auto; padding: 6px 0 2px; scrollbar-width: thin; }
+.attn-card {
+  flex: 0 0 auto; min-width: 190px; max-width: 240px;
+  display: block; text-decoration: none;
+  background: var(--card); border: 1px solid var(--panel-edge);
+  border-radius: 10px; padding: 9px 12px; transition: border-color 120ms;
+}
+.attn-card:hover, .attn-card:focus-visible { border-color: var(--amber); }
+.attn-card:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.attn-card .co { font-size: 13px; font-weight: 600; color: var(--text); margin: 0 0 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.attn-card .role { font-size: 11.5px; color: var(--muted); margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.attn-card .why { font-size: 11px; margin: 6px 0 0; display: inline-block; border-radius: 999px; padding: 1px 8px; }
+.why.followup { color: var(--amber); border: 1px solid #4a3f1f; }
+.why.aging { color: var(--muted); border: 1px solid var(--panel-edge); }
+
+.grid { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr) 250px; align-items: stretch; }
+@media (max-width: 880px) { .grid { grid-template-columns: 1fr; } }
+
+.sec--sankey .p-card-content { display: flex; flex-direction: column; min-height: 340px; }
+#sankey { flex: 1; width: 100%; min-height: 300px; }
+#sankey text { font-family: "Spline Sans Mono", ui-monospace, monospace; pointer-events: none; }
+.node-value { font-size: 14px; font-weight: 600; fill: var(--text); }
+.node-label { font-size: 11px; fill: var(--muted); }
+.ribbon { transition: stroke-opacity 140ms ease; cursor: default; }
+.ribbon:hover { stroke-opacity: 0.85 !important; }
+
+.stats { display: flex; flex-direction: column; gap: 14px; }
+.stat-card.p-card { background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 14px; box-shadow: none; }
+.stat-card .p-card-body { padding: 16px 18px; }
+.stat-card .p-card-content { padding: 0; }
+.stat-inner { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.stat-card .meta { min-width: 0; }
+.stat-card .name { font-size: 14px; font-weight: 600; margin: 0 0 2px; }
+.stat-card .sub { font-size: 12px; color: var(--muted); margin: 0; }
+.donut { flex: none; }
+.donut .value { font-size: 14px; font-weight: 600; fill: var(--text); }
+
+/* Velocity + sources row */
+.row2 { display: grid; gap: 14px; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); margin-top: 14px; }
+@media (max-width: 880px) { .row2 { grid-template-columns: 1fr; } }
+#velocity svg { width: 100%; height: 150px; display: block; margin-top: 8px; }
+.vbar { cursor: default; }
+.legend { display: flex; gap: 14px; font-size: 11.5px; color: var(--muted); margin-top: 8px; }
+.legend .k { display: inline-flex; align-items: center; gap: 6px; }
+.legend .sw { width: 10px; height: 10px; border-radius: 3px; }
+
+.src-row { display: grid; grid-template-columns: 110px 1fr 86px; gap: 10px; align-items: center; margin-top: 9px; font-size: 12.5px; }
+.src-row .dom { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.src-bar { height: 12px; background: #26262c; border-radius: 6px; overflow: hidden; position: relative; }
+.src-bar .fill { position: absolute; inset: 0 auto 0 0; background: var(--stone); opacity: .45; border-radius: 6px; }
+.src-bar .rep { position: absolute; inset: 0 auto 0 0; background: var(--amber); border-radius: 6px; }
+.src-row .rate { color: var(--muted); text-align: right; }
+
+/* Salary context */
+.salary { margin-top: 4px; }
+.sal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.sal-card.p-card { background: var(--card); border: 1px solid var(--panel-edge); border-radius: 10px; box-shadow: none; }
+.sal-card .p-card-body { padding: 10px 12px; }
+.sal-card .p-card-content { padding: 0; }
+.sal-card .lab { font-size: 12px; color: var(--muted); margin: 0 0 4px; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.sal-card .lab .n { color: var(--faint); font-size: 11px; }
+.sal-card .med { font-size: 22px; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
+.sal-card .rng { font-size: 11.5px; color: var(--muted); margin: 3px 0 0; }
+.sal-note { font-size: 11.5px; color: var(--faint); margin: 10px 0 0; }
+
+/* Kanban */
+#tracker { margin-top: 26px; }
+#tracker .tracker-head { display: flex; align-items: flex-start; gap: 14px; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; }
+#tracker .tracker-heading { display: flex; flex-direction: column; gap: 1px; }
+#tracker .tracker-tools { display: flex; align-items: center; gap: 12px; flex-wrap: nowrap; flex-shrink: 0; }
+#tracker h2 { font-size: 18px; font-weight: 600; margin: 0; color: var(--text); text-transform: none; letter-spacing: 0; }
+#tracker .total { color: var(--muted); font-size: 12.5px; }
+
+/* Applications table (PrimeVue DataTable lives here) */
+.table-wrap { overflow-x: auto; }
+.tbl-link { color: var(--text); text-decoration: none; }
+.tbl-link:hover, .tbl-link:focus-visible { color: var(--amber); }
+.tracker-tools .p-iconfield { width: min(300px, 100%); }
+.tracker-tools .p-inputtext { width: 100%; }
+.board { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: thin; }
+.col {
+  flex: 1 0 215px; min-width: 215px;
+  border: 1px dashed var(--panel-edge); border-radius: 12px;
+  padding: 10px; display: flex; flex-direction: column; gap: 8px; max-height: 460px;
+}
+.col-head { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--muted); padding: 2px 4px 6px; }
+.col-head .dot { width: 8px; height: 8px; border-radius: 50%; }
+.col-head .n {
+  margin-left: auto; color: var(--text); font-weight: 600;
+  background: var(--panel); border: 1px solid var(--panel-edge);
+  border-radius: 999px; padding: 1px 8px; font-size: 11.5px;
+}
+.cards { overflow-y: auto; display: flex; flex-direction: column; gap: 8px; scrollbar-width: thin; }
+.card {
+  display: block; text-decoration: none;
+  background: var(--card); border: 1px solid var(--panel-edge);
+  border-radius: 10px; padding: 10px 12px; transition: border-color 120ms;
+}
+.card:hover, .card:focus-visible { border-color: var(--faint); }
+.card:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.card .co { font-size: 13.5px; font-weight: 600; color: var(--text); margin: 0 0 2px; }
+.card .role { font-size: 12px; color: var(--muted); margin: 0; }
+.card .when { font-size: 11px; color: var(--faint); margin: 5px 0 0; }
+.empty-col { color: var(--faint); font-size: 12.5px; text-align: center; padding: 22px 0; }
+
+#tip {
+  position: fixed; z-index: 10; pointer-events: none;
+  background: #26262c; border: 1px solid #35353d; border-radius: 9px;
+  padding: 9px 11px; font-size: 12.5px; color: var(--text);
+  box-shadow: 0 6px 22px rgba(0,0,0,0.45);
+  max-width: 260px; line-height: 1.45;
+}
+#tip .t-head { font-weight: 600; }
+#tip .t-sub { color: var(--muted); }
+#tip .t-list { color: var(--muted); margin-top: 4px; }
+
+.state { color: var(--muted); font-size: 14px; padding: 32px 0; text-align: center; }
+.state.error { color: #c98a8a; }
+footer { margin-top: 18px; font-size: 12px; color: var(--faint); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .ribbon.draw { animation: draw 700ms ease both; }
+  @keyframes draw { from { stroke-opacity: 0; } }
+}

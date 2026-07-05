@@ -1,0 +1,50 @@
+name = "job-pipeline"
+
+# Nuxt/Nitro builds the Worker to .output/ (preset: cloudflare_module).
+# `npm run deploy` runs `nuxt build` first, then `wrangler deploy` reads this.
+main = ".output/server/index.mjs"
+compatibility_date = "2026-07-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Keep the *.workers.dev URL disabled so the ONLY way in is your custom
+# domain, which sits behind Cloudflare Access. If workers.dev were enabled,
+# it would bypass Access entirely. (Load-bearing — see CLAUDE.md.)
+workers_dev = false
+
+# Serve on a custom domain in a zone you control (required for Access).
+# NOTE: all bare top-level keys must stay ABOVE the first [table] header — in
+# TOML anything after a [table] belongs to that table (this bit us: workers_dev
+# and routes got swallowed into [assets]).
+routes = [
+  { pattern = "jobs.codertheory.dev", custom_domain = true }
+]
+
+# Static assets (client bundle, _headers). Nitro serves these via the ASSETS
+# binding — the binding name is required, do not rename it.
+[assets]
+directory = ".output/public"
+binding = "ASSETS"
+
+[vars]
+# Header "Open in Notion →" link. NUXT_PUBLIC_ prefix maps it onto
+# runtimeConfig.public.notionViewUrl at runtime (was NOTION_VIEW_URL).
+NUXT_PUBLIC_NOTION_VIEW_URL = ""
+
+# Applied rows older than this many days count as "No Answer".
+STALE_DAYS = "30"
+
+# Secrets (never put these in this file):
+#   wrangler secret put NOTION_TOKEN
+#   wrangler secret put NOTION_DATABASE_ID
+
+# Daily snapshot at 15:00 UTC (~9am Edmonton) → KV, for trend lines. Nitro also
+# emits this cron from nuxt.config `scheduledTasks`; keeping it here makes the
+# deploy config explicit. Requires the SNAPSHOTS binding below.
+[triggers]
+crons = ["0 15 * * *"]
+
+# Create with:  wrangler kv namespace create SNAPSHOTS
+# then paste the returned id here and redeploy.
+[[kv_namespaces]]
+binding = "SNAPSHOTS"
+id = "a7a84a85d49040d9a4e7ac605f8c2400"
