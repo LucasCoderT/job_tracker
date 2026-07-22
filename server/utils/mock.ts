@@ -79,7 +79,7 @@ function makePage(spec: Spec, i: number, now: number): NotionPage {
     Position: { type: 'rich_text', rich_text: [{ plain_text: spec.position }] },
     Status: { type: 'select', select: { name: spec.status } },
     'Application Date': { type: 'date', date: { start: dateIso } },
-    'Reference Link': { type: 'url', url: SOURCE_URLS[spec.source] },
+    'Job Posting': { type: 'url', url: SOURCE_URLS[spec.source] },
   }
   if (spec.nextAction) {
     properties['Next Action'] = { type: 'select', select: { name: spec.nextAction } }

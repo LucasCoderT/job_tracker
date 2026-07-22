@@ -153,6 +153,7 @@ export function classifyRole(position: string): RoleType {
 }
 
 // Registrable-ish domain: ca.indeed.com → indeed.com, www.linkedin.com → linkedin.com
+// Registrable domain of a URL (e.g. "job-boards.greenhouse.io" → "greenhouse.io").
 export function sourceDomain(url: string | null): string | null {
   if (!url) return null
   try {
@@ -162,6 +163,35 @@ export function sourceDomain(url: string | null): string | null {
   } catch {
     return null
   }
+}
+
+// Friendly "source channel" of an application, derived from its Job Posting
+// URL. Known job boards and ATS vendors get a readable label; anything else
+// (a company's own careers domain, a referral link, etc.) falls back to its
+// registrable domain. This is the apply/posting channel — a good proxy for
+// where a role came from without a manual per-row field. Returns null for
+// rows with no Job Posting URL so they can be counted as "unknown" upstream.
+const CHANNEL_BY_DOMAIN: Record<string, string> = {
+  'linkedin.com': 'LinkedIn',
+  'indeed.com': 'Indeed',
+  'remoteok.com': 'RemoteOK',
+  'ashbyhq.com': 'Ashby',
+  'greenhouse.io': 'Greenhouse',
+  'lever.co': 'Lever',
+  'myworkdayjobs.com': 'Workday',
+  'myworkdaysite.com': 'Workday',
+  'rippling.com': 'Rippling',
+  'breezy.hr': 'Breezy',
+  'wellfound.com': 'Wellfound',
+  'angel.co': 'Wellfound',
+  'jobbank.gc.ca': 'Job Bank',
+  'hrsdc-rhdcc.gc.ca': 'Job Bank',
+}
+
+export function channelOf(url: string | null): string | null {
+  const domain = sourceDomain(url)
+  if (!domain) return null
+  return CHANNEL_BY_DOMAIN[domain] ?? domain
 }
 
 // Monday of the week containing the given ISO date (UTC).

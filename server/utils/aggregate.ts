@@ -41,7 +41,7 @@ import {
   readUrl,
   readNumber,
   readDateMs,
-  sourceDomain,
+  channelOf,
   weekStartISO,
 } from './notion'
 
@@ -99,7 +99,7 @@ export function aggregate(
     const ageDays = dateMs !== null ? Math.floor((now - dateMs) / dayMs) : null
     const replied = HEARD_BACK_BUCKETS.has(bucket)
     const nextAction = readSelect(page, NEXT_ACTION_PROP)
-    const source = sourceDomain(readUrl(page, SOURCE_PROP))
+    const source = channelOf(readUrl(page, SOURCE_PROP))
     const salary = readNumber(page, SALARY_PROP)
 
     const job: Job = {

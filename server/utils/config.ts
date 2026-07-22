@@ -22,17 +22,32 @@ export const STATUS_PROP = 'Status'
 export const DATE_PROP = 'Application Date'
 export const POSITION_PROP = 'Position'
 export const NEXT_ACTION_PROP = 'Next Action'
-export const SOURCE_PROP = 'Reference Link'
+// The Notion URL property the source/channel breakdown reads. Renamed from
+// "Reference Link" → "Job Posting" in the 2026-07-14 schema cleanup; the old
+// name silently returned null for every row (→ everything "other").
+export const SOURCE_PROP = 'Job Posting'
 export const SALARY_PROP = 'Salary' // number (annual); ~43% of rows populated
 export const INTERVIEWED_PROP = 'Interviewed' // optional checkbox, absent today
 
 // Notion Status option (case-insensitive) → funnel bucket.
+// The live Notion enum (set 2026-07-14) is:
+//   Applied · Interviewing · On Hold · Offer · Accepted · Rejected
+// plus the older labels kept for back-compat with historical rows.
 export const STATUS_BUCKETS: Record<string, string> = {
   applied: 'applied',
   pending: 'pending',
   interviewed: 'interviewed',
-  progressing: 'progressing',
   interviewing: 'interviewed',
+  progressing: 'progressing',
+  // "On Hold" = employer paused/froze the req after a human reply (e.g. a role
+  // frozen mid-process). Heard back, non-terminal → treat as pending so it
+  // counts toward heard-back rather than vanishing into `unknown`.
+  'on hold': 'pending',
+  // Bare "Offer" (received, undecided) and "Accepted" both count as a landed
+  // offer. If offer-received vs accepted ever needs splitting, add an "Offer
+  // Declined" Notion option and map it to offerDeclined.
+  offer: 'offerAccepted',
+  accepted: 'offerAccepted',
   'offer accepted': 'offerAccepted',
   'offer declined': 'offerDeclined',
   rejected: 'rejected',
