@@ -12,7 +12,8 @@ export const CACHE_TTL_SECONDS = 300
 // so a deploy never serves an old-shaped cached response to new frontend code.
 // v6: added `roles` (reply rate by role type) and `salary` (salary context).
 // v7: enriched `jobs` rows with salary/source/nextAction for the applications table.
-export const SCHEMA_VERSION = '7'
+// v8: added `stages` (how far each interview process actually got) + per-job stage.
+export const SCHEMA_VERSION = '8'
 
 export const DEFAULT_STALE_DAYS = 30
 export const ATTENTION_MIN_DAYS = 10
@@ -27,7 +28,13 @@ export const NEXT_ACTION_PROP = 'Next Action'
 // name silently returned null for every row (→ everything "other").
 export const SOURCE_PROP = 'Job Posting'
 export const SALARY_PROP = 'Salary' // number (annual); ~43% of rows populated
-export const INTERVIEWED_PROP = 'Interviewed' // optional checkbox, absent today
+export const INTERVIEWED_PROP = 'Interviewed' // checkbox; added to Notion 2026-08-16 and backfilled
+
+// How far a process actually got. Ordinal rather than semantic ("Hiring
+// Manager", "Technical") because round names differ per company and ordinal
+// labels stay comparable across all of them. Order here IS the ladder order.
+export const STAGE_PROP = 'Furthest Stage'
+export const STAGE_ORDER = ['Round 1 — Screen', 'Round 2', 'Round 3+', 'Offer']
 
 // Notion Status option (case-insensitive) → funnel bucket.
 // The live Notion enum (set 2026-07-14) is:

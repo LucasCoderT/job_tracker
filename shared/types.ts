@@ -33,6 +33,7 @@ export interface Counts {
   offerDeclined: number
   rejected: number
   rejectedAfterInterview: number
+  pendingAfterInterview: number
   noAnswer: number
   unknown: number
 }
@@ -56,6 +57,14 @@ export interface Job {
   salary: number | null
   source: string | null // registrable domain, e.g. "ashbyhq.com"
   nextAction: string | null
+  stage: string | null // furthest interview round reached; null = never interviewed
+}
+
+// One rung of the interview-depth ladder: how many processes got this far.
+export interface StageStat {
+  stage: string
+  reached: number // processes that got AT LEAST this far
+  stoppedHere: number // processes whose furthest point was exactly this rung
 }
 
 export interface AttentionItem extends Job {
@@ -137,6 +146,7 @@ export interface Stats {
   roles: RoleStat[]
   salary: SalaryContext
   metrics: Metrics
+  stages: StageStat[]
   sankey: SankeySpec
 }
 

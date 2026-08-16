@@ -112,7 +112,23 @@ export function readDateMs(page: NotionPage): number | null {
 
 export function readInterviewed(page: NotionPage): boolean {
   const prop = page.properties?.[INTERVIEWED_PROP]
-  return prop?.type === 'checkbox' ? Boolean(prop.checkbox) : false
+  if (prop?.type === 'checkbox' && prop.checkbox) return true
+  // A row with a Furthest Stage set has demonstrably interviewed, so the stage
+  // property alone is enough — the checkbox is belt-and-braces, not required.
+  return readStage(page) !== null
+}
+
+// How deep the process actually got. Ordinal, not semantic, so companies with
+// different round names stay comparable. Null = never reached an interview.
+export function readStage(page: NotionPage): string | null {
+  const prop = page.properties?.[STAGE_PROP]
+  const name = prop?.type === 'select' ? (prop.select?.name ?? null) : null
+  return name && STAGE_ORDER.includes(name) ? name : null
+}
+
+export function readStageRank(page: NotionPage): number {
+  const name = readStage(page)
+  return name ? STAGE_ORDER.indexOf(name) + 1 : 0
 }
 
 // ---- Derivation helpers ----

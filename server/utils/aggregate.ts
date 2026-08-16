@@ -16,6 +16,9 @@ import type {
   RoleStat,
   SalaryGroup,
   SalaryContext,
+  StageStat,
+  SankeySpec,
+  SankeyNodeSpec,
   Stats,
 } from '../../shared/types'
 import type { NotionPage } from '../../shared/types'
@@ -29,12 +32,14 @@ import {
   SOURCE_PROP,
   SALARY_PROP,
   DATE_PROP,
+  STAGE_ORDER,
 } from './config'
 import {
   classify,
   classifyRole,
   ROLE_ORDER,
   readInterviewed,
+  readStage,
   readTitle,
   readRichText,
   readSelect,
@@ -70,6 +75,7 @@ export function aggregate(
     offerDeclined: 0,
     rejected: 0,
     rejectedAfterInterview: 0,
+    pendingAfterInterview: 0,
     noAnswer: 0,
     unknown: 0,
   }
@@ -82,6 +88,12 @@ export function aggregate(
   // silent (awaiting/noAnswer). Those two buckets partition every row.
   const salaryHeard: number[] = []
   const salarySilent: number[] = []
+  // Furthest rung reached, counted per process, split by how it ended there.
+  // Turned into a cumulative ladder after the loop so "reached" answers
+  // "how many got at least this far".
+  const stageStopped = new Map<string, number>()
+  const stageStoppedRejected = new Map<string, number>()
+  const stageStoppedOpen = new Map<string, number>()
 
   for (const page of pages) {
     const bucket = classify(page, { staleMs, now }) as BucketKey | null
@@ -93,6 +105,12 @@ export function aggregate(
     if (bucket === 'rejected' && readInterviewed(page)) {
       counts.rejectedAfterInterview++
     }
+    // A row can sit in `pending` ("On Hold" = req frozen mid-process) after an
+    // interview already happened. Without this the Interviewed checkbox is
+    // ignored for those rows and the interview rate under-reports.
+    if (bucket === 'pending' && readInterviewed(page)) {
+      counts.pendingAfterInterview++
+    }
 
     const dateIso = page.properties?.[DATE_PROP]?.date?.start ?? null
     const dateMs = readDateMs(page)
@@ -101,6 +119,14 @@ export function aggregate(
     const nextAction = readSelect(page, NEXT_ACTION_PROP)
     const source = channelOf(readUrl(page, SOURCE_PROP))
     const salary = readNumber(page, SALARY_PROP)
+    const stage = readStage(page)
+    if (stage) {
+      stageStopped.set(stage, (stageStopped.get(stage) ?? 0) + 1)
+      // Where the process went after its furthest rung: closed out, or still
+      // live (in-process, or paused by the employer).
+      const sink = bucket === 'rejected' ? stageStoppedRejected : stageStoppedOpen
+      sink.set(stage, (sink.get(stage) ?? 0) + 1)
+    }
 
     const job: Job = {
       company: readTitle(page) || 'Untitled',
@@ -112,6 +138,7 @@ export function aggregate(
       salary,
       source,
       nextAction,
+      stage,
     }
     jobs.push(job)
 
@@ -217,11 +244,32 @@ export function aggregate(
   // Ladder: Pending → Interviewed → Progressing → Offers. A row's current
   // status implies it passed through the earlier stages ("ever reached").
   const everProgressing = counts.progressing + offers
-  const everInterviewed = counts.interviewed + everProgressing + counts.rejectedAfterInterview
-  const everPending = counts.pending + everInterviewed
+  const everInterviewed =
+    counts.interviewed +
+    everProgressing +
+    counts.rejectedAfterInterview +
+    counts.pendingAfterInterview
+  // pendingAfterInterview rows are inside BOTH counts.pending and
+  // everInterviewed, so subtract them once to avoid double-counting the stage.
+  const pendingBeforeInterview = counts.pending - counts.pendingAfterInterview
+  const everPending = pendingBeforeInterview + everInterviewed
   const heardBack =
     counts.pending + counts.interviewed + counts.progressing + offers + counts.rejected
   const rejectedBeforeInterview = counts.rejected - counts.rejectedAfterInterview
+
+  // Cumulative ladder: walk the rungs from deepest back to shallowest so
+  // `reached` accumulates ("got at least this far"), while `stoppedHere` stays
+  // the count whose process ended on that exact rung.
+  let carried = 0
+  const stages: StageStat[] = STAGE_ORDER.map((stage) => ({
+    stage,
+    reached: 0,
+    stoppedHere: stageStopped.get(stage) ?? 0,
+  }))
+  for (let i = stages.length - 1; i >= 0; i--) {
+    carried += stages[i]!.stoppedHere
+    stages[i]!.reached = carried
+  }
 
   return {
     generatedAt: new Date(now).toISOString(),
@@ -247,31 +295,105 @@ export function aggregate(
       interviewRate: total ? everInterviewed / total : 0,
       offerRate: total ? offers / total : 0,
     },
-    sankey: {
-      nodes: [
-        { id: 'applications', label: 'Applications' },
-        { id: 'pending', label: 'Pending' },
-        { id: 'interviewed', label: 'Interviewed' },
-        { id: 'progressing', label: 'Progressing' },
-        { id: 'awaiting', label: 'Awaiting Reply' },
-        { id: 'rejected', label: 'Rejected' },
-        { id: 'noAnswer', label: 'No Answer' },
-        { id: 'offers', label: 'Offers' },
-        { id: 'accepted', label: 'Offer Accepted' },
-        { id: 'declined', label: 'Offer Declined' },
-      ],
-      links: [
-        { source: 'applications', target: 'pending', value: everPending },
-        { source: 'applications', target: 'awaiting', value: counts.awaiting },
-        { source: 'applications', target: 'rejected', value: rejectedBeforeInterview },
-        { source: 'applications', target: 'noAnswer', value: counts.noAnswer },
-        { source: 'pending', target: 'interviewed', value: everInterviewed },
-        { source: 'interviewed', target: 'progressing', value: everProgressing },
-        { source: 'interviewed', target: 'rejected', value: counts.rejectedAfterInterview },
-        { source: 'progressing', target: 'offers', value: offers },
-        { source: 'offers', target: 'accepted', value: counts.offerAccepted },
-        { source: 'offers', target: 'declined', value: counts.offerDeclined },
-      ],
-    },
+    stages,
+    sankey: buildSankey({
+      counts,
+      stages,
+      stageStoppedRejected,
+      stageStoppedOpen,
+      everPending,
+      pendingBeforeInterview,
+      rejectedBeforeInterview,
+      offers,
+    }),
   }
+}
+
+/**
+ * The interview ladder, folded into the Sankey. The old diagram collapsed every
+ * interview into one "Interviewed" node, which hid how far each process got.
+ * Now each round is its own rung: flow moves rightward to the next round, and
+ * peels off to Rejected or Still Open at whichever rung the process ended on.
+ *
+ * Rungs with no traffic are dropped, along with any node left unreferenced, so
+ * the diagram never renders empty stages (d3-sankey chokes on orphan nodes).
+ */
+function buildSankey(input: {
+  counts: Counts
+  stages: StageStat[]
+  stageStoppedRejected: Map<string, number>
+  stageStoppedOpen: Map<string, number>
+  everPending: number
+  pendingBeforeInterview: number
+  rejectedBeforeInterview: number
+  offers: number
+}): SankeySpec {
+  const {
+    counts,
+    stages,
+    stageStoppedRejected,
+    stageStoppedOpen,
+    everPending,
+    pendingBeforeInterview,
+    rejectedBeforeInterview,
+    offers,
+  } = input
+
+  const rungId = (i: number) => `stage${i}`
+  // The trailing "Offer" rung is represented by the existing offers nodes, so
+  // the ladder rungs drawn here are the interview rounds only.
+  const rungs = stages.slice(0, -1)
+
+  const nodes: SankeyNodeSpec[] = [
+    { id: 'applications', label: 'Applications' },
+    { id: 'pending', label: 'Heard Back' },
+    ...rungs.map((s, i) => ({ id: rungId(i), label: s.stage })),
+    { id: 'offers', label: 'Offers' },
+    { id: 'accepted', label: 'Offer Accepted' },
+    { id: 'declined', label: 'Offer Declined' },
+    { id: 'stillOpen', label: 'Still Open' },
+    { id: 'awaiting', label: 'Awaiting Reply' },
+    { id: 'rejected', label: 'Rejected' },
+    { id: 'noAnswer', label: 'No Answer' },
+  ]
+
+  const links: SankeySpec['links'] = [
+    { source: 'applications', target: 'pending', value: everPending },
+    { source: 'applications', target: 'awaiting', value: counts.awaiting },
+    { source: 'applications', target: 'rejected', value: rejectedBeforeInterview },
+    { source: 'applications', target: 'noAnswer', value: counts.noAnswer },
+    // Heard back but never interviewed, and not yet closed out.
+    { source: 'pending', target: 'stillOpen', value: pendingBeforeInterview },
+  ]
+
+  // Each rung emits only its INCOMING edge plus its two drop-offs. Emitting an
+  // "onward" edge here as well would draw every rung-to-rung link twice.
+  rungs.forEach((rung, i) => {
+    const from = i === 0 ? 'pending' : rungId(i - 1)
+    links.push({ source: from, target: rungId(i), value: rung.reached })
+    links.push({
+      source: rungId(i),
+      target: 'rejected',
+      value: stageStoppedRejected.get(rung.stage) ?? 0,
+    })
+    links.push({
+      source: rungId(i),
+      target: 'stillOpen',
+      value: stageStoppedOpen.get(rung.stage) ?? 0,
+    })
+  })
+
+  // The last rung feeds the offers nodes, which stand in for the Offer stage.
+  const lastRung = rungs.length - 1
+  const offerStage = stages[stages.length - 1]
+  if (lastRung >= 0 && offerStage) {
+    links.push({ source: rungId(lastRung), target: 'offers', value: offerStage.reached })
+  }
+
+  links.push({ source: 'offers', target: 'accepted', value: counts.offerAccepted })
+  links.push({ source: 'offers', target: 'declined', value: counts.offerDeclined })
+
+  const live = links.filter((l) => l.value > 0)
+  const used = new Set(live.flatMap((l) => [l.source, l.target]))
+  return { nodes: nodes.filter((n) => used.has(n.id)), links: live }
 }
