@@ -8,22 +8,28 @@ const { show, move, hide } = useTooltip()
 
 // Fixed internal coordinate space; the SVG scales to its container via viewBox,
 // so we don't need to measure width at runtime.
-const W = 720
-const H = 360
+const W = 800
+const H = 400
 
+// Every node that can render gets its own colour — the interview rungs used to
+// fall through to the grey default, which made the whole middle of the diagram
+// look like one undifferentiated flow.
 const NODE_COLORS: Record<string, string> = {
-  applications: 'var(--stone)', pending: 'var(--blue)', interviewed: 'var(--olive)',
-  progressing: 'var(--plum)', awaiting: 'var(--amber)', rejected: 'var(--rust)',
-  noAnswer: 'var(--stone)', offers: 'var(--teal)', accepted: 'var(--green)', declined: 'var(--rust)',
+  applications: 'var(--stone)', pending: 'var(--blue)',
+  stage0: 'var(--olive)', stage1: 'var(--plum)', stage2: 'var(--teal)',
+  stillOpen: 'var(--green)', awaiting: 'var(--amber)',
+  rejected: 'var(--rust)', noAnswer: 'var(--stone)',
+  offers: 'var(--teal)', accepted: 'var(--green)', declined: 'var(--rust)',
 }
-// Terminal nodes map straight to a kanban bucket; stage nodes ("ever reached")
-// also know which bucket is *currently* sitting there.
+const nodeColor = (n: any) => NODE_COLORS[n.id] || 'var(--stone)'
+
+// Terminal nodes map straight to a kanban bucket, so hovering can list who is
+// sitting there. Interview rungs are listed from each job's own stage instead.
 const NODE_TO_BUCKET: Record<string, string> = {
   awaiting: 'awaiting', rejected: 'rejected', noAnswer: 'noAnswer',
-  accepted: 'offerAccepted', declined: 'offerDeclined',
-  pending: 'pending', interviewed: 'interviewed', progressing: 'progressing',
+  accepted: 'offerAccepted', declined: 'offerDeclined', pending: 'pending',
 }
-const STAGE_NODES = new Set(['pending', 'interviewed', 'progressing'])
+const isRung = (id: string) => id.startsWith('stage')
 
 const layout = computed(() => {
   const graph = props.stats.sankey
@@ -34,9 +40,11 @@ const layout = computed(() => {
 
   const gen = d3sankey<any, any>()
     .nodeId((d: any) => d.id)
-    .nodeWidth(6)
-    .nodePadding(28)
-    .extent([[8, 24], [W - 8, H - 12]])
+    .nodeWidth(8)
+    .nodePadding(34)
+    // Top inset leaves room for the two-line labels that middle columns draw
+    // ABOVE their node; side insets leave room for the outer columns' labels.
+    .extent([[110, 46], [W - 110, H - 14]])
 
   const out = gen({
     nodes: nodes.map((d) => ({ ...d })),
@@ -49,25 +57,57 @@ const layout = computed(() => {
   }
 })
 
-const isLeft = (n: any) => n.x0 < W / 2
-const labelX = (n: any) => (isLeft(n) ? n.x0 - 10 : n.x1 + 10)
 const linkColor = (l: any) => NODE_COLORS[l.target.id] || 'var(--stone)'
+
+// Labels used to be placed by "is this node left of centre?", which pushed the
+// middle columns' text sideways into the neighbouring column and overlapped
+// once the interview rungs added columns. Now only the outermost columns label
+// sideways (outward, into the SVG margin); every column in between labels
+// ABOVE its node, where there is always clear space.
+const columnXs = computed(() =>
+  [...new Set(layout.value.nodes.map((n: any) => Math.round(n.x0)))].sort((a, b) => a - b),
+)
+type Side = 'left' | 'right' | 'above'
+function labelSide(n: any): Side {
+  const cols = columnXs.value
+  const x = Math.round(n.x0)
+  // Outermost columns label OUTWARD into the side margins, so their text never
+  // crosses a ribbon; everything between labels above its own node.
+  if (cols.length > 1 && x === cols[0]) return 'left'
+  if (cols.length > 1 && x === cols[cols.length - 1]) return 'right'
+  return 'above'
+}
+const anchorFor = (n: any) => {
+  const s = labelSide(n)
+  return s === 'left' ? 'end' : s === 'right' ? 'start' : 'middle'
+}
+const labelX = (n: any) => {
+  const s = labelSide(n)
+  if (s === 'left') return n.x0 - 12
+  if (s === 'right') return n.x1 + 12
+  return (n.x0 + n.x1) / 2
+}
+// Sideways labels sit on the node's vertical centre; stacked labels sit above it.
+const valueY = (n: any) => (labelSide(n) === 'above' ? n.y0 - 20 : (n.y0 + n.y1) / 2 - 4)
+const labelY = (n: any) => (labelSide(n) === 'above' ? n.y0 - 7 : (n.y0 + n.y1) / 2 + 11)
 
 // esc() and pct() are auto-imported from app/utils/format.ts
 
 function nodeTip(n: any): string {
-  const isStage = STAGE_NODES.has(n.id)
+  const rung = isRung(n.id)
   let html =
     `<div class="t-head">${esc(n.label)} — ${n.value}</div>` +
-    `<div class="t-sub">${pct(n.value, props.stats.total)} of applications${isStage ? ' reached this stage' : ''}</div>`
-  const bucket = NODE_TO_BUCKET[n.id]
-  if (bucket) {
-    const here = props.stats.jobs.filter((j) => j.bucket === bucket)
-    if (isStage) html += `<div class="t-sub">${here.length} currently here</div>`
-    const names = here.map((j) => j.company)
-    if (names.length && names.length <= 8) {
-      html += `<div class="t-list">${names.map(esc).join('<br>')}</div>`
-    }
+    `<div class="t-sub">${pct(n.value, props.stats.total)} of applications${rung ? ' reached this round' : ''}</div>`
+
+  // For an interview rung, list the processes whose furthest point was exactly
+  // this round — that is the question the diagram is there to answer.
+  const here = rung
+    ? props.stats.jobs.filter((j) => j.stage === n.label)
+    : props.stats.jobs.filter((j) => j.bucket === NODE_TO_BUCKET[n.id])
+  if (rung && here.length) html += `<div class="t-sub">${here.length} stopped here</div>`
+  const names = here.map((j) => j.company)
+  if (names.length && names.length <= 8) {
+    html += `<div class="t-list">${names.map(esc).join('<br>')}</div>`
   }
   return html
 }
@@ -115,13 +155,13 @@ function linkTip(l: any): string {
         :width.attr="n.x1 - n.x0"
         :height.attr="Math.max(2, n.y1 - n.y0)"
         rx="2"
-        fill="#d6d4cf"
+        :fill="nodeColor(n)"
         pointer-events="none"
       />
-      <text class="node-value" :x.attr="labelX(n)" :y.attr="(n.y0 + n.y1) / 2 - 4" :text-anchor="isLeft(n) ? 'end' : 'start'">
+      <text class="node-value" :x.attr="labelX(n)" :y.attr="valueY(n)" :text-anchor="anchorFor(n)">
         {{ n.value }}
       </text>
-      <text class="node-label" :x.attr="labelX(n)" :y.attr="(n.y0 + n.y1) / 2 + 11" :text-anchor="isLeft(n) ? 'end' : 'start'">
+      <text class="node-label" :x.attr="labelX(n)" :y.attr="labelY(n)" :text-anchor="anchorFor(n)">
         {{ n.label }}
       </text>
     </g>
