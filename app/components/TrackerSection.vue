@@ -8,6 +8,9 @@ const props = defineProps<{
   total: number
 }>()
 
+// Pack state per row (one shared request; see usePacks).
+const { byJob: packs } = usePacks()
+
 const view = ref<'board' | 'table'>('board')
 const viewOptions = [
   { label: 'Board', value: 'board' },
@@ -56,8 +59,8 @@ const filtered = computed(() => {
         </div>
       </div>
 
-      <TrackerBoard v-if="view === 'board'" :buckets="buckets" :jobs="filtered" :searching="searching" />
-      <ApplicationsTable v-else :jobs="filtered" />
+      <TrackerBoard v-if="view === 'board'" :buckets="buckets" :jobs="filtered" :searching="searching" :packs="packs" />
+      <ApplicationsTable v-else :jobs="filtered" :packs="packs" />
     </template>
   </PrimeCard>
 </template>

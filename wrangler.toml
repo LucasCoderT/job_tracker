@@ -33,6 +33,12 @@ NUXT_PUBLIC_NOTION_VIEW_URL = ""
 # Applied rows older than this many days count as "No Answer".
 STALE_DAYS = "30"
 
+# Interview packs write card edits back to the 🎤 Interview Answer Bank
+# database. The integration behind NOTION_TOKEN must be connected to it
+# (Notion: open the database → ••• → Connections), or set a second secret,
+# NOTION_BANK_TOKEN, from an integration that is.
+NOTION_BANK_DATABASE_ID = "02910f231fd644d6b1f3a552be3c5328"
+
 # Secrets (never put these in this file):
 #   wrangler secret put NOTION_TOKEN
 #   wrangler secret put NOTION_DATABASE_ID
@@ -48,3 +54,10 @@ crons = ["0 15 * * *"]
 [[kv_namespaces]]
 binding = "SNAPSHOTS"
 id = "a7a84a85d49040d9a4e7ac605f8c2400"
+
+# Interview packs (see CLAUDE.md "Interview packs"): one pack per application,
+# the bank InterviewHelper imports plus the exports the desktop worker
+# publishes. Created with:  wrangler kv namespace create PACKS
+[[kv_namespaces]]
+binding = "PACKS"
+id = "198f7254f01a43439ed9da7232eec2a6"

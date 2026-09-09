@@ -20,16 +20,26 @@ import {
 // @cloudflare/workers-types for this one binding.
 export interface KVNamespace {
   get(key: string, type?: 'text' | 'json'): Promise<any>
-  put(key: string, value: string): Promise<void>
-  list(opts?: { prefix?: string; limit?: number }): Promise<{ keys: { name: string }[] }>
+  put(key: string, value: string, opts?: { metadata?: unknown }): Promise<void>
+  delete(key: string): Promise<void>
+  list(opts?: { prefix?: string; limit?: number; cursor?: string }): Promise<{
+    keys: { name: string; metadata?: unknown }[]
+    list_complete?: boolean
+    cursor?: string
+  }>
 }
 
 export interface AppEnv {
   NOTION_TOKEN?: string
   NOTION_DATABASE_ID?: string
+  // Interview packs: the answer-bank database and, optionally, a token from
+  // an integration that is connected to it (falls back to NOTION_TOKEN).
+  NOTION_BANK_DATABASE_ID?: string
+  NOTION_BANK_TOKEN?: string
   STALE_DAYS?: string
   NOTION_VIEW_URL?: string
   SNAPSHOTS?: KVNamespace
+  PACKS?: KVNamespace
 }
 
 // On Cloudflare, secrets + vars + bindings live on the request's cloudflare

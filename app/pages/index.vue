@@ -18,6 +18,16 @@ const footer = computed(() => {
   <div>
     <header>
       <h1>Job Pipeline</h1>
+      <div class="header-tools">
+      <PrimeButton
+        as="a"
+        href="/packs"
+        label="Interview packs"
+        icon="pi pi-book"
+        severity="secondary"
+        outlined
+        size="small"
+      />
       <PrimeButton
         v-if="notionUrl"
         as="a"
@@ -31,6 +41,7 @@ const footer = computed(() => {
         outlined
         size="small"
       />
+      </div>
     </header>
 
     <div v-if="pending" class="state"><PrimeProgressSpinner style="width: 44px; height: 44px" stroke-width="4" /></div>

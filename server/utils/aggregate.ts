@@ -129,6 +129,7 @@ export function aggregate(
     }
 
     const job: Job = {
+      id: String(page.id ?? page.url ?? ''),
       company: readTitle(page) || 'Untitled',
       position: readRichText(page, POSITION_PROP),
       bucket,

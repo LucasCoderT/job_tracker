@@ -48,6 +48,7 @@ export interface Bucket {
 // ---- Rows ----
 
 export interface Job {
+  id: string // Notion page id of the application row; keys the interview pack
   company: string
   position: string
   bucket: BucketKey
@@ -163,3 +164,80 @@ export interface HistoryResponse {
   enabled: boolean
   snapshots: Snapshot[]
 }
+
+// ---- Interview packs (/api/packs) ----
+//
+// A pack is everything InterviewHelper needs for one interview: the answer
+// bank the app reads (same JSON shape as its bank files) plus any exports the
+// desktop worker publishes (prep notes, question banks). Packs live in the
+// PACKS KV namespace, keyed by the application's Notion page id, so the web
+// can request, view and edit them from any device while the Mac builds them.
+
+export type PackStatus = 'requested' | 'building' | 'done' | 'failed'
+
+export interface Beat {
+  text: string
+  keys: string[]
+  stance?: 'DELIBERATE' | 'GAP' | 'MEASURED' | 'UNMEASURED' | string
+}
+
+export interface Answer {
+  id: string
+  question: string
+  cues: string[]
+  beats: Beat[]
+  script?: string
+  avoid?: string[]
+  minSeconds?: number
+}
+
+export interface PresentationSection {
+  answerId: string
+  budgetSeconds: number
+}
+
+export interface AnswerBank {
+  title?: string
+  answers: Answer[]
+  avoid?: string[]
+  presentation?: PresentationSection[]
+}
+
+export interface PackExport {
+  name: string // file name, e.g. "round2-prep.md"
+  contentType: string
+  bytes: number
+  updatedAt: string
+}
+
+export interface PackMeta {
+  jobId: string
+  company: string
+  position: string
+  slug: string // the bank slug the app files it under
+  status: PackStatus
+  note: string // what the requester asked for ("round 2, hiring manager")
+  requestedAt: string
+  updatedAt: string
+  builtAt: string | null
+  error: string | null
+  answers: number
+  beats: number
+  exports: PackExport[]
+}
+
+export interface PacksResponse {
+  enabled: boolean
+  packs: PackMeta[]
+}
+
+export interface PackDetail {
+  meta: PackMeta
+  bank: AnswerBank | null
+  lint: string[]
+}
+
+// What an answer edit on the web reports back about its Notion write-back.
+export type NotionWriteResult =
+  | { ok: true; pageId: string; url: string | null; created: boolean; scope: 'company' | 'universal' }
+  | { ok: false; error: string }

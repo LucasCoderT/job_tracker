@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import type { Job } from '../../shared/types'
+import type { Job, PackMeta } from '../../shared/types'
 
 // Table view — first real PrimeVue surface in the dashboard. Search is handled
 // by the parent (TrackerSection); this just displays, sorts, and paginates the
 // already-filtered rows. money() is auto-imported from app/utils/format.ts.
-defineProps<{ jobs: Job[] }>()
+defineProps<{ jobs: Job[]; packs: Map<string, PackMeta> }>()
 
 const BUCKET_LABEL: Record<string, string> = {
   awaiting: 'Awaiting',
@@ -65,6 +65,9 @@ function severity(bucket: string): string {
       </PrimeColumn>
       <PrimeColumn field="ageDays" header="Age" sortable>
         <template #body="{ data }">{{ data.ageDays != null ? data.ageDays + 'd' : '—' }}</template>
+      </PrimeColumn>
+      <PrimeColumn header="Pack">
+        <template #body="{ data }"><PackChip :job="data" :pack="packs.get(data.id)" /></template>
       </PrimeColumn>
     </PrimeDataTable>
   </div>

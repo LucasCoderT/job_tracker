@@ -21,6 +21,7 @@ Browser ─► Cloudflare Access ─► Worker (Nitro) ─► Notion API
                                    ├─ GET /api/stats    → aggregated JSON (edge-cached 5 min)
                                    ├─ GET /api/history  → daily snapshots from KV
                                    ├─ GET /api/snapshot → manual snapshot trigger (reliable seed)
+                                   ├─ /api/packs/**     → interview packs (PACKS KV; see below)
                                    └─ scheduledTask     → daily cron snapshot → KV
 ```
 
@@ -30,8 +31,12 @@ Browser ─► Cloudflare Access ─► Worker (Nitro) ─► Notion API
 nuxt.config.ts        cloudflare_module preset, scheduledTasks (cron), security headers, fonts
 wrangler.toml         deploy config — custom domain, workers_dev=false, KV, cron, vars, assets
 shared/types.ts       the /api/stats payload types — single source of truth, server + client
+shared/bank.ts        answer-bank helpers shared by Worker + browser (lint, beat lines)
 server/
   utils/aggregate.ts  aggregate() — the core fold (see "The data model")
+  utils/packs.ts      PACKS KV store + prep-sheet renderer  |  utils/bank-notion.ts  Notion write-back
+  utils/pack-route.ts shared plumbing for the /api/packs routes
+  api/packs/**        the pack API (list, queue, request, bank, answers, exports, prep.html)
   utils/notion.ts     property readers, pagination, getCloudflareEnv()/getTaskEnv()
   utils/config.ts     constants + status ladder (SCHEMA_VERSION, buckets, prop names)
   utils/snapshot.ts   takeSnapshot()
@@ -40,9 +45,10 @@ server/
   api/history.get.ts  | api/snapshot.get.ts | tasks/snapshot.ts (cron)
 app/
   pages/index.vue     assembles the sections; useStats() → SSR data
+  pages/packs/        packs index + the pack page (cards, editor, exports)
   components/          PipelineSankey, StatCard, VelocityChart, SourcesBreakdown,
-                      TrackerBoard, AttentionQueue, AppTooltip
-  composables/         useStats (useFetch), useTooltip (shared floating tooltip)
+                      TrackerBoard, AttentionQueue, AppTooltip, PackChip, PackCardEditor
+  composables/         useStats (useFetch), useTooltip (shared floating tooltip), usePacks
   utils/format.ts      esc()/pct() — auto-imported
   assets/css/main.css  design tokens + all styles (ported from the old PAGE_HTML)
 ```
@@ -150,7 +156,82 @@ npm run deploy                           # = nuxt build && wrangler deploy
 - ~~**Salary context**~~ — shipped (`SalaryContext.vue`, `salary` in the payload). Finding: heard-back roles skew ~$10k higher median ($120k vs $110k), small n.
 - **Follow-up nudges** — extend the cron to ping ntfy/Discord when a row enters the attention window. (Needs the cron binding-access caveat resolved + a webhook secret.)
 - **Time-to-response** — needs a `Rejection Date` property or use the page `last_edited_time` as a proxy; could calibrate `STALE_DAYS` from data instead of hardcoding 30.
-- This is the **tracking dashboard**; the **CareerOps** side project is separate (research/apply-packs). Kept distinct on purpose.
+- This is the **tracking dashboard**; the **CareerOps** side project is separate (research/apply-packs). Kept distinct on purpose. Interview packs are the one bridge: the site queues and shows them, career-ops on the Mac builds them.
+- **Desktop worker for packs** — a launchd job on the Mac that drains `GET /api/packs/queue` through career-ops (`agent-inbox` → `claude -p` with the interview-bank skill → the interview-helper MCP `site_push`) and marks packs done. Until it exists, career-ops does the same by hand from a Claude session with `site_queue` / `site_push`.
+
+## Interview packs (2026-09-09)
+
+The one write surface in the app, and the reason it is no longer purely
+read-only analytics. An **interview pack** is everything
+[InterviewHelper](https://github.com/lucaslukowski/interview-helper) (the
+macOS app that ticks off his own talking points mid-interview) needs for one
+interview: the answer bank it imports, plus whatever the desktop publishes
+alongside (prep notes, question banks). Packs let him **queue a build, read
+the result, and edit the cards from a phone**; the Mac does the building.
+
+```
+phone/laptop ─► "Build pack" on a job row ─► PACKS KV  meta:<jobId> status=requested
+                                                  ▲                │
+Mac (career-ops + interview-bank skill) ◄── GET /api/packs/queue ──┘
+   builds the bank from Notion ─► PUT /api/packs/<id>/bank?status=done
+   publishes notes            ─► PUT /api/packs/<id>/exports/<name>
+phone/laptop ◄── /packs/<id>: cards, prep.html, bank.json, exports
+   edits a card ─► PUT /api/packs/<id>/answers/<answerId>
+                    ├─ KV bank (what the app imports, at once)
+                    └─ Notion 🎤 Interview Answer Bank row (the record)
+InterviewHelper ◄── Settings › Bank › Import from site → GET /api/packs/<id>/bank.json
+```
+
+Decisions that are load-bearing:
+
+- **Keyed by the application's Notion page id** (`jobs[].id`, added in
+  SCHEMA_VERSION 9). That id is also the `Companies` relation target in the
+  answer bank, so a card created on the web is tagged to the right company
+  with no lookup.
+- **Notion stays the record of truth for his writing.** A web edit lands in
+  KV first (so the site and the app see it immediately) and is then written
+  to the answer-bank row: found by `Answer ID`, then by exact `Question`;
+  created and company-tagged if absent. The desktop rebuilds from Notion, so
+  **regenerate keeps web edits**. Removing a card unticks `Active` on a
+  company-tagged row and leaves a universal row alone (the UI says which).
+  Bank-level title / never-say / deck are site-only (not Notion columns).
+  The write-back is reported per save, never fatal: if the dashboard's
+  integration cannot see the answer-bank database (404) the card still
+  saves on the site and the message says to share the database with it
+  (Notion → the 🎤 database → ••• → Connections) or set `NOTION_BANK_TOKEN`.
+- **The site stores and edits his words; nothing here generates them.**
+  The editor is a place to type. Lint (`shared/bank.ts`, a port of the
+  app's own rules) runs on every save and on the page.
+- **Same edge auth, no auth code.** Every `/api/packs` route is behind
+  Access like the rest. The app and the desktop worker present a
+  **Cloudflare Access service token** (`CF-Access-Client-Id` /
+  `CF-Access-Client-Secret` headers); the Worker never sees a difference.
+  Setup (once, Zero Trust dashboard): Access › Service Auth › Service
+  Tokens › create "interviewhelper"; then on the jobs.codertheory.dev
+  application add a policy with action **Service Auth** whose include rule
+  is that token. The app keeps the pair in the Keychain.
+- **KV, not D1/R2.** Packs are dozens, not thousands; a meta + a bank + a
+  few text exports per job, listed with one prefix scan. Exports are text
+  only and capped at 2MB; a phone is the reader. `done` is refused until a
+  bank has been uploaded — an empty "Ready" would be a lie the phone
+  believes. A pack stuck in `building` (a worker that died) shows in the
+  queue again.
+- **Deletes are two-step on the page** (arm, then confirm within 4s) —
+  the same convention as the app's Quit and Discard, and no browser
+  dialogs, which block automation and screen readers alike.
+
+Routes (`server/api/packs/`): `GET /` list · `GET /queue` requested+building
+· `GET|DELETE /:jobId` · `POST /:jobId/request` · `POST /:jobId/status`
+(building|done|failed) · `GET /:jobId/bank.json` · `PUT /:jobId/bank`
+(`?status=done`) · `GET /:jobId/prep.html` · `PUT|DELETE
+/:jobId/answers/:answerId` (`?notion=0` to skip the write-back) ·
+`GET|PUT|DELETE /:jobId/exports/:name`.
+
+Config: `PACKS` KV binding (`wrangler kv namespace create PACKS`),
+`NOTION_BANK_DATABASE_ID` var (defaults to the 🎤 database), optional
+`NOTION_BANK_TOKEN` secret. Local: `npx wrangler dev .output/server/index.mjs
+--assets .output/public --local` after `nuxt build` emulates the KV; the
+whole route set was exercised that way before the first deploy.
 
 ## Tunable constants (`server/utils/config.ts`)
 

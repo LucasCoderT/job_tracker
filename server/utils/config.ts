@@ -13,7 +13,8 @@ export const CACHE_TTL_SECONDS = 300
 // v6: added `roles` (reply rate by role type) and `salary` (salary context).
 // v7: enriched `jobs` rows with salary/source/nextAction for the applications table.
 // v8: added `stages` (how far each interview process actually got) + per-job stage.
-export const SCHEMA_VERSION = '8'
+// v9: `jobs[].id` (Notion page id) so a row can own an interview pack.
+export const SCHEMA_VERSION = '9'
 
 export const DEFAULT_STALE_DAYS = 30
 export const ATTENTION_MIN_DAYS = 10
@@ -85,3 +86,10 @@ export const BUCKET_SPEC: { key: BucketKey; label: string; color: string }[] = [
   { key: 'rejected', label: 'Rejected', color: 'rust' },
   { key: 'noAnswer', label: 'No Answer', color: 'stone' },
 ]
+
+// The 🎤 Interview Answer Bank database (Personal Life › Job Hunting). Web
+// edits to a pack's cards are written back here so Notion stays the record
+// of truth for his own writing. Override with the NOTION_BANK_DATABASE_ID
+// var; the integration must be connected to that database or every
+// write-back reports "not connected" (the KV copy still saves).
+export const DEFAULT_BANK_DATABASE_ID = '02910f231fd644d6b1f3a552be3c5328'

@@ -4,6 +4,10 @@ A private, single-page dashboard for Lucas's Notion job-tracker database ("DB Ap
 
 Auth is handled by Cloudflare Access (Zero Trust) in front of the Worker, so nothing here is publicly reachable and the Worker itself contains no auth code.
 
+## Interview packs
+
+The one thing the dashboard writes. Press **Build pack** on a job (board card or table row) and the Mac builds an InterviewHelper answer bank for that interview; the pack page (`/packs/<job>`) then shows every card, a printable prep sheet, the `bank.json` the app imports, and anything else the desktop publishes. Cards can be edited or added from a phone; each save updates the pack and writes the row back to the 🎤 Interview Answer Bank in Notion, so a later **Regenerate** keeps the edit. Details, routes and the one-time Access service-token setup are in `CLAUDE.md` › "Interview packs".
+
 ## 1. Notion database (as it exists today)
 
 The Worker is adapted to the current schema — no changes required:
