@@ -22,7 +22,7 @@
   },
   "devDependencies": {
     "nitro-cloudflare-dev": "^0.2.2",
-    "wrangler": "^4.107.0"
+    "wrangler": "^4.114.0"
   },
   "allowScripts": {
     "esbuild@0.28.1": true,
