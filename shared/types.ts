@@ -335,3 +335,6 @@ export interface PostingDetail { meta: PostingMeta; jd: string | null; analysis:
 
 /** POST /:id/applied — the row went into Notion (or said why it didn't). */
 export interface PostingApplyResult { meta: PostingMeta; notion: NotionWriteResult }
+
+/** POST /api/postings — `created: false` means this URL was already here. */
+export interface PostingCreateResult { meta: PostingMeta; created: boolean }

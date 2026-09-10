@@ -598,3 +598,14 @@ a.rail-primary.as-link:hover { background: #d9bd71; border-color: #d9bd71; color
    the grid collapses, so the rail's actions stay above it on a phone. */
 .brief-jd { grid-column: 1; }
 @media (max-width: 880px) { .brief-jd { grid-column: auto; } }
+
+/* ---- Add a posting by URL ---- */
+.postings-head-tools { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.add-posting { display: flex; flex-direction: column; gap: 12px; }
+.add-posting label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+.add-posting label small { color: var(--faint); margin-left: 6px; }
+.add-posting .p-inputtext { width: 100%; }
+.add-posting .two { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; }
+@media (max-width: 480px) { .add-posting .two { grid-template-columns: 1fr; } }
+.add-hint { margin: 0; font-size: 11.5px; color: var(--faint); line-height: 1.45; }
+.add-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 2px; }

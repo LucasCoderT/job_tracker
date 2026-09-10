@@ -63,6 +63,7 @@ const footer = computed(() => {
     <header>
       <h1>Job Pipeline</h1>
       <div class="header-tools">
+        <AddPostingButton />
         <PrimeButton
           as="a"
           href="/postings"

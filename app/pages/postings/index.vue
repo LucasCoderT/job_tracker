@@ -27,9 +27,12 @@ function age(iso: string | null): string {
         <NuxtLink to="/" class="crumb"><i class="pi pi-arrow-left" /> Pipeline</NuxtLink>
         <h1>Postings</h1>
       </div>
-      <span v-if="postings.length" class="total mono">
-        {{ open.length }} to look at<template v-if="dismissed.length"> · {{ dismissed.length }} dismissed</template>
-      </span>
+      <div class="postings-head-tools">
+        <AddPostingButton />
+        <span v-if="postings.length" class="total mono">
+          {{ open.length }} to look at<template v-if="dismissed.length"> · {{ dismissed.length }} dismissed</template>
+        </span>
+      </div>
     </header>
 
     <div v-if="pending" class="state"><PrimeProgressSpinner style="width: 44px; height: 44px" stroke-width="4" /></div>
