@@ -116,22 +116,6 @@ export interface Metrics {
   offerRate: number
 }
 
-export interface SankeyNodeSpec {
-  id: string
-  label: string
-}
-
-export interface SankeyLinkSpec {
-  source: string
-  target: string
-  value: number
-}
-
-export interface SankeySpec {
-  nodes: SankeyNodeSpec[]
-  links: SankeyLinkSpec[]
-}
-
 // ---- Top-level /api/stats payload ----
 
 export interface Stats {
@@ -148,7 +132,6 @@ export interface Stats {
   salary: SalaryContext
   metrics: Metrics
   stages: StageStat[]
-  sankey: SankeySpec
 }
 
 // ---- /api/history payload ----

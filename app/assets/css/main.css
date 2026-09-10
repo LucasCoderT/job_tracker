@@ -346,3 +346,151 @@ footer { margin-top: 18px; font-size: 12px; color: var(--faint); }
    so these are whatever the evaluation happened to carry. */
 .facts-grid.extras { margin-top: 14px; }
 .facts-grid.extras dt { text-transform: lowercase; }
+
+/* ---- Pipeline: the conversion strip (replaced the Sankey 2026-09-10) ---- */
+.strip-wrap { display: flex; flex-direction: column; flex: 1; }
+.strip { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: start; margin-top: 10px; }
+.step { border-left: 1px solid var(--panel-edge); padding: 0 14px; min-height: 150px; }
+.step-label { margin: 0; font-size: 11px; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+.step-n { margin: 6px 0 0; font-size: 34px; line-height: 1; font-weight: 600; letter-spacing: -0.02em; }
+.step-of { margin: 6px 0 0; font-size: 11.5px; color: var(--faint); }
+.step-rate { margin: 14px 0 0; font-size: 12.5px; color: var(--text); line-height: 1.35; }
+.step-rate b { font-weight: 600; color: var(--amber); }
+.step-rate-label { color: var(--muted); font-family: "Instrument Sans", system-ui, sans-serif; font-size: 11.5px; }
+.step-lost { margin: 4px 0 0; font-size: 11.5px; color: var(--muted); line-height: 1.45; text-wrap: pretty; }
+
+/* The phone funnel. Only one of the two is ever visible; CSS decides, so
+   both render server-side and neither costs a measurement round trip. */
+.funnel { display: none; flex-direction: column; gap: 10px; padding-top: 6px; }
+.fn-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 12.5px; margin-bottom: 4px; color: var(--muted); }
+.fn-head .strong { color: var(--text); }
+.fn-head b { color: var(--text); font-weight: 600; }
+.fn-track { height: 14px; background: #26262c; border-radius: 6px; position: relative; overflow: hidden; }
+.fn-fill { position: absolute; top: 0; bottom: 0; left: 50%; transform: translateX(-50%); border-radius: 6px; }
+
+.outcome { margin-top: auto; padding-top: 18px; }
+.outcome-cap { margin: 0 0 6px; font-size: 11.5px; color: var(--muted); }
+.outcome-bar { display: flex; height: 10px; gap: 2px; border-radius: 5px; overflow: hidden; }
+.outcome-key { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px; font-size: 11.5px; color: var(--muted); }
+.outcome-key .k { display: inline-flex; align-items: center; gap: 6px; }
+.outcome-key .sw { width: 8px; height: 8px; border-radius: 2px; }
+.outcome-key b { color: var(--text); font-weight: 600; }
+
+@media (max-width: 880px) {
+  .strip { display: none; }
+  .funnel { display: flex; }
+  .outcome-cap { display: none; }
+}
+
+/* ---- The lede: the finding in words, before any chart ---- */
+.lede { margin: 0 0 20px; font-size: 14px; line-height: 1.5; color: var(--muted); max-width: 720px; text-wrap: pretty; }
+.lede-strong { color: var(--text); }
+
+/* ---- Loading skeletons at the real panel dimensions ---- */
+@keyframes sk-pulse { 0%, 100% { opacity: .55 } 50% { opacity: 1 } }
+.sk { animation: sk-pulse 1.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .sk { animation: none; } }
+.skel-panel { background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 14px; }
+.skel-pipeline { min-height: 378px; }
+.skel-stat { height: 116px; }
+.skel-row2 { height: 224px; }
+
+/* ---- Section head with a note on the right ---- */
+.sec-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.sec-head h2 { margin-bottom: 8px; }
+.sec-note { font-size: 11.5px; color: var(--faint); }
+
+/* ---- Stat cards: a bar on a shared scale, plus a 30-day trend ---- */
+.stat-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.stat-card .name { font-size: 14px; font-weight: 600; margin: 0; }
+.stat-card .pct { font-size: 18px; font-weight: 600; margin: 0; }
+.stat-track { height: 8px; background: #26262c; border-radius: 4px; position: relative; overflow: hidden; margin: 8px 0; }
+.stat-fill { position: absolute; inset: 0 auto 0 0; border-radius: 4px; min-width: 2px; }
+.stat-foot { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
+.stat-card .sub { font-size: 12px; color: var(--muted); margin: 0; }
+.spark { flex: none; overflow: visible; }
+.stat-card .delta { font-size: 11px; color: var(--faint); margin: 6px 0 0; text-align: right; }
+
+/* ---- Footnote panel: role type + salary share one quiet surface ---- */
+.footnotes .p-card-content { display: grid; gap: 14px 28px; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); }
+.foot-col { min-width: 0; }
+@media (max-width: 880px) { .footnotes .p-card-content { grid-template-columns: 1fr; } }
+
+/* Salary as a range on one shared scale — the overlap is the honest headline */
+.src-row .n { color: var(--faint); font-size: 11px; }
+.sal-scale { height: 12px; position: relative; display: block; }
+.sal-span { position: absolute; top: 4px; bottom: 4px; border-radius: 2px; opacity: .35; }
+.sal-med { position: absolute; top: 0; bottom: 0; width: 3px; border-radius: 2px; }
+.src-row .rate b { font-weight: 600; color: var(--text); }
+
+/* ---- Tracker: status filters ---- */
+.filter-group { display: inline-flex; background: var(--bg); border: 1px solid var(--panel-edge); border-radius: 6px; padding: 3px; gap: 2px; }
+.filter-btn {
+  border: 0; cursor: pointer; font: inherit; font-size: 13.5px; font-weight: 500;
+  padding: 3px 10px; border-radius: 4px; display: inline-flex; gap: 6px; align-items: baseline;
+  background: transparent; color: var(--muted); transition: background 120ms, color 120ms;
+}
+.filter-btn:hover { color: var(--text); }
+.filter-btn.on { background: var(--card); color: var(--text); }
+.filter-btn:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.filter-btn .n { font-size: 11px; color: var(--muted); }
+
+/* ---- Board: say how much is below the fold ---- */
+.col { position: relative; }
+.cards.has-more { padding-bottom: 40px; }
+.col-more {
+  position: absolute; left: 1px; right: 1px; bottom: 1px; height: 56px;
+  border-radius: 0 0 11px 11px; pointer-events: none;
+  background: linear-gradient(180deg, rgba(28, 28, 32, 0), var(--panel) 70%);
+  display: flex; align-items: flex-end; justify-content: center; padding-bottom: 8px;
+  font-size: 11px; color: var(--muted);
+}
+
+/* ---- Table: PrimeDataTable retuned to the panel ---- */
+.tracker-table .p-datatable-header-cell,
+.tracker-table .p-datatable-thead > tr > th {
+  background: var(--panel); color: var(--muted); border-bottom: 1px solid var(--panel-edge);
+  font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap;
+}
+.tracker-table .p-datatable-tbody > tr { background: transparent; }
+.tracker-table .p-datatable-tbody > tr > td { border-bottom: 1px solid #26262c; font-size: 13.5px; }
+.tracker-table .p-datatable-tbody > tr:hover { background: var(--card); }
+.tracker-table .p-datatable-tbody > tr.p-row-odd { background: transparent; }
+.tracker-table .p-sortable-column:hover { color: var(--text); }
+.tracker-table .p-sortable-column-icon { color: var(--amber); }
+.tracker-table .col-right .p-datatable-column-header-content { justify-content: flex-end; }
+.tracker-table td.col-right, .tracker-table th.col-right { text-align: right; }
+.tbl-sub { font-size: 12px; color: var(--muted); margin-top: 1px; }
+.tbl-empty { padding: 40px; text-align: center; color: var(--muted); }
+.faint { color: var(--faint); }
+.muted { color: var(--muted); }
+.status-pill {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 12px;
+  border-radius: 999px; padding: 2px 9px; white-space: nowrap;
+  color: var(--text); border: 1px solid #35353d;
+}
+.status-pill.closed { color: var(--muted); border-color: var(--panel-edge); }
+.status-pill .dot { width: 6px; height: 6px; border-radius: 50%; }
+.next-flag { display: inline-flex; align-items: center; gap: 6px; color: var(--amber); white-space: nowrap; }
+.next-flag .pi { font-size: 11px; }
+.age-cell { display: inline-flex; align-items: center; gap: 8px; justify-content: flex-end; }
+.age-track { display: inline-block; width: 40px; height: 4px; border-radius: 2px; background: #26262c; position: relative; overflow: hidden; }
+.age-fill { position: absolute; inset: 0 auto 0 0; border-radius: 2px; }
+.tracker-table .p-paginator { background: transparent; border: 0; padding: 12px 4px 0; }
+.tracker-table .p-paginator .p-paginator-page.p-paginator-page-selected { background: rgba(194, 162, 75, .16); color: var(--amber); border: 1px solid #4a3f1f; }
+.filter-btn { white-space: nowrap; }
+/* PrimeVue marks every sortable column with a double arrow. The design shows
+   direction only where it applies, so inactive indicators stay hidden until
+   the header is hovered or focused — the affordance without the noise. */
+.tracker-table .p-sortable-column .p-sortable-column-icon { opacity: 0; transition: opacity 120ms; }
+.tracker-table .p-sortable-column:hover .p-sortable-column-icon,
+.tracker-table .p-sortable-column:focus-visible .p-sortable-column-icon,
+.tracker-table .p-sortable-column[aria-sort='ascending'] .p-sortable-column-icon,
+.tracker-table .p-sortable-column[aria-sort='descending'] .p-sortable-column-icon { opacity: 1; }
+/* Five status filters cannot sit on one 360px row. Wrap rather than scroll —
+   a hidden filter is a filter he never uses. */
+.filter-group { flex-wrap: wrap; }
+@media (max-width: 560px) {
+  .filter-group { width: 100%; justify-content: flex-start; }
+  #tracker .tracker-tools { align-items: stretch; }
+}

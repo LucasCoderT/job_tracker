@@ -25,7 +25,7 @@ const rows = computed(() =>
         <span class="fill" :style="{ width: s.fillW + '%' }" />
         <span v-if="s.replied" class="rep" :style="{ width: s.repW + '%' }" />
       </span>
-      <span class="rate mono">{{ s.rate }} · {{ s.replied }}/{{ s.total }}</span>
+      <span class="rate mono"><b>{{ s.rate }}</b> · {{ s.replied }}/{{ s.total }}</span>
     </div>
   </div>
 </template>

@@ -50,9 +50,13 @@ export default defineEventHandler(async (event): Promise<Stats | Response | { er
         'cache-control': `public, max-age=${CACHE_TTL_SECONDS}`,
       },
     })
-    const waitUntil = (event.context as any)?.cloudflare?.context?.waitUntil
+    // waitUntil must be called ON the execution context: pulling the method
+    // off it and calling it bare throws "Illegal invocation" in workerd. This
+    // only runs on a cache miss, which is why it survived until a
+    // SCHEMA_VERSION bump made every request a miss.
+    const cfCtx = (event.context as any)?.cloudflare?.context
     const put = caches.default.put(cacheKey, res.clone())
-    if (typeof waitUntil === 'function') waitUntil(put)
+    if (typeof cfCtx?.waitUntil === 'function') cfCtx.waitUntil(put)
     else await put
     return res
   }

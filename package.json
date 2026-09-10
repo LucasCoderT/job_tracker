@@ -16,13 +16,11 @@
   "dependencies": {
     "@primeuix/themes": "^2.0.3",
     "@primevue/nuxt-module": "^4.5.5",
-    "d3-sankey": "^0.12.3",
     "nuxt": "^4.4.8",
     "primeicons": "^7.0.0",
     "primevue": "^4.5.5"
   },
   "devDependencies": {
-    "@types/d3-sankey": "^0.12.5",
     "nitro-cloudflare-dev": "^0.2.2",
     "wrangler": "^4.107.0"
   },

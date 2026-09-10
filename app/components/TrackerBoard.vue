@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import type { Bucket, Job, PackMeta } from '../../shared/types'
 
-// Board view. Search + the section header now live in TrackerSection, which
-// passes an already-filtered `jobs` set and whether a search is active.
+// Board view. Search, the status filter and the section header live in
+// TrackerSection, which passes an already-filtered `jobs` set.
 const props = defineProps<{
   buckets: Bucket[]
   jobs: Job[]
@@ -22,15 +22,36 @@ function whenText(job: Job): string {
   return job.ageDays + ' days ago'
 }
 
+/**
+ * A column caps at 460px and scrolls, which silently hid whatever was below
+ * the fold (DESIGN.md §7.9). Each column now says how much is down there and
+ * fades the last card, and stops saying it once you reach the end.
+ */
+const CARD_H = 92
+const COL_VIEWPORT = 460 - 50
+const scrolled = ref<Record<string, { top: number; atEnd: boolean }>>({})
+
+function onScroll(key: string, e: Event) {
+  const el = e.currentTarget as HTMLElement
+  scrolled.value = {
+    ...scrolled.value,
+    [key]: { top: el.scrollTop, atEnd: el.scrollTop + el.clientHeight >= el.scrollHeight - 4 },
+  }
+}
+
 const columns = computed(() =>
   props.buckets.map((col) => {
     const jobs = props.jobs.filter((j) => j.bucket === col.key)
+    const sc = scrolled.value[col.key] ?? { top: 0, atEnd: false }
+    const hidden = Math.max(0, jobs.length - Math.floor((COL_VIEWPORT + sc.top) / CARD_H))
     return {
       ...col,
       jobs,
       hadAny: col.count > 0,
       // col.count is the full (unfiltered) bucket size; jobs.length is filtered.
       badge: props.searching ? `${jobs.length}/${col.count}` : String(col.count),
+      more: hidden > 0 && !sc.atEnd,
+      moreN: hidden,
     }
   }),
 )
@@ -44,7 +65,7 @@ const columns = computed(() =>
         {{ col.label }}
         <span class="n mono">{{ col.badge }}</span>
       </div>
-      <div class="cards">
+      <div class="cards" :class="{ 'has-more': col.more }" @scroll="onScroll(col.key, $event)">
         <div v-if="!col.hadAny" class="empty-col">No jobs yet</div>
         <!-- The card is a div: the Notion link and the pack chip are both
              links, and an anchor cannot nest an anchor. -->
@@ -56,6 +77,9 @@ const columns = computed(() =>
           </a>
           <PackChip :job="job" :pack="packs.get(job.id)" />
         </div>
+      </div>
+      <div v-if="col.more" class="col-more" aria-hidden="true">
+        <span class="mono">{{ col.moreN }} more ↓</span>
       </div>
     </div>
   </div>

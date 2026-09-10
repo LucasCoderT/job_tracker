@@ -14,7 +14,7 @@ export const CACHE_TTL_SECONDS = 300
 // v7: enriched `jobs` rows with salary/source/nextAction for the applications table.
 // v8: added `stages` (how far each interview process actually got) + per-job stage.
 // v9: `jobs[].id` (Notion page id) so a row can own an interview pack.
-export const SCHEMA_VERSION = '9'
+export const SCHEMA_VERSION = '10'
 
 export const DEFAULT_STALE_DAYS = 30
 export const ATTENTION_MIN_DAYS = 10

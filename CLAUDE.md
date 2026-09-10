@@ -7,7 +7,7 @@ rules, the review rubric, and the standing list of known design weaknesses.
 
 ## What this is
 
-A private, single-page job-hunt dashboard — a Rabbit Resume recreation — that reads a Notion database and renders a Sankey pipeline, funnel stat cards, a weekly velocity chart, a reply-rate-by-source breakdown, and a searchable kanban board. It's a **Nuxt 4 app deployed as a single Cloudflare Worker**. Notion stays the source of truth and data entry surface; this app is read-only analytics on top.
+A private, single-page job-hunt dashboard — a Rabbit Resume recreation — that reads a Notion database and renders a conversion strip, trend stat cards, a weekly velocity chart, a reply-rate-by-source breakdown, and a searchable kanban board. It's a **Nuxt 4 app deployed as a single Cloudflare Worker**. Notion stays the source of truth and data entry surface; this app is read-only analytics on top.
 
 Auth is **Cloudflare Access** (Zero Trust) in front of the Worker's custom domain — there is deliberately **no auth code** in the app. Because access is gated at the edge, the API is free to return company names and Notion links.
 
@@ -56,20 +56,20 @@ app/
   pages/index.vue     assembles the sections; useStats() → SSR data
   pages/packs/        packs index + the pack page (cards, editor, exports)
   pages/postings/     the ranked posting list + the posting brief
-  components/          PipelineSankey, StatCard, VelocityChart, SourcesBreakdown,
+  components/          ConversionStrip, StatCard, VelocityChart, SourcesBreakdown,
                       TrackerBoard, PostingsPreview, AppTooltip, PackChip, PackCardEditor
   composables/         useStats (useFetch), useTooltip (shared floating tooltip), usePacks
   utils/format.ts      esc()/pct() — auto-imported
   assets/css/main.css  design tokens + all styles (ported from the old PAGE_HTML)
 ```
 
-The frontend uses **d3-sankey as an npm dep** (layout math only) and renders SVG marks as Vue template elements — no d3 DOM selections, and it runs during SSR.
+The dataviz is hand-rolled: plain CSS bars and small inline SVG (sparklines, velocity), rendered as Vue template elements so it all runs during SSR. There is no charting or layout dependency — `d3-sankey` went with the Sankey on 2026-09-10.
 
 ## Component library — PrimeVue (the shell)
 
 PrimeVue v4 (`@primevue/nuxt-module`) is the UI shell: **all containers, controls, and states are PrimeVue.** Sections are `<PrimeCard class="sec">`; the header link is `<PrimeButton>`; loading/error/empty are `<PrimeProgressSpinner>`/`<PrimeMessage>`; the tracker uses `<PrimeSelectButton>` (Board/Table toggle), `<PrimeIconField>`+`<PrimeInputText>` (search), `<PrimeDataTable>` (Table view) and `<PrimeTag>` (status).
 
-**What stays bespoke SVG (by design):** the dataviz — Sankey (`PipelineSankey`), donut stat cards (`StatCard`), velocity bars (`VelocityChart`), source/role bars (`SourcesBreakdown`/`RolesBreakdown`) — and the rich `AppTooltip`. No library (incl. Chart.js) ships a Sankey, and moving the others to Chart.js would lose SSR and add weight. They're themed with the same tokens so it reads as one system. Dense clickable list items (kanban job cards, posting preview cards) stay as themed `<a>`/`<NuxtLink>` anchors — PrimeCard is too heavy for them.
+**What stays bespoke (by design):** the dataviz — the conversion strip and phone funnel (`ConversionStrip`), stat bars + sparklines (`StatCard`), velocity bars (`VelocityChart`), source/role/salary bars (`SourcesBreakdown`/`RolesBreakdown`/`SalaryContext`) — and the rich `AppTooltip`. Most of it is CSS, not SVG; moving any of it to Chart.js would lose SSR and add weight for marks that are a div with a width. They're themed with the same tokens so it reads as one system. Dense clickable list items (kanban job cards, posting preview cards) stay as themed `<a>`/`<NuxtLink>` anchors — PrimeCard is too heavy for them.
 
 - Components are **prefixed `Prime`** (`<PrimeDataTable>`, `<PrimeButton>`, …) — no collision with our own components.
 - Theme: a custom Aura preset in `theme/primevue-preset.ts` retuned to the app palette (surface ramp = the `--bg`/`--panel`/`--card` grays, primary = `--amber`). Tune the ramp there if a surface looks off.
@@ -80,7 +80,7 @@ PrimeVue v4 (`@primevue/nuxt-module`) is the UI shell: **all containers, control
 
 Vue 3.5's hydration re-patches *dynamic* props with `patchProp(el, key, null, value, void 0, …)` — namespace hardcoded to `void 0` (runtime-core `hydrateElement`), and runtime-dom derives `isSVG` **only** from that arg (`const isSVG = namespace === "svg"`). So dynamically-bound SVG geometry attributes that are also getter-only DOM props — `x`, `y`, `width`, `height`, `cx`, `cy`, `r`, `viewBox`, `transform` — get `el.x = value`, which throws (`Cannot set property x … only a getter`) and floods the console (~220 warnings).
 
-**Fix/policy: bind those with the `.attr` modifier** (`:x.attr="…"`, `:viewBox.attr="…"`) so Vue forces `setAttribute` — the correct path for SVG. Already applied in `PipelineSankey`, `VelocityChart`, `StatCard`. Static geometry (e.g. `viewBox="0 0 76 76"`, `rx="2"`) is fine as-is (SSR renders it, never re-patched). Non-geometry attrs (`fill`, `stroke`, `d`, hyphenated `stroke-width`) are fine too (not getter-only IDL props → already go through setAttribute). Don't "fix" this with `<ClientOnly>` — that would needlessly drop chart SSR.
+**Fix/policy: bind those with the `.attr` modifier** (`:x.attr="…"`, `:viewBox.attr="…"`) so Vue forces `setAttribute` — the correct path for SVG. Already applied in `VelocityChart` and `StatCard`'s sparkline. Static geometry (e.g. `viewBox="0 0 76 76"`, `rx="2"`) is fine as-is (SSR renders it, never re-patched). Non-geometry attrs (`fill`, `stroke`, `d`, hyphenated `stroke-width`) are fine too (not getter-only IDL props → already go through setAttribute). Don't "fix" this with `<ClientOnly>` — that would needlessly drop chart SSR.
 
 Also: any locale/timezone-dependent text (e.g. the footer's `toLocaleString()` timestamp) must be in `<ClientOnly>`, or SSR and client disagree and you get a hydration text mismatch.
 
@@ -111,7 +111,7 @@ A row's current status implies it passed through earlier stages. So in `aggregat
 - `everInterviewed = interviewed + everProgressing + rejectedAfterInterview`
 - `everPending = pending + everInterviewed`
 
-The Sankey stage nodes show these "ever reached" totals; tooltips separately show how many are *currently* sitting in that bucket. **If you change the ladder order, these rollups are what to edit.**
+The conversion strip shows these "ever reached" totals and the step rate between them; the outcome bar underneath shows how many are *currently* sitting in each bucket. **If you change the ladder order, these rollups are what to edit.**
 
 ### The two metric definitions (don't collapse them)
 
@@ -141,8 +141,7 @@ No test framework is wired up. `aggregate()` is a pure function (`server/utils/a
 
 Key invariants to preserve if you refactor `aggregate()` (verified against the live 129-row DB after the Nuxt migration — results were byte-identical to the old Worker):
 - `total` = sum of all non-unknown buckets.
-- Sankey: sum of links out of `applications` === `total`.
-- Intermediate stage nodes are intentionally *not* flow-conserved — inflow minus outflow = the count currently sitting in that stage (shown in tooltips). `applications` and `offers` do conserve.
+- The outcome bar partitions `total`: awaiting + in-process + rejected + no-answer === `total`. The strip's stage counts are cumulative ("ever reached") and deliberately do *not* sum to it.
 - `sources` totals sum to `total`; `weekly.applied` sums to the count of dated rows (≤ total).
 
 Quick smoke test without Notion creds: `npm run dev` with no `.env` → the server serves `mock.ts` data so the whole dashboard renders offline.
@@ -339,6 +338,49 @@ Known gap: the same job re-listed under different URLs is three postings,
 because three URLs are three ids. career-ops has `detect-reposts.mjs` and a
 SimHash JD fingerprint for exactly this; wiring it into the push is the
 obvious next improvement.
+
+## Dashboard v2 (2026-09-10)
+
+Implemented from a Claude Design project (`Job Pipeline v2.dc.html`), which
+was itself built against `DESIGN.md` §7. What changed and why:
+
+- **The Sankey is gone**, replaced by `ConversionStrip`. The diagram showed
+  where everything went but never answered the question the page exists for —
+  where the process leaks — and it was unreadable on a phone (§7.1: a fixed
+  800×400 viewBox scaled to 360px rendered its 11px labels at about 5px). The
+  step rate between stages is the headline now ("→ 23% to interview"), with a
+  one-line note on what was lost at that step, and a bar underneath saying
+  where the applications sit right now — the one thing the Sankey did well.
+  `d3-sankey`, `PipelineSankey.vue`, `buildSankey()` and `Stats.sankey` all
+  went with it (**SCHEMA_VERSION 10**).
+- **Strip and phone funnel both render server-side; CSS picks one** at 880px.
+  The design measured the viewport in JS, which would have cost the SSR of
+  whichever layout lost and risked a hydration mismatch.
+- **Stat cards lost the donut** (§7.3). A donut cannot express a 2% ratio —
+  `StatCard` carried an arc floor to force a visible tick, a mark apologising
+  for itself. It is a bar on a shared 0–100 scale plus a 30-day sparkline off
+  `/api/history` (§7.10), which finally consumes the snapshots the cron has
+  been writing since July. Degrades to no sparkline under 3 snapshots.
+- **A lede** states the finding in words before any chart (§7.2). Guarded: it
+  falls back to the plain counts when there is no LinkedIn row, no ATS row, or
+  the ratio is under 1.2×. Note `sources[].domain` holds a *channel label*
+  ("LinkedIn", "Ashby") from `channelOf()`, not a bare domain — match it
+  case-insensitively.
+- **Weight order** (§7.2): reply-rate-by-source is first and widest, velocity
+  is context beside it, and role-type + salary share one quiet footnote panel
+  rather than two cards of equal weight. Salary is a range bar on a shared
+  scale, so the overlap between heard-back and silent is the first thing you
+  see — two big medians invited a conclusion the sample size cannot carry.
+- **Skeletons** at real panel dimensions replace the centred spinner (§7.8).
+- **Tracker**: status filters (All / In conversation / Live / Closed / No
+  answer) defaulting to *In conversation*, because 8 columns of mostly-dead
+  rows buried the two he can act on. The choice persists in `localStorage`,
+  read in `onMounted` — reading it during setup would make the client's first
+  render disagree with the SSR markup. Board columns now say how much is below
+  the fold (§7.9). The table keeps `PrimeDataTable` (sorting, paging and
+  keyboard behaviour stay library-owned) restyled to the design, with the
+  status pill, the age-against-cutoff bar, and sort indicators hidden until
+  hover or active.
 
 ## Tunable constants (`server/utils/config.ts`)
 

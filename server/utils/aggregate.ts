@@ -17,8 +17,6 @@ import type {
   SalaryGroup,
   SalaryContext,
   StageStat,
-  SankeySpec,
-  SankeyNodeSpec,
   Stats,
 } from '../../shared/types'
 import type { NotionPage } from '../../shared/types'
@@ -297,104 +295,5 @@ export function aggregate(
       offerRate: total ? offers / total : 0,
     },
     stages,
-    sankey: buildSankey({
-      counts,
-      stages,
-      stageStoppedRejected,
-      stageStoppedOpen,
-      everPending,
-      pendingBeforeInterview,
-      rejectedBeforeInterview,
-      offers,
-    }),
   }
-}
-
-/**
- * The interview ladder, folded into the Sankey. The old diagram collapsed every
- * interview into one "Interviewed" node, which hid how far each process got.
- * Now each round is its own rung: flow moves rightward to the next round, and
- * peels off to Rejected or Still Open at whichever rung the process ended on.
- *
- * Rungs with no traffic are dropped, along with any node left unreferenced, so
- * the diagram never renders empty stages (d3-sankey chokes on orphan nodes).
- */
-function buildSankey(input: {
-  counts: Counts
-  stages: StageStat[]
-  stageStoppedRejected: Map<string, number>
-  stageStoppedOpen: Map<string, number>
-  everPending: number
-  pendingBeforeInterview: number
-  rejectedBeforeInterview: number
-  offers: number
-}): SankeySpec {
-  const {
-    counts,
-    stages,
-    stageStoppedRejected,
-    stageStoppedOpen,
-    everPending,
-    pendingBeforeInterview,
-    rejectedBeforeInterview,
-    offers,
-  } = input
-
-  const rungId = (i: number) => `stage${i}`
-  // The trailing "Offer" rung is represented by the existing offers nodes, so
-  // the ladder rungs drawn here are the interview rounds only.
-  const rungs = stages.slice(0, -1)
-
-  const nodes: SankeyNodeSpec[] = [
-    { id: 'applications', label: 'Applications' },
-    { id: 'pending', label: 'Heard Back' },
-    ...rungs.map((s, i) => ({ id: rungId(i), label: s.stage })),
-    { id: 'offers', label: 'Offers' },
-    { id: 'accepted', label: 'Offer Accepted' },
-    { id: 'declined', label: 'Offer Declined' },
-    { id: 'stillOpen', label: 'Still Open' },
-    { id: 'awaiting', label: 'Awaiting Reply' },
-    { id: 'rejected', label: 'Rejected' },
-    { id: 'noAnswer', label: 'No Answer' },
-  ]
-
-  const links: SankeySpec['links'] = [
-    { source: 'applications', target: 'pending', value: everPending },
-    { source: 'applications', target: 'awaiting', value: counts.awaiting },
-    { source: 'applications', target: 'rejected', value: rejectedBeforeInterview },
-    { source: 'applications', target: 'noAnswer', value: counts.noAnswer },
-    // Heard back but never interviewed, and not yet closed out.
-    { source: 'pending', target: 'stillOpen', value: pendingBeforeInterview },
-  ]
-
-  // Each rung emits only its INCOMING edge plus its two drop-offs. Emitting an
-  // "onward" edge here as well would draw every rung-to-rung link twice.
-  rungs.forEach((rung, i) => {
-    const from = i === 0 ? 'pending' : rungId(i - 1)
-    links.push({ source: from, target: rungId(i), value: rung.reached })
-    links.push({
-      source: rungId(i),
-      target: 'rejected',
-      value: stageStoppedRejected.get(rung.stage) ?? 0,
-    })
-    links.push({
-      source: rungId(i),
-      target: 'stillOpen',
-      value: stageStoppedOpen.get(rung.stage) ?? 0,
-    })
-  })
-
-  // The last rung feeds the offers nodes, which stand in for the Offer stage.
-  const lastRung = rungs.length - 1
-  const offerStage = stages[stages.length - 1]
-  if (lastRung >= 0 && offerStage) {
-    links.push({ source: rungId(lastRung), target: 'offers', value: offerStage.reached })
-  }
-
-  links.push({ source: 'offers', target: 'accepted', value: counts.offerAccepted })
-  links.push({ source: 'offers', target: 'declined', value: counts.offerDeclined })
-
-  const live = links.filter((l) => l.value > 0)
-  const used = new Set(live.flatMap((l) => [l.source, l.target]))
-  return { nodes: nodes.filter((n) => used.has(n.id)), links: live }
 }

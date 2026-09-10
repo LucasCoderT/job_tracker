@@ -94,9 +94,9 @@ propose the token — don't inline a hex.
 - **PrimeVue (`Prime*` prefix) is the shell**: containers, buttons, inputs,
   tables, tags, spinners, messages. Reach for it first for anything with
   states and keyboard behaviour — you will not out-engineer it in an evening.
-- **Bespoke SVG is the dataviz**: Sankey, donuts, velocity bars, source bars,
-  and the rich `AppTooltip`. No chart library. They're themed with the same
-  tokens so the seam is invisible.
+- **Bespoke marks are the dataviz**: the conversion strip and phone funnel,
+  stat bars and sparklines, velocity bars, source/role/salary bars, and the
+  rich `AppTooltip`. No chart library — most of it is a div with a width.
 - Dense clickable rows (job cards, posting preview cards, pack rows) stay
   themed anchors. `PrimeCard` is too heavy for a 40px item.
 
@@ -215,24 +215,16 @@ propose the token — don't inline a hex.
 These are known weak spots as of 2026-09-09, worth picking up whenever you're
 in the area. They're ordered by how much they hurt.
 
-1. **Charts collapse on a phone.** `PipelineSankey` and `VelocityChart` use a
-   fixed 800×400 / viewBox coordinate space scaled by CSS. At 360px the Sankey
-   renders its 11px labels at roughly 5px. The page "works" at phone width in
-   the sense that nothing overflows, and is unreadable in the sense that
-   matters. Needs a real decision: a phone layout for the Sankey (a stacked
-   funnel or a ranked stage list), a min-width + horizontal scroll container,
-   or size-aware type inside the SVG.
-2. **The page is a pile of panels, not an argument.** Sankey + 3 stats, then
-   two identical `.row2` grids of four equal-weight cards. Nothing tells the
-   reader that "reply rate by source" is the single most actionable panel and
-   "salary vs reply" is a footnote. Consider a one-line lede stating the
-   current finding in words ("ATS applications reply ~5× more often than
-   LinkedIn"), and a deliberate weight order down the page.
-3. **The donut is the wrong mark for a 2% ratio.** Three donuts reading 20%,
-   2% and 1% are visually near-identical rings; the arc floor hack in
-   `StatCard` exists precisely because the mark can't express small values.
-   A small horizontal bar with the fraction, or a shared-scale small-multiple,
-   would read honestly at a glance.
+1. **Charts collapse on a phone.** Mostly paid: the Sankey is gone, and
+   `ConversionStrip` renders a real stacked funnel under 880px. `VelocityChart`
+   still uses a fixed 640×150 viewBox scaled by CSS, so its 10px week labels
+   render around 5px on a 360px screen — the same defect, less acute. It wants
+   fewer labels and larger type at narrow widths.
+2. ~~**The page is a pile of panels, not an argument.**~~ Shipped: a lede
+   states the finding in words, sources leads the second row at 1.6fr, and
+   role-type + salary share one quiet footnote panel.
+3. ~~**The donut is the wrong mark for a 2% ratio.**~~ Shipped: a bar on a
+   shared 0–100 scale, with the fraction and a 30-day sparkline.
 4. **Font-size zoo.** 11, 11.5, 12, 12.5, 13, 13.5, 14, 15, 18, 20, 22px are
    all in use. Propose a 6-step scale as tokens (`--fs-xs`…`--fs-xl`) and
    migrate opportunistically.
@@ -249,17 +241,14 @@ in the area. They're ordered by how much they hurt.
    category colour.
 7. **Inconsistent focus colour.** `.attn-card` outlines amber, `.card-main`
    outlines blue. Pick one (amber) and make it a token.
-8. **No skeletons.** Loading is a centred spinner that the real layout then
-   shoves aside. Panel-shaped skeletons at the real dimensions would remove
-   the jump.
-9. **Scroll containers hide content silently.** Half-paid: the top slot's
-   horizontal scroller is gone, replaced by the postings preview's wrapping
-   grid. Board columns still cap at 460px with inner scroll — no
-   fade/affordance says there's more, and on a phone the column scroll fights
-   the page scroll.
-10. **The history API has no UI.** `/api/history` accumulates daily snapshots
-    and nothing renders them. A sparkline in each `StatCard` is the obvious
-    first use and would turn three static ratios into three trends.
+8. ~~**No skeletons.**~~ Shipped: panel-shaped skeletons at the real
+   dimensions on the dashboard. The packs and postings pages still spin.
+9. ~~**Scroll containers hide content silently.**~~ Shipped: the top slot is
+   a wrapping grid, and board columns now fade the last card and say "N more
+   ↓". On a phone the column scroll still fights the page scroll.
+10. ~~**The history API has no UI.**~~ Shipped: each `StatCard` carries a
+    30-day sparkline and a points delta. A trend panel off the same data —
+    pipeline composition over time — is still unbuilt.
 11. **`prep.html` has no print stylesheet** — it's the one surface likely to be
     printed or PDF'd before an interview.
 
