@@ -30,7 +30,16 @@ export default defineEventHandler(async (event): Promise<Stats | Response | { er
 
   if (cacheKey) {
     const hit = await caches.default.match(cacheKey)
-    if (hit) return hit
+    if (hit) {
+      // Cloudflare rewrites cache-control on responses served out of
+      // caches.default to the zone's Browser Cache TTL — 4 hours by default,
+      // so a browser that landed on a cache hit would hold these stats for
+      // four hours while the footer promises five minutes. Restate our own
+      // header on the way out; the edge copy is unaffected.
+      const res = new Response(hit.body, { status: hit.status, headers: new Headers(hit.headers) })
+      res.headers.set('cache-control', `public, max-age=${CACHE_TTL_SECONDS}`)
+      return res
+    }
   }
 
   let pages

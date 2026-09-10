@@ -232,7 +232,9 @@ Decisions that are load-bearing:
 Routes (`server/api/packs/`): `GET /` list · `GET /queue` requested+building
 · `GET|DELETE /:jobId` · `POST /:jobId/request` · `POST /:jobId/status`
 (building|done|failed) · `GET /:jobId/bank.json` · `PUT /:jobId/bank`
-(`?status=done`) · `GET /:jobId/prep.html` · `PUT|DELETE
+(`?status=done`; creates the pack if there isn't one, naming it from the
+bank title, so a bank built on the Mac can be linked up without queueing a
+build first) · `GET /:jobId/prep.html` · `PUT|DELETE
 /:jobId/answers/:answerId` (`?notion=0` to skip the write-back) ·
 `GET|PUT|DELETE /:jobId/exports/:name`.
 

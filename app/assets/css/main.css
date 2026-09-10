@@ -58,13 +58,10 @@ h1 { font-size: 20px; font-weight: 600; letter-spacing: 0.01em; margin: 0; }
 .grid { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr) 250px; align-items: stretch; }
 @media (max-width: 880px) { .grid { grid-template-columns: 1fr; } }
 
-.sec--sankey .p-card-content { display: flex; flex-direction: column; min-height: 340px; }
-#sankey { flex: 1; width: 100%; min-height: 300px; }
-#sankey text { font-family: "Spline Sans Mono", ui-monospace, monospace; pointer-events: none; }
-.node-value { font-size: 14px; font-weight: 600; fill: var(--text); }
-.node-label { font-size: 11px; fill: var(--muted); }
-.ribbon { transition: stroke-opacity 140ms ease; cursor: default; }
-.ribbon:hover { stroke-opacity: 0.85 !important; }
+/* The card content is a flex column so the outcome bar can sit against the
+   bottom of the panel (margin-top:auto on .outcome) instead of floating up
+   under the strip. */
+.sec--pipeline .p-card-content { display: flex; flex-direction: column; min-height: 340px; }
 
 .stats { display: flex; flex-direction: column; gap: 14px; }
 .stat-card.p-card { background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 14px; box-shadow: none; }
@@ -109,7 +106,7 @@ h1 { font-size: 20px; font-weight: 600; letter-spacing: 0.01em; margin: 0; }
 #tracker { margin-top: 26px; }
 #tracker .tracker-head { display: flex; align-items: flex-start; gap: 14px; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; }
 #tracker .tracker-heading { display: flex; flex-direction: column; gap: 1px; }
-#tracker .tracker-tools { display: flex; align-items: center; gap: 12px; flex-wrap: nowrap; flex-shrink: 0; }
+#tracker .tracker-tools { display: flex; align-items: center; justify-content: flex-end; gap: 12px; flex-wrap: wrap; }
 #tracker h2 { font-size: 18px; font-weight: 600; margin: 0; color: var(--text); text-transform: none; letter-spacing: 0; }
 #tracker .total { color: var(--muted); font-size: 12.5px; }
 
@@ -487,10 +484,12 @@ footer { margin-top: 18px; font-size: 12px; color: var(--faint); }
 .tracker-table .p-sortable-column:focus-visible .p-sortable-column-icon,
 .tracker-table .p-sortable-column[aria-sort='ascending'] .p-sortable-column-icon,
 .tracker-table .p-sortable-column[aria-sort='descending'] .p-sortable-column-icon { opacity: 1; }
-/* Five status filters cannot sit on one 360px row. Wrap rather than scroll —
-   a hidden filter is a filter he never uses. */
-.filter-group { flex-wrap: wrap; }
+/* The group holds one line and .tracker-tools wraps around it, so the
+   filters never split across rows. Below 560px five nowrap buttons cannot
+   fit, so there they do wrap — rather than scroll, since a hidden filter is
+   a filter he never uses. */
+.filter-group { flex-wrap: nowrap; }
 @media (max-width: 560px) {
-  .filter-group { width: 100%; justify-content: flex-start; }
+  .filter-group { flex-wrap: wrap; width: 100%; justify-content: flex-start; }
   #tracker .tracker-tools { align-items: stretch; }
 }
