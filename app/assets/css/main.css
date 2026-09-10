@@ -326,3 +326,7 @@ footer { margin-top: 18px; font-size: 12px; color: var(--faint); }
   color: var(--text); margin: 12px 0 0; padding-left: 14px;
   border-left: 1px solid var(--panel-edge); max-width: 68ch;
 }
+/* Report fields with no dedicated slot — the Machine Summary schema drifts,
+   so these are whatever the evaluation happened to carry. */
+.facts-grid.extras { margin-top: 14px; }
+.facts-grid.extras dt { text-transform: lowercase; }

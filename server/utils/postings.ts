@@ -280,6 +280,32 @@ export function cleanAnalysis(raw: any): PostingAnalysis {
   const confidential = get('company_confidential', 'companyConfidential')
   const via = get('via')
 
+  // Anything not mapped above is carried through rather than dropped: the
+  // report schema drifts, and a field this code has never heard of is far
+  // more likely to be a new signal than noise.
+  const MAPPED = new Set([
+    'company', 'role', 'score', 'num', 'date', 'url', 'status',
+    'final_decision', 'finalDecision', 'archetype', 'legitimacy_tier', 'legitimacy',
+    'risk_level', 'riskLevel', 'confidence', 'work_auth', 'workAuth',
+    'next_action', 'nextAction', 'advertised_comp', 'advertisedComp',
+    'reports_to', 'reportsTo', 'via', 'company_confidential', 'companyConfidential',
+    'hard_stops', 'hardStops', 'soft_gaps', 'softGaps', 'top_strengths', 'topStrengths',
+    'discard_reasons', 'discardReasons', 'requirement_importance', 'requirements',
+    'risk_summary', 'risk',
+  ])
+  const extra: Record<string, string> = {}
+  for (const [k, val] of Object.entries(v).slice(0, 60)) {
+    if (MAPPED.has(k) || val === null || val === undefined || val === '') continue
+    const text = Array.isArray(val)
+      ? val.map((x) => str(x, 200)).filter(Boolean).join(', ')
+      : typeof val === 'boolean'
+        ? (val ? 'yes' : 'no')
+        : typeof val === 'object'
+          ? ''
+          : str(val, 1000)
+    if (text) extra[str(k, 60)] = text
+  }
+
   return {
     finalDecision: opt('final_decision', 'finalDecision'),
     archetype: opt('archetype'),
@@ -298,5 +324,6 @@ export function cleanAnalysis(raw: any): PostingAnalysis {
     discardReasons: strList(get('discard_reasons', 'discardReasons')),
     requirements,
     risk,
+    extra,
   }
 }

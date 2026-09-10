@@ -302,6 +302,17 @@ export interface PostingAnalysis {
   discardReasons: string[]
   requirements: PostingRequirement[]
   risk: Record<string, string>
+  /**
+   * Every other key the report carried, flattened to strings.
+   *
+   * The Machine Summary schema has drifted well past what batch-prompt.md
+   * documents — recent reports carry comp_posted, comp_anchor_cad,
+   * geo_eligible, stack_primary, ats, applicants and no final_decision or
+   * hard_stops at all. Mapping a fixed list would silently drop most of what
+   * a current evaluation actually says, so anything unmapped is carried
+   * through verbatim and rendered as-is.
+   */
+  extra: Record<string, string>
 }
 
 export interface PostingMeta {

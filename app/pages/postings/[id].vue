@@ -148,6 +148,12 @@ const facts = computed(() => {
   ].filter((f) => f.v)
 })
 
+/** Everything the report said that has no dedicated slot above. */
+const extras = computed(() => {
+  const e = analysis.value?.extra ?? {}
+  return Object.entries(e).map(([k, v]) => ({ k: k.replace(/_/g, ' '), v }))
+})
+
 const lists = computed(() => {
   const a = analysis.value
   if (!a) return []
@@ -226,7 +232,7 @@ const lists = computed(() => {
       </PrimeCard>
 
       <!-- What the evaluation found -->
-      <PrimeCard v-if="lists.length || analysis?.nextAction" class="sec" aria-label="The evaluation">
+      <PrimeCard v-if="lists.length || analysis?.nextAction || extras.length" class="sec" aria-label="The evaluation">
         <template #content>
           <h2>Evaluation<span v-if="meta.reportNum" class="mono muted"> · report {{ meta.reportNum }}</span></h2>
           <p v-if="analysis?.nextAction" class="next-action">{{ analysis.nextAction }}</p>
@@ -236,6 +242,12 @@ const lists = computed(() => {
               <li v-for="(item, i) in l.items" :key="i">{{ item }}</li>
             </ul>
           </div>
+          <dl v-if="extras.length" class="facts-grid extras">
+            <template v-for="e in extras" :key="e.k">
+              <dt>{{ e.k }}</dt>
+              <dd>{{ e.v }}</dd>
+            </template>
+          </dl>
         </template>
       </PrimeCard>
 
