@@ -241,3 +241,103 @@ export interface PackDetail {
 export type NotionWriteResult =
   | { ok: true; pageId: string; url: string | null; created: boolean; scope: 'company' | 'universal' }
   | { ok: false; error: string }
+
+// ---- Job postings (/api/postings) ----
+//
+// A posting is a job career-ops found, scored and judged worth a look —
+// pushed up BEFORE it is applied to. It arrives thin from the 07:00 standup
+// (score, why, comp, geo, stack) and is upgraded in place when a full
+// evaluation report is written later, gaining the analysis and the JD text.
+//
+// Keyed by sha256(normalizeUrl(url)).slice(0,16): normalizeUrl is career-ops's
+// canonical posting key (url-key.mjs), so both sides derive the same id from
+// the same posting without a lookup.
+//
+// Two orthogonal fields: `state` is his decision, `pack` is the Mac's
+// progress building the CV + cover letter. Merging them would make
+// "dismissed, but the pack already built" unrepresentable.
+
+export type PostingState = 'new' | 'dismissed' | 'applied'
+export type PostingPack = 'none' | 'requested' | 'building' | 'done' | 'failed'
+
+export interface PostingArtifact {
+  name: string // file name, e.g. "Lucas-Lukowski-Acme-CV.pdf"
+  contentType: string
+  bytes: number
+  kind: 'cv' | 'cover-letter' | 'notes' | 'other'
+  updatedAt: string
+}
+
+export interface PostingSalary { min: number | null; max: number | null; currency: string | null }
+
+/** One requirement the JD stated, and how well he matches it. */
+export interface PostingRequirement {
+  requirement: string
+  evidence?: string
+  importance?: string
+  match?: string
+}
+
+/**
+ * career-ops's evaluation, mirroring the report's `## Machine Summary` fence.
+ * Every field is optional and every enum is a free string: the real corpus
+ * spells legitimacy five ways and risk seven, and validating strictly would
+ * reject about a third of it.
+ */
+export interface PostingAnalysis {
+  finalDecision?: string
+  archetype?: string
+  legitimacy?: string
+  riskLevel?: string
+  confidence?: string
+  workAuth?: string
+  nextAction?: string
+  advertisedComp?: string
+  reportsTo?: string
+  via?: string | null
+  companyConfidential?: boolean
+  hardStops: string[]
+  softGaps: string[]
+  topStrengths: string[]
+  discardReasons: string[]
+  requirements: PostingRequirement[]
+  risk: Record<string, string>
+}
+
+export interface PostingMeta {
+  id: string
+  url: string
+  company: string
+  role: string
+  location: string
+  source: string // the board it came from, e.g. "linkedin", "indeed", "ashby"
+  score: number | null // career-ops's global score, 0–5
+  why: string // the one-line justification for the score
+  comp: string // as advertised, verbatim — never estimated
+  geo: string
+  stack: string
+  salary: PostingSalary | null
+  postedAt: string | null
+  firstSeen: string | null
+  reportNum: string | null // the career-ops report this was upgraded from
+  state: PostingState
+  pack: PostingPack
+  packNote: string
+  packError: string | null
+  packRequestedAt: string | null
+  packBuiltAt: string | null
+  notionPageId: string | null // set once applied; what an interview pack keys on
+  appliedAt: string | null
+  hasJD: boolean
+  hasAnalysis: boolean
+  artifacts: PostingArtifact[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface PostingsResponse { enabled: boolean; postings: PostingMeta[] }
+
+export interface PostingDetail { meta: PostingMeta; jd: string | null; analysis: PostingAnalysis | null }
+
+/** POST /:id/applied — the row went into Notion (or said why it didn't). */
+export interface PostingApplyResult { meta: PostingMeta; notion: NotionWriteResult }

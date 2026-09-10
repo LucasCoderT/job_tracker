@@ -19,8 +19,10 @@ import {
 // Minimal shape of the KV namespace we use — avoids a hard dep on
 // @cloudflare/workers-types for this one binding.
 export interface KVNamespace {
-  get(key: string, type?: 'text' | 'json'): Promise<any>
-  put(key: string, value: string, opts?: { metadata?: unknown }): Promise<void>
+  // arrayBuffer is how posting artifacts (a CV is a ~110KB PDF) come back;
+  // packs only ever store text.
+  get(key: string, type?: 'text' | 'json' | 'arrayBuffer'): Promise<any>
+  put(key: string, value: string | ArrayBuffer, opts?: { metadata?: unknown }): Promise<void>
   delete(key: string): Promise<void>
   list(opts?: { prefix?: string; limit?: number; cursor?: string }): Promise<{
     keys: { name: string; metadata?: unknown }[]
@@ -40,6 +42,8 @@ export interface AppEnv {
   NOTION_VIEW_URL?: string
   SNAPSHOTS?: KVNamespace
   PACKS?: KVNamespace
+  // Job postings career-ops pushes up before they are applied to.
+  POSTINGS?: KVNamespace
 }
 
 // On Cloudflare, secrets + vars + bindings live on the request's cloudflare

@@ -47,6 +47,7 @@ empty states, no card that exists to hold a single number and an icon.
 | `--blue` | `#517ea6` | interview stage, pack "building" |
 | `--green` | `#57b784` | still open, accepted, pack "done" |
 | `--olive` `--plum` `--teal` `--rust` `--stone` | | pipeline stage categories (see below) |
+| `--danger` | `#d98a7f` | errors, failed builds, armed destructive actions |
 
 Three surfaces, three inks, one accent. That ramp is also the PrimeVue surface
 ramp in `theme/primevue-preset.ts` — **change a token there too, or the two
@@ -170,6 +171,9 @@ propose the token — don't inline a hex.
    the velocity treatment. Ranked list with a rate → the `.src-row` pattern
    (name / bar / rate) — it's the most reusable thing in the app; reuse it
    instead of inventing a fourth bar style.
+   The `.pack-row` / `.posting-row` grid (a leading figure, a name/role stack,
+   clamped facts, then tags) is the app's list idiom — reuse it for any new
+   list of records rather than inventing a fourth row shape.
 4. **Wrap it in the standard shell:**
    ```vue
    <PrimeCard class="sec" aria-label="Plain description">
@@ -232,10 +236,12 @@ in the area. They're ordered by how much they hurt.
 4. **Font-size zoo.** 11, 11.5, 12, 12.5, 13, 13.5, 14, 15, 18, 20, 22px are
    all in use. Propose a 6-step scale as tokens (`--fs-xs`…`--fs-xl`) and
    migrate opportunistically.
-5. **Off-token colours.** `#26262c`, `#35353d`, `#3a3323`, `#4a3f1f`,
-   `#23364a`, `#1f4a34`, `#4a2a25`, and two different error reds
-   (`#c98a8a`, `#d98a7f`). Needs `--danger` plus a documented "tinted border"
-   recipe (accent at ~30% over `--panel`) rather than seven hand-mixed hexes.
+5. **Off-token colours.** Half-paid: the two error reds are now one
+   `--danger` token. Still hand-mixed: `#26262c`, `#35353d`, and the tinted
+   borders `#3a3323`, `#4a3f1f`, `#23364a`, `#1f4a34`, `#4a2a25`. Those want a
+   documented recipe (accent at ~30% over `--panel`, ideally
+   `color-mix(in srgb, var(--amber) 30%, var(--panel))`) rather than five
+   more hexes.
 6. **Stage colours are close in luminance.** olive / plum / teal / rust on
    `--bg` are hard to separate in the middle of the Sankey, and untested for
    colour-vision deficiency. Ribbons should not rely on hue alone — position

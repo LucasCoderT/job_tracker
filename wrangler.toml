@@ -61,3 +61,11 @@ id = "a7a84a85d49040d9a4e7ac605f8c2400"
 [[kv_namespaces]]
 binding = "PACKS"
 id = "198f7254f01a43439ed9da7232eec2a6"
+
+# Job postings career-ops pushes up before they are applied to (see CLAUDE.md
+# "Job postings"): the posting, its JD, its evaluation, and the tailored CV /
+# cover letter PDFs the Mac builds. Created with:
+#   wrangler kv namespace create POSTINGS
+[[kv_namespaces]]
+binding = "POSTINGS"
+id = "d65f0d9f317d4b7d9ffe0071721440d9"

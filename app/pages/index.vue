@@ -5,6 +5,10 @@ const { data: stats, pending, error } = await useStats()
 const config = useRuntimeConfig()
 const notionUrl = computed(() => config.public.notionViewUrl)
 
+// The badge is the whole point of the link: postings only matter while
+// there are some he has not looked at.
+const { open: openPostings } = usePostings()
+
 const footer = computed(() => {
   if (!stats.value) return ''
   return (
@@ -19,6 +23,15 @@ const footer = computed(() => {
     <header>
       <h1>Job Pipeline</h1>
       <div class="header-tools">
+      <PrimeButton
+        as="a"
+        href="/postings"
+        :label="openPostings.length ? `Postings (${openPostings.length})` : 'Postings'"
+        icon="pi pi-inbox"
+        :severity="openPostings.length ? 'primary' : 'secondary'"
+        :outlined="!openPostings.length"
+        size="small"
+      />
       <PrimeButton
         as="a"
         href="/packs"

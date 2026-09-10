@@ -25,6 +25,7 @@ Browser ─► Cloudflare Access ─► Worker (Nitro) ─► Notion API
                                    ├─ GET /api/history  → daily snapshots from KV
                                    ├─ GET /api/snapshot → manual snapshot trigger (reliable seed)
                                    ├─ /api/packs/**     → interview packs (PACKS KV; see below)
+                                   ├─ /api/postings/**  → job postings (POSTINGS KV; see below)
                                    └─ scheduledTask     → daily cron snapshot → KV
 ```
 
@@ -35,6 +36,7 @@ nuxt.config.ts        cloudflare_module preset, scheduledTasks (cron), security 
 wrangler.toml         deploy config — custom domain, workers_dev=false, KV, cron, vars, assets
 shared/types.ts       the /api/stats payload types — single source of truth, server + client
 shared/bank.ts        answer-bank helpers shared by Worker + browser (lint, beat lines)
+shared/postings.ts    normalizeUrl — the posting key, shared with career-ops
 server/
   utils/aggregate.ts  aggregate() — the core fold (see "The data model")
   utils/packs.ts      PACKS KV store + prep-sheet renderer  |  utils/bank-notion.ts  Notion write-back
@@ -44,11 +46,16 @@ server/
   utils/config.ts     constants + status ladder (SCHEMA_VERSION, buckets, prop names)
   utils/snapshot.ts   takeSnapshot()
   utils/mock.ts       fake Notion pages for tokenless local dev
+  utils/postings.ts   POSTINGS KV store + the Machine Summary reader
+  utils/posting-route.ts  shared plumbing for the /api/postings routes
+  utils/applications-notion.ts  the one write into DB Applications
+  api/postings/**     the postings API (list, queue, upsert, pack, artifacts)
   api/stats.get.ts    edge-cached via caches.default keyed by SCHEMA_VERSION
   api/history.get.ts  | api/snapshot.get.ts | tasks/snapshot.ts (cron)
 app/
   pages/index.vue     assembles the sections; useStats() → SSR data
   pages/packs/        packs index + the pack page (cards, editor, exports)
+  pages/postings/     the ranked posting list + the posting brief
   components/          PipelineSankey, StatCard, VelocityChart, SourcesBreakdown,
                       TrackerBoard, AttentionQueue, AppTooltip, PackChip, PackCardEditor
   composables/         useStats (useFetch), useTooltip (shared floating tooltip), usePacks
@@ -160,7 +167,7 @@ npm run deploy                           # = nuxt build && wrangler deploy
 - **Follow-up nudges** — extend the cron to ping ntfy/Discord when a row enters the attention window. (Needs the cron binding-access caveat resolved + a webhook secret.)
 - **Time-to-response** — needs a `Rejection Date` property or use the page `last_edited_time` as a proxy; could calibrate `STALE_DAYS` from data instead of hardcoding 30.
 - This is the **tracking dashboard**; the **CareerOps** side project is separate (research/apply-packs). Kept distinct on purpose. Interview packs are the one bridge: the site queues and shows them, career-ops on the Mac builds them.
-- **Desktop worker for packs** — a launchd job on the Mac that drains `GET /api/packs/queue` through career-ops (`agent-inbox` → `claude -p` with the interview-bank skill → the interview-helper MCP `site_push`) and marks packs done. Until it exists, career-ops does the same by hand from a Claude session with `site_queue` / `site_push`.
+- ~~**Desktop worker for packs**~~ — shipped, and it lives in the InterviewHelper repo: `Scripts/site_worker.py` runs from launchd, drains `GET /api/packs/queue`, and builds each pack with a headless `claude -p` in career-ops. `career-ops/site-apply-worker.mjs` is its sibling for apply packs.
 
 ## Interview packs (2026-09-09)
 
@@ -235,6 +242,103 @@ Config: `PACKS` KV binding (`wrangler kv namespace create PACKS`),
 `NOTION_BANK_TOKEN` secret. Local: `npx wrangler dev .output/server/index.mjs
 --assets .output/public --local` after `nuxt build` emulates the KV; the
 whole route set was exercised that way before the first deploy.
+
+## Job postings (2026-09-09)
+
+The other end of the pipeline. Interview packs are for jobs already applied
+to; **postings** are jobs career-ops found and scored but that have not been
+applied to yet. They land on the site so they can be read and decided on from
+a phone, "Build pack" queues a tailored CV back on the Mac, and "Mark applied"
+writes the Notion row — which is how a posting becomes an application and
+enters the funnel.
+
+```
+career-ops (Mac)                         jobs.codertheory.dev         phone
+07:00 standup → strong-match-queue.md
+push-postings.mjs ─ PUT /api/postings/:id ─► POSTINGS KV ────────────► /postings
+   (thin: score, why, comp, geo, stack)                                 ranked
+push-postings.mjs --upgrade ─ PUT same id ─► + jd, + analysis ───────► /postings/:id
+   (Machine Summary + JD from reports/)                                 [Build pack]
+site-apply-worker.mjs ◄─ GET /api/postings/queue ◄──────────────────────────┘
+   claude -p → the existing CV chain → data/site-packs/<id>.json
+   ─ PUT /api/postings/:id/artifacts/*.pdf ─► artifacts ─────────────► download
+                             POST /:id/applied ─► Notion row ────────► the funnel
+```
+
+Decisions that are load-bearing:
+
+- **Keyed by `sha256(normalizeUrl(url)).slice(0,16)`.** `normalizeUrl` is a
+  port of career-ops's `url-key.mjs` (its canonical posting key) and lives in
+  `shared/postings.ts` so the Worker, the browser and the producer all derive
+  the same id from the same URL with no lookup. `normalizeUrl` returns `''`
+  for anything that is not a real http(s) URL, and **`''` is "no key", never a
+  value to dedupe on** — those are skipped, not stored. `PUT /:id` recomputes
+  the id from the body's url and 409s on a mismatch, so a producer bug cannot
+  silently split one posting into two records.
+- **Two orthogonal fields.** `state` (`new` / `dismissed` / `applied`) is his
+  decision; `pack` (`none` / `requested` / `building` / `done` / `failed`) is
+  the Mac's progress. Folding them into one ladder the way packs do would make
+  "dismissed, but the pack already built" unrepresentable. `state: applied` is
+  not settable through `/state` — it is a consequence of the Notion row
+  existing, and claiming it without the row would put a job in the funnel's
+  story that the funnel has never heard of.
+- **A push never overwrites a judgement.** `PUT /:id` is an upsert: present
+  fields win, absent fields keep their value, and `state`, `pack`, artifacts
+  and `notionPageId` are never touched by a producer (`mergePosting`). That is
+  what lets a thin record from the morning scan be upgraded in place hours
+  later by an evaluation without undoing something he did on his phone.
+- **Every enum is a free string.** 174 of 194 real reports carry a
+  `## Machine Summary`, and the corpus spells `legitimacy_tier` five ways
+  (including a bare `1`) and `risk_level` seven ("Low-Medium", "N/A - not
+  eligible"). Strict validation would reject about a third of it, so
+  `cleanAnalysis` normalizes shape and key case only, never vocabulary.
+- **Artifacts are binary; pack exports are not.** A CV is a ~110KB PDF, so
+  postings get their own `artifact:` prefix, a raw-bytes path
+  (`readRawBody(event, false)` → `ArrayBuffer` → KV) and a widened
+  `KVNamespace` interface in `server/utils/notion.ts`. Capped at 6MB and 12
+  files. Served `content-disposition: attachment` — unlike a pack export,
+  which is `inline`, because the whole point here is getting the file onto the
+  device.
+- **`done` is refused until a file exists** (409), the same lie-prevention as
+  a pack's bank check. A "Ready" pack with no CV behind it would be found out
+  at the worst possible moment.
+- **The manifest is the agent/uploader contract.** `claude -p` writes
+  `data/site-packs/<id>.json` (`{reportNum, files[]}`) and
+  `site-apply-worker.mjs` uploads exactly those paths, refusing anything
+  resolving outside the repo. Letting the agent do the HTTP would put the
+  service token in a prompt and make "did it upload" unverifiable.
+- **Notion `Status` may be a `status` or a `select` property** and the two
+  take different payloads. `readStatus` already tolerates both on read;
+  `applications-notion.ts` reads the database schema once and branches, rather
+  than guessing and showing him a 400 for a schema difference he cannot see.
+  A missing `Status` column writes the row anyway — losing the click is worse.
+- **`/api/stats` is edge-cached 5 minutes**, so a row created by "Mark
+  applied" does not appear in the funnel immediately. The success notice says
+  so; do not "fix" it by dropping the cache.
+- **No `SCHEMA_VERSION` bump.** Postings never touch the `/api/stats` payload,
+  and like the pack routes these are uncached.
+
+Routes (`server/api/postings/`): `GET /` list · `GET /queue`
+requested+building, FIFO · `GET|PUT|DELETE /:id` · `POST /:id/state` ·
+`POST /:id/pack` · `POST /:id/pack/status` · `POST /:id/applied` ·
+`GET|PUT|DELETE /:id/artifacts/:name`.
+
+Config: `POSTINGS` KV binding (`wrangler kv namespace create POSTINGS`). The
+producers authenticate with a Cloudflare Access **service token** like the
+pack worker does, from the Keychain item
+`dev.codertheory.careerops.site` (`{"clientId","clientSecret"}`), or
+`CAREER_OPS_SITE_CLIENT_ID` / `_SECRET` / `_BASE` for testing.
+
+The producer side lives in **career-ops**, not here: `push-postings.mjs`
+(queue → thin, `--upgrade` → reports), `site-apply-worker.mjs` (drains
+`/queue`), `site-postings.sh` and the two launchd plists. Both default to
+`https://jobs.codertheory.dev`; point them at a local `wrangler dev` with
+`CAREER_OPS_SITE_BASE`.
+
+Known gap: the same job re-listed under different URLs is three postings,
+because three URLs are three ids. career-ops has `detect-reposts.mjs` and a
+SimHash JD fingerprint for exactly this; wiring it into the push is the
+obvious next improvement.
 
 ## Tunable constants (`server/utils/config.ts`)
 
