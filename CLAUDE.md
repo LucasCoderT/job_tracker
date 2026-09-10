@@ -1,6 +1,9 @@
 # CLAUDE.md
 
 Context for working on this repo with Claude Code. Read this first.
+For anything that touches how the site **looks or reads** — restyling, a new
+section, a new feature's UI — read [`DESIGN.md`](DESIGN.md) too: tokens, house
+rules, the review rubric, and the standing list of known design weaknesses.
 
 ## What this is
 
