@@ -258,6 +258,10 @@ career-ops (Mac)                         jobs.codertheory.dev         phone
 07:00 standup → strong-match-queue.md
 push-postings.mjs ─ PUT /api/postings/:id ─► POSTINGS KV ────────────► /postings
    (thin: score, why, comp, geo, stack)                                 ranked
+site-eval-worker.mjs  (every 30 min)
+   any posting with no valid evaluation
+   → claude -p through modes/oferta.md
+   → reports/NNN-*.md, schema-validated
 push-postings.mjs --upgrade ─ PUT same id ─► + jd, + analysis ───────► /postings/:id
    (Machine Summary + JD from reports/)                                 [Build pack]
 site-apply-worker.mjs ◄─ GET /api/postings/queue ◄──────────────────────────┘
@@ -353,11 +357,40 @@ pack worker does, from the Keychain item
 `dev.codertheory.careerops.site` (`{"clientId","clientSecret"}`), or
 `CAREER_OPS_SITE_CLIENT_ID` / `_SECRET` / `_BASE` for testing.
 
-The producer side lives in **career-ops**, not here: `push-postings.mjs`
-(queue → thin, `--upgrade` → reports), `site-apply-worker.mjs` (drains
-`/queue`), `site-postings.sh` and the two launchd plists. Both default to
-`https://jobs.codertheory.dev`; point them at a local `wrangler dev` with
-`CAREER_OPS_SITE_BASE`.
+The producer side lives in **career-ops**, not here, and is four pieces:
+
+| Script | What it does | Schedule |
+|---|---|---|
+| `push-postings.mjs` | strong-match queue → thin postings; `--upgrade` rescans `reports/` for the Machine Summary + JD | 07:15 daily |
+| `site-eval-worker.mjs` | every posting without a *valid* evaluation gets one, then pushes it | every 30 min, 3 per tick |
+| `site-apply-worker.mjs` | drains `/api/postings/queue`, builds the CV + cover letter, uploads them | every 20 min |
+| `validate-machine-summary.mjs` | the schema gate the other three rely on | on demand / inside the eval run |
+
+All default to `https://jobs.codertheory.dev`; point them at a local
+`wrangler dev` with `CAREER_OPS_SITE_BASE`.
+
+**Why the eval worker exists.** A full A–G evaluation only ever ran when a
+human pasted a JD into a Claude session, so the site got the morning scan's
+thin record and nothing else — the brief's requirements matrix, hard stops,
+gaps and strengths were empty on real data no matter how well they were
+built. The worker closes that: no valid evaluation → one headless `claude -p`
+through `modes/oferta.md` → push.
+
+**Why the validator exists.** `batch/batch-prompt.md` has specified the
+Machine Summary schema all along and nothing checked it, so it drifted: **0
+of 195 reports carried a complete one**, none had ever emitted
+`requirement_importance`, and 47 carried an improvised key set
+(`comp_anchor_cad`, `geo_eligible`, `stack_primary`) that appears in no spec.
+Downstream — `analyze-patterns.mjs`, `salary-gap.mjs`, this site — silently
+rendered nothing for keys that never arrived. So "has an evaluation" means
+*passes validation*, not *a report exists*; the latter would have meant
+"never evaluate anything". The evaluation prompt runs the validator on itself
+and fixes what it reports before finishing.
+
+Errors fail; vocabulary warnings do not. The site reads these as free strings
+precisely because the corpus spells them several ways, and failing a real
+evaluation over the word "Legitimate" would throw away the work to enforce a
+label nothing depends on.
 
 Known gap: the same job re-listed under different URLs is three postings,
 because three URLs are three ids. career-ops has `detect-reposts.mjs` and a
