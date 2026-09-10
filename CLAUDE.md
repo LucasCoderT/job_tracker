@@ -55,7 +55,7 @@ server/
 app/
   pages/index.vue     assembles the sections; useStats() → SSR data
   pages/packs/        packs index + the pack page (cards, editor, exports)
-  pages/postings/     the ranked posting list + the posting brief
+  pages/postings/     the ranked posting list + the two-column posting brief
   components/          ConversionStrip, StatCard, VelocityChart, SourcesBreakdown,
                       TrackerBoard, PostingsPreview, AppTooltip, PackChip, PackCardEditor
   composables/         useStats (useFetch), useTooltip (shared floating tooltip), usePacks
@@ -318,6 +318,29 @@ Decisions that are load-bearing:
   so; do not "fix" it by dropping the cache.
 - **No `SCHEMA_VERSION` bump.** Postings never touch the `/api/stats` payload,
   and like the pack routes these are uncached.
+
+The brief (`app/pages/postings/[id].vue`) was rebuilt from the
+`Posting Brief v2` design on 2026-09-10: the decision on the left, a sticky
+rail of actions on the right. Left is the call (score + bar, verdict, signal
+pills coloured by `tone()`, facts, stack chips), then the evaluation — next
+action, the three finding lists with counts, **the requirements matrix**, risk,
+and a `<details>` for everything else the report carried. The matrix is the
+substantive addition: `analysis.requirements` has been in the payload since the
+first push and nothing rendered it.
+
+Two things worth keeping. `tone()` reads a colour off the words rather than
+matching an enum, for the same reason `cleanAnalysis` stores them as free
+strings — the corpus spells everything several ways. And the stack chips are
+tinted by cross-referencing each token against the requirements matrix, so
+"Kubernetes" reads amber when the JD called it high-importance and the match is
+only partial.
+
+The rail has one primary button whose label and action move with the state
+(Build pack → Building… → Mark applied → Open in Notion). The JD is its own
+grid child rather than the last card in the left column: when the grid
+collapses on a phone that puts it *after* the rail, instead of burying the
+actions under two hundred lines of job description. That is a deliberate
+departure from the design, which simply stacks main-then-rail.
 
 Routes (`server/api/postings/`): `GET /` list · `GET /queue`
 requested+building, FIFO · `GET|PUT|DELETE /:id` · `POST /:id/state` ·

@@ -296,42 +296,6 @@ footer { margin-top: 18px; font-size: 12px; color: var(--faint); }
 }
 .postings-page .more { margin-top: 12px; }
 
-/* The call: score, verdict, the facts that came with it */
-.verdict { display: flex; align-items: flex-start; gap: 16px; }
-.verdict .score-block { flex: none; display: flex; align-items: baseline; gap: 1px; }
-.verdict .big { font-size: 34px; font-weight: 600; letter-spacing: -0.05em; line-height: 1; }
-.verdict .of { font-size: 13px; color: var(--faint); }
-.verdict-text { min-width: 0; flex: 1; }
-.verdict .call { font-size: 15px; font-weight: 600; margin: 0 0 3px; }
-.verdict .why { font-size: 13.5px; color: var(--text); margin: 0; line-height: 1.5; }
-.verdict .arch { font-size: 12px; color: var(--muted); margin: 5px 0 0; }
-.verdict-tags { flex: none; }
-
-.facts-grid {
-  display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 14px;
-  margin: 14px 0 0; padding: 12px 0 0; border-top: 1px solid var(--panel-edge); font-size: 12.5px;
-}
-.facts-grid dt { color: var(--muted); }
-.facts-grid dd { color: var(--text); margin: 0; }
-
-.posting-links { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-top: 12px; font-size: 12.5px; }
-.posting-links a { color: var(--text); text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
-.posting-links a:hover, .posting-links a:focus-visible { color: var(--amber); }
-.posting-links .pi { color: var(--muted); font-size: 12px; }
-
-/* What the evaluation found */
-.next-action { font-size: 13.5px; color: var(--text); margin: 0 0 12px; line-height: 1.5; }
-.finding { margin-top: 12px; }
-.finding h3 {
-  font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
-  margin: 0 0 5px; color: var(--muted);
-}
-.finding h3.stop { color: var(--danger); }
-.finding h3.gap { color: var(--amber); }
-.finding h3.good { color: var(--green); }
-.finding-list { margin: 0; padding-left: 17px; font-size: 12.5px; color: var(--text); line-height: 1.5; }
-.finding-list li { margin: 4px 0; }
-
 .postings-page .stamp { margin: 8px 0 0; }
 .jd summary { color: var(--muted); cursor: pointer; font-size: 12.5px; }
 .jd-body {
@@ -493,3 +457,144 @@ footer { margin-top: 18px; font-size: 12px; color: var(--faint); }
   .filter-group { flex-wrap: wrap; width: 100%; justify-content: flex-start; }
   #tracker .tracker-tools { align-items: stretch; }
 }
+
+/* ---- Posting brief: the decision on the left, the actions on a rail ---- */
+.brief { max-width: 1040px; }
+.brief header { align-items: flex-end; }
+.brief-head { min-width: 0; }
+.brief-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--faint); }
+.state-pill {
+  display: inline-flex; align-items: center; font-size: 12px; font-weight: 600;
+  padding: 2px 8px; border-radius: 999px; border: 1px solid;
+  font-family: "Instrument Sans", system-ui, sans-serif;
+}
+.state-pill.applied { color: var(--green); border-color: #1f4a34; }
+.state-pill.dismissed { color: var(--muted); border-color: var(--panel-edge); }
+
+.brief-grid { display: grid; gap: 14px; align-items: start; grid-template-columns: minmax(0, 1fr) 300px; }
+.brief-main, .brief-rail { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+/* The rail follows down a long JD: the decision is always one click away. */
+.brief-rail { position: sticky; top: 16px; }
+@media (max-width: 880px) {
+  .brief-grid { grid-template-columns: 1fr; }
+  .brief-rail { position: static; }
+}
+
+/* The call */
+.verdict { display: flex; align-items: flex-start; gap: 18px; }
+.score-block { flex: none; display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 56px; }
+.score-n { display: flex; align-items: baseline; gap: 1px; }
+.verdict .big { font-size: 34px; font-weight: 600; letter-spacing: -0.05em; line-height: 1; }
+.verdict .of { font-size: 13px; color: var(--faint); }
+.score-track { height: 4px; width: 56px; border-radius: 2px; background: #26262c; position: relative; overflow: hidden; }
+.score-fill { position: absolute; inset: 0 auto 0 0; border-radius: 2px; }
+.verdict-text { min-width: 0; flex: 1; }
+.verdict .call { font-size: 15px; font-weight: 600; margin: 0 0 3px; line-height: 1.35; text-wrap: pretty; }
+.verdict .why { font-size: 13.5px; margin: 0; line-height: 1.5; text-wrap: pretty; }
+.verdict .arch { font-size: 12px; color: var(--muted); margin: 6px 0 0; }
+
+.signals { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+.signal {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 12px;
+  border-radius: 999px; padding: 2px 9px; border: 1px solid #35353d; white-space: nowrap;
+}
+.signal .dot, .req .dot, .chip .dot { width: 6px; height: 6px; border-radius: 50%; flex: none; }
+.signal .sig-k { color: var(--muted); }
+
+.facts-grid {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 14px;
+  margin: 14px 0 0; padding: 12px 0 0; border-top: 1px solid var(--panel-edge);
+  font-size: 12.5px; line-height: 1.45;
+}
+.facts-grid.lower { border-top: 0; padding-top: 0; }
+.facts-grid dt { color: var(--muted); }
+.facts-grid dt.low { text-transform: lowercase; }
+.facts-grid dt.mid { align-self: center; }
+.facts-grid dd { color: var(--text); margin: 0; }
+.facts-grid dd.chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px;
+  border: 1px solid var(--panel-edge); border-radius: 999px; padding: 2px 8px 2px 7px;
+  white-space: nowrap; color: var(--muted);
+}
+
+/* The evaluation */
+.next-action { display: flex; gap: 9px; align-items: flex-start; font-size: 13.5px; margin: 0; line-height: 1.5; text-wrap: pretty; }
+.next-action .pi { color: var(--amber); font-size: 12px; position: relative; top: 4px; flex: none; }
+.findings { display: grid; gap: 14px 20px; margin-top: 16px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 880px) { .findings { grid-template-columns: 1fr; } }
+.finding { min-width: 0; }
+.finding h3 {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+  margin: 0 0 5px; display: flex; justify-content: space-between; gap: 8px; color: var(--muted);
+}
+.finding h3 .n { color: var(--faint); letter-spacing: 0; }
+.finding h3.stop { color: var(--danger); }
+.finding h3.gap { color: var(--amber); }
+.finding h3.good { color: var(--green); }
+.finding-list { margin: 0; padding-left: 17px; font-size: 12.5px; color: var(--text); line-height: 1.5; }
+.finding-list li { margin: 4px 0; }
+.finding .none { margin: 0; }
+
+/* Requirements: what the JD asked for, against what he has */
+.reqs { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--panel-edge); }
+.reqs-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 6px; }
+.reqs-head h3 {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+  margin: 0; color: var(--muted);
+}
+.reqs-head h3 .mono { letter-spacing: 0; }
+.req {
+  display: grid; grid-template-columns: minmax(0, 1fr) 84px minmax(0, 220px);
+  gap: 6px 12px; align-items: baseline; padding: 7px 0;
+  border-bottom: 1px solid #26262c; font-size: 12.5px;
+}
+.req-text { display: flex; gap: 9px; align-items: baseline; min-width: 0; }
+.req-text span:last-child { text-wrap: pretty; }
+.req .dot { position: relative; top: -1px; }
+.req-imp { color: var(--muted); font-size: 11.5px; white-space: nowrap; }
+.req-match { font-size: 11.5px; text-align: right; }
+@media (max-width: 880px) {
+  .req { grid-template-columns: minmax(0, 1fr); }
+  .req-match { text-align: left; }
+}
+.extras-toggle { margin-top: 12px; }
+.extras-toggle summary { color: var(--faint); cursor: pointer; font-size: 12px; }
+
+/* The rail */
+.rail-next.p-card { border-color: #3a3323; }
+.rail-title { color: var(--amber) !important; margin-bottom: 10px !important; }
+.rail-primary { width: 100%; justify-content: center; }
+a.rail-primary.as-link {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 9px 14px; font-size: 14px; font-weight: 600; border-radius: 6px;
+  border: 1px solid var(--amber); background: var(--amber); color: var(--panel);
+  text-decoration: none; transition: background 120ms;
+}
+a.rail-primary.as-link:hover { background: #d9bd71; border-color: #d9bd71; color: var(--panel); }
+.rail-hint { margin: 8px 0 0; font-size: 11.5px; color: var(--muted); line-height: 1.45; text-wrap: pretty; }
+.rail-pack { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--panel-edge); }
+.rail-pack-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+.rail-label { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.rail-pack .pack-chip { margin-top: 0; }
+.rail-files { display: flex; flex-direction: column; gap: 6px; }
+.rail-file { display: flex; align-items: center; gap: 8px; font-size: 12.5px; min-width: 0; }
+.rail-file a { text-decoration: none; color: var(--text); display: inline-flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
+.rail-file a:hover, .rail-file a:focus-visible { color: var(--amber); }
+.rail-file .pi { color: var(--muted); font-size: 12px; flex: none; }
+.rail-file .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rail-pack .built { margin: 8px 0 0; }
+.rail-build { display: flex; gap: 8px; margin-top: 10px; }
+.rail-build .p-inputtext { flex: 1; min-width: 0; }
+.rail-danger { display: flex; gap: 4px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--panel-edge); }
+.rail-danger .p-button:last-child { margin-left: auto; }
+.rail-links .p-card-content { display: flex; flex-direction: column; gap: 8px; font-size: 12.5px; }
+.rail-links a { color: var(--text); text-decoration: none; display: inline-flex; align-items: center; gap: 8px; }
+.rail-links a:hover, .rail-links a:focus-visible { color: var(--amber); }
+.rail-links .pi { color: var(--muted); font-size: 12px; }
+.rail-links .in-notion { color: var(--green); }
+.small { font-size: 12.5px; }
+/* The JD sits under the main column on a wide screen and last of all when
+   the grid collapses, so the rail's actions stay above it on a phone. */
+.brief-jd { grid-column: 1; }
+@media (max-width: 880px) { .brief-jd { grid-column: auto; } }
