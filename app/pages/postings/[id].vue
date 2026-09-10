@@ -47,8 +47,9 @@ async function act(key: string, run: () => Promise<unknown>, after?: () => void)
   }
 }
 
-const buildPack = () =>
-  act(
+const buildPack = () => {
+  buildOpen.value = false
+  return act(
     'pack',
     () => $fetch(`/api/postings/${id.value}/pack`, { method: 'POST', body: { note: note.value } }),
     () => {
@@ -58,6 +59,7 @@ const buildPack = () =>
       }
     },
   )
+}
 
 async function markApplied() {
   busy.value = 'applied'
@@ -90,7 +92,7 @@ function dismiss() {
 }
 
 async function remove() {
-  if (armed.value !== 'delete') return arm('delete')
+  deleteOpen.value = false
   try {
     await $fetch(`/api/postings/${id.value}`, { method: 'DELETE' })
     await refreshIndex()
@@ -258,6 +260,51 @@ const lists = computed(() => {
   ]
 })
 
+/**
+ * Findings as one table rather than three columns. Three columns forced every
+ * finding into a third of the width, so a two-line gap wrapped to four; the
+ * kind is a label on the first row of its group instead, and the text gets the
+ * full measure.
+ */
+const findingRows = computed(() => {
+  const rows: {
+    first: boolean; last: boolean; kind: string; n: number; tone: string; text: string; muted: boolean
+  }[] = []
+  for (const l of lists.value) {
+    if (!l.items.length) {
+      rows.push({ first: true, last: true, kind: l.title, n: 0, tone: l.tone, text: 'None found.', muted: true })
+      continue
+    }
+    l.items.forEach((text, i) =>
+      rows.push({ first: i === 0, last: i === l.items.length - 1, kind: l.title, n: l.items.length, tone: l.tone, text, muted: false }),
+    )
+  }
+  return rows
+})
+
+const findSummary = computed(() => {
+  const a = analysis.value
+  if (!a) return ''
+  return `${a.hardStops.length} stops · ${a.softGaps.length} gaps · ${a.topStrengths.length} strengths`
+})
+
+// Build and delete are dialogs now. Not browser dialogs — an in-page modal,
+// which is what the no-`confirm()` rule was actually about: it says what will
+// be removed instead of relying on him remembering what "Really delete?" meant.
+const buildOpen = ref(false)
+const deleteOpen = ref(false)
+
+const fileCount = computed(() => {
+  const n = meta.value?.artifacts.length ?? 0
+  return n === 1 ? '1 built file' : `${n} built files`
+})
+
+const deleteNote = computed(() =>
+  applied.value
+    ? 'The Notion row and the funnel are untouched — this only removes the posting record here.'
+    : 'The morning scan can push it back up if it scores again; Dismiss is the quieter option if you just want it out of the way.',
+)
+
 const risks = computed(() => Object.entries(analysis.value?.risk ?? {}).map(([k, v]) => ({ k, v })))
 const extras = computed(() =>
   Object.entries(analysis.value?.extra ?? {}).map(([k, v]) => ({ k: k.replace(/_/g, ' '), v })),
@@ -309,7 +356,7 @@ const notionHref = computed(() =>
 function onPrimary() {
   if (applied.value || inFlight.value) return
   if (packDone.value) return markApplied()
-  return buildPack()
+  buildOpen.value = true
 }
 </script>
 
@@ -414,41 +461,66 @@ function onPrimary() {
                 <i class="pi pi-flag" /><span>{{ analysis.nextAction }}</span>
               </p>
 
-              <div class="findings">
-                <div v-for="l in lists" :key="l.title" class="finding">
-                  <h3 :class="l.tone">{{ l.title }}<span class="n mono">{{ l.items.length }}</span></h3>
-                  <p v-if="!l.items.length" class="muted small none">None found.</p>
-                  <ul v-else class="finding-list">
-                    <li v-for="(item, i) in l.items" :key="i">{{ item }}</li>
-                  </ul>
-                </div>
+              <div v-if="findingRows.length" class="eval-sec">
+                <h3>Findings <span class="mono">· {{ findSummary }}</span></h3>
+              </div>
+              <div class="table-scroll">
+                <table class="findings-table">
+                  <tbody>
+                    <tr v-for="(f, i) in findingRows" :key="i" :class="{ 'group-end': f.last && i < findingRows.length - 1 }">
+                      <td class="kind" :class="{ pt: f.first, pb: f.last }">
+                        <span v-if="f.first" class="kind-label" :class="f.tone">
+                          <span class="dot" />{{ f.kind }}<span class="n mono">{{ f.n }}</span>
+                        </span>
+                      </td>
+                      <td class="finding-text" :class="{ pt: f.first, pb: f.last, muted: f.muted }">{{ f.text }}</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
 
               <!-- What the JD asked for against what he has. The payload has
                    carried this since the first push; nothing rendered it. -->
-              <div v-if="requirements.length" class="reqs">
-                <div class="reqs-head">
+              <template v-if="requirements.length">
+                <div class="eval-sec">
                   <h3>Requirements <span class="mono">· {{ reqSummary }}</span></h3>
                   <span class="sec-note">what the JD asked for, and what you have</span>
                 </div>
-                <div v-for="(r, i) in requirements" :key="i" class="req">
-                  <span class="req-text">
-                    <span class="dot" :style="{ background: r.color }" />
-                    <span>{{ r.requirement }}</span>
-                  </span>
-                  <span class="req-imp mono">{{ r.importance }}</span>
-                  <span class="req-match" :style="{ color: r.color }">
-                    {{ r.match }}<span v-if="r.evidence" class="faint"> · {{ r.evidence }}</span>
-                  </span>
+                <div class="table-scroll">
+                  <table class="reqs-table">
+                    <thead>
+                      <tr>
+                        <th>Requirement</th>
+                        <th class="tight">Importance</th>
+                        <th class="tight">Match</th>
+                        <th class="tight">Evidence</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="(r, i) in requirements" :key="i">
+                        <td class="req-name">{{ r.requirement }}</td>
+                        <td class="req-imp mono" :class="{ critical: /critical|must|required/i.test(r.importance) }">
+                          {{ r.importance || '—' }}
+                        </td>
+                        <td class="req-match">
+                          <span :style="{ color: r.color }"><span class="dot" :style="{ background: r.color }" />{{ r.match }}</span>
+                        </td>
+                        <td class="req-ev">{{ r.evidence || '—' }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
-              </div>
+              </template>
 
-              <dl v-if="risks.length" class="facts-grid lower">
-                <template v-for="r in risks" :key="r.k">
-                  <dt class="low">{{ r.k }}</dt>
-                  <dd>{{ r.v }}</dd>
-                </template>
-              </dl>
+              <template v-if="risks.length">
+                <div class="eval-sec"><h3>Risk</h3></div>
+                <dl class="facts-grid lower risk-grid">
+                  <template v-for="r in risks" :key="r.k">
+                    <dt class="low">{{ r.k }}</dt>
+                    <dd>{{ r.v }}</dd>
+                  </template>
+                </dl>
+              </template>
 
               <details v-if="extras.length" class="extras-toggle">
                 <summary class="mono">everything else the report said · {{ extras.length }}</summary>
@@ -499,18 +571,23 @@ function onPrimary() {
 
                 <div v-if="files.length" class="rail-files">
                   <div v-for="f in files" :key="f.name" class="rail-file">
-                    <a :href="`/api/postings/${id}/artifacts/${encodeURIComponent(f.name)}`">
-                      <i :class="f.icon" /><span class="name">{{ f.label }}</span>
+                    <a class="file-card" :href="`/api/postings/${id}/artifacts/${encodeURIComponent(f.name)}`">
+                      <i :class="f.icon" />
+                      <span class="file-meta">
+                        <span class="file-label">{{ f.label }}</span>
+                        <span class="file-sub mono">{{ f.name }} · {{ kb(f.bytes) }}</span>
+                      </span>
+                      <i class="pi pi-download go" />
                     </a>
-                    <span class="mono faint">{{ kb(f.bytes) }}</span>
                     <button
                       type="button"
-                      class="linkish"
-                      :class="{ danger: armed === `file:${f.name}` }"
+                      class="file-del"
+                      :class="{ armed: armed === `file:${f.name}` }"
                       :aria-label="`Delete ${f.name}`"
+                      :title="armed === `file:${f.name}` ? 'Really delete?' : 'Delete'"
                       @click="deleteFile(f.name)"
                     >
-                      {{ armed === `file:${f.name}` ? 'really?' : 'delete' }}
+                      <i :class="armed === `file:${f.name}` ? 'pi pi-exclamation-triangle' : 'pi pi-trash'" />
                     </button>
                   </div>
                 </div>
@@ -525,23 +602,16 @@ function onPrimary() {
                   </p>
                 </ClientOnly>
 
-                <div class="rail-build">
-                  <PrimeInputText
-                    v-model="note"
-                    :placeholder="meta.packNote || 'Note for the build (emphasis, tone)…'"
-                    size="small"
-                    aria-label="Note for the build"
-                  />
-                  <PrimeButton
-                    :label="meta.pack === 'none' ? 'Build' : packDone ? 'Rebuild' : 'Re-queue'"
-                    icon="pi pi-refresh"
-                    size="small"
-                    severity="secondary"
-                    outlined
-                    :loading="busy === 'pack'"
-                    @click="buildPack"
-                  />
-                </div>
+                <PrimeButton
+                  class="rail-build"
+                  :label="meta.pack === 'none' ? 'Build' : packDone ? 'Rebuild' : 'Re-queue'"
+                  icon="pi pi-refresh"
+                  size="small"
+                  severity="secondary"
+                  outlined
+                  :loading="busy === 'pack'"
+                  @click="buildOpen = true"
+                />
               </div>
 
               <div class="rail-danger">
@@ -555,34 +625,46 @@ function onPrimary() {
                   @click="dismiss"
                 />
                 <PrimeButton
-                  :label="armed === 'delete' ? 'Really delete?' : 'Delete'"
+                  class="danger-btn"
+                  label="Delete"
                   icon="pi pi-trash"
                   size="small"
-                  :severity="armed === 'delete' ? 'danger' : 'secondary'"
+                  severity="danger"
                   text
-                  @click="remove"
+                  @click="deleteOpen = true"
                 />
               </div>
             </template>
           </PrimeCard>
 
-          <PrimeCard class="sec rail-links" aria-label="Links">
-            <template #content>
-              <a v-if="meta.url" :href="meta.url" target="_blank" rel="noopener">
-                <i class="pi pi-external-link" />The posting<span v-if="meta.source" class="mono muted"> · {{ meta.source }}</span>
-              </a>
-              <a v-if="notionHref" :href="notionHref" target="_blank" rel="noopener">
-                <i class="pi pi-check-circle in-notion" />In Notion<ClientOnly><span class="mono muted"> · applied {{ when(meta.appliedAt) }}</span></ClientOnly>
-              </a>
+          <a
+            v-if="meta.url"
+            class="link-card"
+            :href="meta.url"
+            target="_blank"
+            rel="noopener"
+            :aria-label="`Open the posting on ${meta.source || 'its site'}`"
+          >
+            <span class="link-meta">
+              <span class="link-title">The posting<span v-if="meta.source" class="mono muted"> · {{ meta.source }}</span></span>
               <ClientOnly>
-                <span v-if="meta.postedAt || meta.location" class="faint small mono">
+                <span v-if="meta.postedAt || meta.location" class="link-sub mono">
                   <template v-if="meta.postedAt">posted {{ when(meta.postedAt) }}</template>
                   <template v-if="meta.postedAt && meta.location"> · </template>
                   <template v-if="meta.location">{{ meta.location }}</template>
                 </span>
               </ClientOnly>
-            </template>
-          </PrimeCard>
+            </span>
+            <i class="pi pi-external-link go" />
+          </a>
+
+          <a v-if="notionHref" class="link-card" :href="notionHref" target="_blank" rel="noopener">
+            <span class="link-meta">
+              <span class="link-title"><i class="pi pi-check-circle in-notion" />In Notion</span>
+              <ClientOnly><span class="link-sub mono">applied {{ when(meta.appliedAt) }}</span></ClientOnly>
+            </span>
+            <i class="pi pi-external-link go" />
+          </a>
         </aside>
 
         <!-- The posting itself. Its own grid child rather than part of the
@@ -598,6 +680,64 @@ function onPrimary() {
           </template>
         </PrimeCard>
       </div>
+
+      <!-- Build: a note steers emphasis, so it gets room to be written rather
+           than a one-line field wedged into a 300px rail. -->
+      <PrimeDialog
+        v-model:visible="buildOpen"
+        modal
+        :header="meta.pack === 'none' ? 'Build the apply pack' : 'Rebuild the apply pack'"
+        :style="{ width: 'min(520px, calc(100vw - 32px))' }"
+      >
+        <div class="build-dialog">
+          <p class="muted small">
+            The Mac tailors a CV and cover letter to this JD and uploads them here — usually 15–20 minutes.
+            A note steers the emphasis and tone.
+          </p>
+          <label>
+            <span>Note for the build <small>optional</small></span>
+            <PrimeTextarea
+              v-model="note"
+              rows="5"
+              :placeholder="meta.packNote || 'Note for the build (emphasis, tone)…'"
+              autocomplete="off"
+            />
+          </label>
+          <p v-if="meta.packNote" class="faint small mono">last build: “{{ meta.packNote }}”</p>
+        </div>
+        <template #footer>
+          <PrimeButton label="Cancel" severity="secondary" text size="small" @click="buildOpen = false" />
+          <PrimeButton
+            :label="meta.pack === 'none' ? 'Build pack' : 'Rebuild'"
+            icon="pi pi-refresh"
+            size="small"
+            :loading="busy === 'pack'"
+            @click="buildPack"
+          />
+        </template>
+      </PrimeDialog>
+
+      <!-- Delete: a modal rather than the arm-then-confirm used elsewhere.
+           Not a browser dialog, so it does not block automation or screen
+           readers — and unlike "Really delete?" it says what goes with it. -->
+      <PrimeDialog
+        v-model:visible="deleteOpen"
+        modal
+        header="Delete this posting?"
+        :style="{ width: 'min(440px, calc(100vw - 32px))' }"
+      >
+        <div class="delete-dialog">
+          <p>
+            Removes <b>{{ meta.company }}<template v-if="meta.role"> · {{ meta.role }}</template></b>
+            from postings, along with its job description, the evaluation, and {{ fileCount }}.
+          </p>
+          <p class="muted">{{ deleteNote }}</p>
+        </div>
+        <template #footer>
+          <PrimeButton label="Cancel" severity="secondary" text size="small" @click="deleteOpen = false" />
+          <PrimeButton label="Delete posting" icon="pi pi-trash" severity="danger" size="small" @click="remove" />
+        </template>
+      </PrimeDialog>
     </template>
   </div>
 </template>

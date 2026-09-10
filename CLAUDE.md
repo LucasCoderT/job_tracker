@@ -346,6 +346,28 @@ collapses on a phone that puts it *after* the rail, instead of burying the
 actions under two hundred lines of job description. That is a deliberate
 departure from the design, which simply stacks main-then-rail.
 
+Revised again the same day from an updated `Posting Brief v2`: findings and
+requirements are **tables** (three equal columns forced a two-line gap to wrap
+to four; a row per finding with the kind labelled once per group gives the
+text the full measure), the requirements table gets a real `<thead>` and a
+560px min-width with horizontal scroll on a phone, and the rail's files became
+cards with the real filename and a download affordance.
+
+**Build and Delete are dialogs.** That is a departure from the arm-then-confirm
+convention, and a deliberate one: `PrimeDialog` is an in-page modal, not a
+browser `confirm()`, so it does not block automation or screen readers — which
+is what that rule was actually protecting. Both earn it. The build note steers
+emphasis and deserves a textarea rather than a one-line field wedged into a
+300px rail; and the delete dialog *names what goes with it* ("its job
+description, the evaluation, and 3 built files") plus whether the Notion row
+survives, which "Really delete?" cannot say. Dismiss and per-file delete keep
+the two-step arm — the gradation is intentional, heavier action, louder
+confirmation.
+
+These tables are plain `<table>` rather than `PrimeDataTable`: they neither
+sort nor page, and the PrimeVue rule is about controls and containers, not
+static markup.
+
 Routes (`server/api/postings/`): `GET /` list · `GET /queue`
 requested+building, FIFO · `GET|PUT|DELETE /:id` · `POST /:id/state` ·
 `POST /:id/pack` · `POST /:id/pack/status` · `POST /:id/applied` ·

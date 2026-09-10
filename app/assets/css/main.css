@@ -519,46 +519,65 @@ footer { margin-top: 18px; font-size: 12px; color: var(--faint); }
 }
 
 /* The evaluation */
-.next-action { display: flex; gap: 9px; align-items: flex-start; font-size: 13.5px; margin: 0; line-height: 1.5; text-wrap: pretty; }
+.next-action { display: flex; gap: 9px; align-items: flex-start; font-size: 13.5px; margin: 0; line-height: 1.55; text-wrap: pretty; max-width: 64ch; }
 .next-action .pi { color: var(--amber); font-size: 12px; position: relative; top: 4px; flex: none; }
-.findings { display: grid; gap: 14px 20px; margin-top: 16px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
-@media (max-width: 880px) { .findings { grid-template-columns: 1fr; } }
-.finding { min-width: 0; }
-.finding h3 {
-  font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
-  margin: 0 0 5px; display: flex; justify-content: space-between; gap: 8px; color: var(--muted);
-}
-.finding h3 .n { color: var(--faint); letter-spacing: 0; }
-.finding h3.stop { color: var(--danger); }
-.finding h3.gap { color: var(--amber); }
-.finding h3.good { color: var(--green); }
-.finding-list { margin: 0; padding-left: 17px; font-size: 12.5px; color: var(--text); line-height: 1.5; }
-.finding-list li { margin: 4px 0; }
-.finding .none { margin: 0; }
 
-/* Requirements: what the JD asked for, against what he has */
-.reqs { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--panel-edge); }
-.reqs-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 6px; }
-.reqs-head h3 {
+/* Each block inside the evaluation gets a rule and a label, so the card reads
+   as sections rather than one long run. */
+.eval-sec {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+  margin: 26px 0 8px; padding-top: 18px; border-top: 1px solid var(--panel-edge);
+}
+.eval-sec h3 {
   font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
   margin: 0; color: var(--muted);
 }
-.reqs-head h3 .mono { letter-spacing: 0; }
-.req {
-  display: grid; grid-template-columns: minmax(0, 1fr) 84px minmax(0, 220px);
-  gap: 6px 12px; align-items: baseline; padding: 7px 0;
-  border-bottom: 1px solid #26262c; font-size: 12.5px;
+.eval-sec h3 .mono { letter-spacing: 0; }
+.table-scroll { overflow-x: auto; }
+
+/* Findings: one row each, the kind labelled once per group. Three equal
+   columns forced a two-line gap to wrap to four; this gives the text the
+   full measure. */
+.findings-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.findings-table td { border-bottom: 1px solid transparent; vertical-align: top; padding: 5px 10px 5px 0; }
+.findings-table td.pt { padding-top: 10px; }
+.findings-table td.pb { padding-bottom: 10px; }
+.findings-table tr.group-end td { border-bottom-color: var(--panel-edge); }
+.findings-table tr:hover { background: var(--card); }
+.findings-table td.kind { white-space: nowrap; width: 1%; padding-right: 28px; }
+.kind-label {
+  display: inline-flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 600;
+  letter-spacing: 0.06em; text-transform: uppercase; line-height: 19px; color: var(--muted);
 }
-.req-text { display: flex; gap: 9px; align-items: baseline; min-width: 0; }
-.req-text span:last-child { text-wrap: pretty; }
-.req .dot { position: relative; top: -1px; }
-.req-imp { color: var(--muted); font-size: 11.5px; white-space: nowrap; }
-.req-match { font-size: 11.5px; text-align: right; }
-@media (max-width: 880px) {
-  .req { grid-template-columns: minmax(0, 1fr); }
-  .req-match { text-align: left; }
+.kind-label .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
+.kind-label .n { color: var(--faint); letter-spacing: 0; }
+.kind-label.stop { color: var(--danger); }
+.kind-label.gap { color: var(--amber); }
+.kind-label.good { color: var(--green); }
+.findings-table td.finding-text { line-height: 1.5; text-wrap: pretty; max-width: 64ch; color: var(--text); }
+.findings-table td.finding-text.muted { color: var(--muted); }
+
+/* Requirements: a real table — four short columns read faster than a stack. */
+.reqs-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.reqs-table th {
+  padding: 0 10px 8px; font-size: 11px; font-weight: 500; letter-spacing: 0.04em;
+  color: var(--faint); border-bottom: 1px solid var(--panel-edge); text-align: left; white-space: nowrap;
 }
-.extras-toggle { margin-top: 12px; }
+.reqs-table th:first-child { padding-left: 0; padding-right: 16px; }
+.reqs-table th.tight { width: 1%; }
+.reqs-table td { padding: 10px; border-bottom: 1px solid #26262c; vertical-align: top; }
+.reqs-table tr:hover { background: var(--card); }
+.reqs-table td.req-name { padding-left: 0; padding-right: 16px; line-height: 1.5; text-wrap: pretty; max-width: 52ch; }
+.reqs-table td.req-imp { white-space: nowrap; font-size: 11.5px; color: var(--muted); }
+.reqs-table td.req-imp.critical { color: var(--text); }
+.reqs-table td.req-match { white-space: nowrap; }
+.reqs-table td.req-match span { display: inline-flex; align-items: center; gap: 6px; }
+.reqs-table td.req-match .dot { width: 6px; height: 6px; border-radius: 50%; flex: none; }
+.reqs-table td.req-ev { color: var(--muted); white-space: nowrap; }
+@media (max-width: 880px) { .reqs-table { min-width: 560px; } }
+
+.risk-grid { gap: 8px 18px; max-width: 64ch; line-height: 1.5; }
+.extras-toggle { margin-top: 22px; }
 .extras-toggle summary { color: var(--faint); cursor: pointer; font-size: 12px; }
 
 /* The rail */
@@ -577,22 +596,54 @@ a.rail-primary.as-link:hover { background: #d9bd71; border-color: #d9bd71; color
 .rail-pack-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 6px; }
 .rail-label { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
 .rail-pack .pack-chip { margin-top: 0; }
-.rail-files { display: flex; flex-direction: column; gap: 6px; }
-.rail-file { display: flex; align-items: center; gap: 8px; font-size: 12.5px; min-width: 0; }
-.rail-file a { text-decoration: none; color: var(--text); display: inline-flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
-.rail-file a:hover, .rail-file a:focus-visible { color: var(--amber); }
-.rail-file .pi { color: var(--muted); font-size: 12px; flex: none; }
-.rail-file .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.rail-pack .built { margin: 8px 0 0; }
-.rail-build { display: flex; gap: 8px; margin-top: 10px; }
-.rail-build .p-inputtext { flex: 1; min-width: 0; }
+.rail-files { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.rail-file { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.file-card {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px;
+  text-decoration: none; color: var(--text); background: var(--card);
+  border: 1px solid var(--panel-edge); border-radius: 10px; padding: 9px 12px;
+  transition: border-color 120ms;
+}
+.file-card:hover, .file-card:focus-visible { border-color: var(--amber); }
+.file-card > .pi { color: var(--muted); font-size: 13px; flex: none; }
+.file-meta { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.file-label { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.file-sub { font-size: 11px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.file-del {
+  flex: none; width: 30px; height: 30px; border: 0; background: transparent; border-radius: 6px;
+  cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+  color: var(--faint); transition: background 120ms, color 120ms;
+}
+.file-del:hover { background: var(--card); color: var(--danger); }
+.file-del.armed { color: var(--danger); }
+.file-del:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.rail-pack .built { margin: 8px 0 0; line-height: 1.5; text-wrap: pretty; }
+.rail-build { width: 100%; justify-content: center; margin-top: 10px; }
 .rail-danger { display: flex; gap: 4px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--panel-edge); }
 .rail-danger .p-button:last-child { margin-left: auto; }
-.rail-links .p-card-content { display: flex; flex-direction: column; gap: 8px; font-size: 12.5px; }
-.rail-links a { color: var(--text); text-decoration: none; display: inline-flex; align-items: center; gap: 8px; }
-.rail-links a:hover, .rail-links a:focus-visible { color: var(--amber); }
-.rail-links .pi { color: var(--muted); font-size: 12px; }
-.rail-links .in-notion { color: var(--green); }
+/* The links are tap targets on a phone, so they are cards rather than a row
+   of small anchors inside one. */
+.link-card {
+  display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--text);
+  background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 14px;
+  padding: 14px 20px; font-size: 12.5px; transition: border-color 120ms;
+}
+.link-card:hover, .link-card:focus-visible { border-color: var(--amber); }
+.link-meta { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.link-title { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
+.link-sub { color: var(--faint); font-size: 11.5px; }
+.link-card .go { color: var(--muted); font-size: 13px; flex: none; }
+.link-card .in-notion { color: var(--green); font-size: 12px; }
+.rail-danger .danger-btn { margin-left: auto; }
+
+/* Dialogs */
+.build-dialog { display: flex; flex-direction: column; gap: 12px; }
+.build-dialog label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--muted); }
+.build-dialog label small { color: var(--faint); margin-left: 6px; }
+.build-dialog .p-textarea { width: 100%; }
+.delete-dialog { display: flex; flex-direction: column; gap: 10px; font-size: 13px; line-height: 1.5; }
+.delete-dialog p { margin: 0; text-wrap: pretty; }
+.delete-dialog b { font-weight: 600; }
 .small { font-size: 12.5px; }
 /* The JD sits under the main column on a wide screen and last of all when
    the grid collapses, so the rail's actions stay above it on a phone. */
