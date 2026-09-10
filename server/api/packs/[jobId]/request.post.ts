@@ -8,6 +8,7 @@
 import type { PackMeta } from '../../../../shared/types'
 import { packContext, now } from '../../../utils/pack-route'
 import { getMeta, getBank, putMeta, slugify, withCounts } from '../../../utils/packs'
+import { announce, commandWorkers } from '../../../utils/realtime'
 
 export default defineEventHandler(async (event): Promise<PackMeta> => {
   const ctx = packContext(event)
@@ -34,5 +35,9 @@ export default defineEventHandler(async (event): Promise<PackMeta> => {
   }
   const counted = withCounts(meta, await getBank(ctx.kv, ctx.jobId))
   await putMeta(ctx.kv, counted)
+  // Tell the UI immediately, and wake the Mac worker rather than making it
+  // wait up to 20 minutes for its next poll.
+  announce(event, 'pack.requested', ctx.jobId, { company, position, status: 'requested' })
+  commandWorkers(event, 'build-pack', { jobId: ctx.jobId })
   return counted
 })

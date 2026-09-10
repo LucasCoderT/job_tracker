@@ -7,6 +7,7 @@
 import type { PackMeta } from '../../../../shared/types'
 import { packContext, requireMeta, now } from '../../../utils/pack-route'
 import { STATUSES, getBank, putMeta, withCounts } from '../../../utils/packs'
+import { announce } from '../../../utils/realtime'
 
 export default defineEventHandler(async (event): Promise<PackMeta> => {
   const ctx = packContext(event)
@@ -32,5 +33,10 @@ export default defineEventHandler(async (event): Promise<PackMeta> => {
     bank,
   )
   await putMeta(ctx.kv, next)
+  // This is the one Lucas actually watches for: the pack finishing while the
+  // phone is open.
+  announce(event, `pack.${status}` as 'pack.building' | 'pack.done' | 'pack.failed', ctx.jobId, {
+    company: next.company, position: next.position, status: next.status, error: next.error,
+  })
   return next
 })

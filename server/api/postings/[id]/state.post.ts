@@ -9,6 +9,8 @@ import type { PostingMeta } from '../../../../shared/types'
 import { postingContext, requirePosting, now } from '../../../utils/posting-route'
 import { putMeta } from '../../../utils/postings'
 
+import { announce } from '../../../utils/realtime'
+
 export default defineEventHandler(async (event): Promise<PostingMeta> => {
   const ctx = postingContext(event)
   const meta = await requirePosting(ctx)
@@ -19,5 +21,6 @@ export default defineEventHandler(async (event): Promise<PostingMeta> => {
   }
   const next: PostingMeta = { ...meta, state, updatedAt: now() }
   await putMeta(ctx.kv, next)
+  announce(event, 'posting.state', ctx.id, { state, company: next.company, role: next.role })
   return next
 })

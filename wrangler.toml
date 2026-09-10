@@ -69,3 +69,22 @@ id = "198f7254f01a43439ed9da7232eec2a6"
 [[kv_namespaces]]
 binding = "POSTINGS"
 id = "d65f0d9f317d4b7d9ffe0071721440d9"
+
+# --- Realtime (added 2026-09-10) --------------------------------------------
+# PipelineHub holds the WebSocket connections that make the site react the
+# moment something changes: a pack finishes building, a posting gets evaluated,
+# a row is marked applied or rejected. A Worker cannot hold a socket open, so a
+# Durable Object is the only way to do this on this stack.
+#
+# Class is defined in server/durable/pipeline-hub.ts and re-exported from the
+# Nitro entry so wrangler can find it in the built bundle.
+[[durable_objects.bindings]]
+name = "PIPELINE_HUB"
+class_name = "PipelineHub"
+
+# SQLite-backed (new_sqlite_classes, not new_classes) — the hub keeps a short
+# replay buffer so a phone that reconnects is immediately correct instead of
+# correct-on-next-event.
+[[migrations]]
+tag = "v1-pipeline-hub"
+new_sqlite_classes = ["PipelineHub"]

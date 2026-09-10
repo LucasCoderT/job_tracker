@@ -72,6 +72,34 @@ export default defineNuxtConfig({
     // Cron: Nitro turns scheduledTasks into wrangler cron triggers at build
     // time. Daily snapshot ~15:00 UTC (~9am Edmonton) → KV, for trend lines.
     experimental: { tasks: true },
+
+    // --- Realtime: re-export the PipelineHub Durable Object ----------------
+    // Cloudflare requires the DO class to be a named export of the Worker
+    // entry. Nitro 2.13's cloudflare_module preset has no `cloudflare.exports`
+    // option (that landed later, and the `cloudflare-durable` preset bundles
+    // its own generic $DurableObject with no role targeting or replay, which
+    // is not what this hub does). So the class is emitted as dependency-free
+    // .mjs — it imports nothing but `cloudflare:workers` — and copied beside
+    // the built entry, with one re-export line appended.
+    //
+    // Deliberately additive: it never rewrites the generated entry, so a Nitro
+    // upgrade cannot silently break the app, only this one export.
+    hooks: {
+      async compiled(nitro) {
+        const { copyFile, appendFile } = await import('node:fs/promises')
+        const { resolve } = await import('node:path')
+        const serverDir = nitro.options.output.serverDir
+        await copyFile(
+          resolve(nitro.options.rootDir, 'server/durable/pipeline-hub.mjs'),
+          resolve(serverDir, 'pipeline-hub.mjs'),
+        )
+        await appendFile(
+          resolve(serverDir, 'index.mjs'),
+          '\n\n// realtime: Durable Object export (see nuxt.config.ts)\nexport { PipelineHub } from "./pipeline-hub.mjs";\n',
+        )
+        console.log('[realtime] PipelineHub exported from the Worker entry')
+      },
+    },
     scheduledTasks: {
       '0 15 * * *': ['snapshot'],
     },

@@ -31,5 +31,8 @@ export default defineEventHandler(async (event): Promise<PostingApplyResult> => 
     updatedAt: stamp,
   }
   await putMeta(ctx.kv, next)
+  announce(event, 'posting.applied', ctx.id, {
+    company: next.company, role: next.role, appliedAt: stamp, notionOk: notion.ok,
+  })
   return { meta: next, notion }
 })
