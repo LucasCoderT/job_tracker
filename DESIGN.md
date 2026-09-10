@@ -16,7 +16,7 @@ page, no onboarding, no empty-state marketing. Every element earns its place by
 answering one of exactly three questions:
 
 1. **Is this working?** (reply rate, interview rate, velocity)
-2. **Where should I spend my next hour?** (attention queue, source breakdown)
+2. **Where should I spend my next hour?** (postings preview, source breakdown)
 3. **What do I need in front of me right now?** (a pack's cards, a job's link)
 
 If a proposed element answers none of those, cut it. A design change that makes
@@ -97,8 +97,8 @@ propose the token — don't inline a hex.
 - **Bespoke SVG is the dataviz**: Sankey, donuts, velocity bars, source bars,
   and the rich `AppTooltip`. No chart library. They're themed with the same
   tokens so the seam is invisible.
-- Dense clickable rows (job cards, attention cards, pack rows) stay themed
-  `<a>` anchors. `PrimeCard` is too heavy for a 40px item.
+- Dense clickable rows (job cards, posting preview cards, pack rows) stay
+  themed anchors. `PrimeCard` is too heavy for a 40px item.
 
 ---
 
@@ -252,8 +252,9 @@ in the area. They're ordered by how much they hurt.
 8. **No skeletons.** Loading is a centred spinner that the real layout then
    shoves aside. Panel-shaped skeletons at the real dimensions would remove
    the jump.
-9. **Scroll containers hide content silently.** The attention row scrolls
-   horizontally and board columns cap at 460px with inner scroll — no
+9. **Scroll containers hide content silently.** Half-paid: the top slot's
+   horizontal scroller is gone, replaced by the postings preview's wrapping
+   grid. Board columns still cap at 460px with inner scroll — no
    fade/affordance says there's more, and on a phone the column scroll fights
    the page scroll.
 10. **The history API has no UI.** `/api/history` accumulates daily snapshots

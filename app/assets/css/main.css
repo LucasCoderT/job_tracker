@@ -28,23 +28,32 @@ h1 { font-size: 20px; font-weight: 600; letter-spacing: 0.01em; margin: 0; }
 .sec .p-card-content { padding: 0; }
 .sec h2 { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
 
-/* Attention queue */
-.attention.p-card { margin-bottom: 14px; border-color: #3a3323; }
-.attention .attn-title { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--amber); letter-spacing: 0.04em; text-transform: uppercase; }
-.attn-row { display: flex; gap: 10px; overflow-x: auto; padding: 6px 0 2px; scrollbar-width: thin; }
-.attn-card {
-  flex: 0 0 auto; min-width: 190px; max-width: 240px;
-  display: block; text-decoration: none;
+/* Postings preview — the top slot, a look at what the morning scan found */
+.preview.p-card { margin-bottom: 14px; border-color: #3a3323; }
+.pv-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.pv-title { margin: 0; font-size: 13px; font-weight: 600; color: var(--amber); letter-spacing: 0.04em; text-transform: uppercase; }
+.pv-all { font-size: 12px; color: var(--muted); text-decoration: none; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.pv-all:hover, .pv-all:focus-visible { color: var(--amber); }
+.pv-all .pi { font-size: 10px; }
+/* A wrapping grid, not a scroller: a horizontal scroller hides items with
+   nothing to say it has. Column counts are pinned rather than auto-filled —
+   there are always five cards, and auto-fill lands on four at common widths,
+   orphaning the fifth on a row of its own. 1 → 2 → 3 → 5 never does that. */
+.pv-row { display: grid; gap: 10px; grid-template-columns: 1fr; }
+@media (min-width: 520px) { .pv-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 760px) { .pv-row { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 1040px) { .pv-row { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+.pv-card {
+  display: block; text-decoration: none; position: relative;
   background: var(--card); border: 1px solid var(--panel-edge);
   border-radius: 10px; padding: 9px 12px; transition: border-color 120ms;
 }
-.attn-card:hover, .attn-card:focus-visible { border-color: var(--amber); }
-.attn-card:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
-.attn-card .co { font-size: 13px; font-weight: 600; color: var(--text); margin: 0 0 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.attn-card .role { font-size: 11.5px; color: var(--muted); margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.attn-card .why { font-size: 11px; margin: 6px 0 0; display: inline-block; border-radius: 999px; padding: 1px 8px; }
-.why.followup { color: var(--amber); border: 1px solid #4a3f1f; }
-.why.aging { color: var(--muted); border: 1px solid var(--panel-edge); }
+.pv-card:hover, .pv-card:focus-visible { border-color: var(--amber); }
+.pv-card:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.pv-score { position: absolute; top: 8px; right: 11px; font-size: 13px; font-weight: 600; letter-spacing: -0.02em; }
+.pv-card .co { font-size: 13px; font-weight: 600; color: var(--text); margin: 0 0 1px; padding-right: 30px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pv-card .role { font-size: 11.5px; color: var(--muted); margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pv-card .when { font-size: 11px; color: var(--faint); margin: 6px 0 0; }
 
 .grid { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr) 250px; align-items: stretch; }
 @media (max-width: 880px) { .grid { grid-template-columns: 1fr; } }
@@ -110,6 +119,13 @@ h1 { font-size: 20px; font-weight: 600; letter-spacing: 0.01em; margin: 0; }
 .tbl-link:hover, .tbl-link:focus-visible { color: var(--amber); }
 .tracker-tools .p-iconfield { width: min(300px, 100%); }
 .tracker-tools .p-inputtext { width: 100%; }
+/* On a phone the view toggle and a 300px search box cannot sit on one
+   nowrap row, and the whole page scrolled sideways as a result. Let them
+   wrap onto their own line instead. */
+@media (max-width: 560px) {
+  #tracker .tracker-tools { flex-wrap: wrap; flex-shrink: 1; width: 100%; }
+  .tracker-tools .p-iconfield { width: 100%; min-width: 0; }
+}
 .board { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: thin; }
 .col {
   flex: 1 0 215px; min-width: 215px;

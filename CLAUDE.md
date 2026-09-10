@@ -57,7 +57,7 @@ app/
   pages/packs/        packs index + the pack page (cards, editor, exports)
   pages/postings/     the ranked posting list + the posting brief
   components/          PipelineSankey, StatCard, VelocityChart, SourcesBreakdown,
-                      TrackerBoard, AttentionQueue, AppTooltip, PackChip, PackCardEditor
+                      TrackerBoard, PostingsPreview, AppTooltip, PackChip, PackCardEditor
   composables/         useStats (useFetch), useTooltip (shared floating tooltip), usePacks
   utils/format.ts      esc()/pct() — auto-imported
   assets/css/main.css  design tokens + all styles (ported from the old PAGE_HTML)
@@ -69,7 +69,7 @@ The frontend uses **d3-sankey as an npm dep** (layout math only) and renders SVG
 
 PrimeVue v4 (`@primevue/nuxt-module`) is the UI shell: **all containers, controls, and states are PrimeVue.** Sections are `<PrimeCard class="sec">`; the header link is `<PrimeButton>`; loading/error/empty are `<PrimeProgressSpinner>`/`<PrimeMessage>`; the tracker uses `<PrimeSelectButton>` (Board/Table toggle), `<PrimeIconField>`+`<PrimeInputText>` (search), `<PrimeDataTable>` (Table view) and `<PrimeTag>` (status).
 
-**What stays bespoke SVG (by design):** the dataviz — Sankey (`PipelineSankey`), donut stat cards (`StatCard`), velocity bars (`VelocityChart`), source/role bars (`SourcesBreakdown`/`RolesBreakdown`) — and the rich `AppTooltip`. No library (incl. Chart.js) ships a Sankey, and moving the others to Chart.js would lose SSR and add weight. They're themed with the same tokens so it reads as one system. Dense clickable list items (kanban job cards, attention cards) stay as themed `<a>` anchors — PrimeCard is too heavy for them.
+**What stays bespoke SVG (by design):** the dataviz — Sankey (`PipelineSankey`), donut stat cards (`StatCard`), velocity bars (`VelocityChart`), source/role bars (`SourcesBreakdown`/`RolesBreakdown`) — and the rich `AppTooltip`. No library (incl. Chart.js) ships a Sankey, and moving the others to Chart.js would lose SSR and add weight. They're themed with the same tokens so it reads as one system. Dense clickable list items (kanban job cards, posting preview cards) stay as themed `<a>`/`<NuxtLink>` anchors — PrimeCard is too heavy for them.
 
 - Components are **prefixed `Prime`** (`<PrimeDataTable>`, `<PrimeButton>`, …) — no collision with our own components.
 - Theme: a custom Aura preset in `theme/primevue-preset.ts` retuned to the app palette (surface ramp = the `--bg`/`--panel`/`--card` grays, primary = `--amber`). Tune the ramp there if a surface looks off.
@@ -164,7 +164,7 @@ npm run deploy                           # = nuxt build && wrangler deploy
 - **Trend charts** off `/api/history` once snapshots accumulate (response-rate-over-time, pipeline composition). The snapshot plumbing exists; the UI doesn't yet. (Verify the cron actually writes on a real deploy first — see the binding caveat above.)
 - ~~**Reply rate by role type**~~ — shipped (`RolesBreakdown.vue`, `classifyRole()` in `notion.ts`). Finding: reply rate is basically **flat across role types** (~20–23% for Full-Stack / Backend / AI-ML / Other), so *source* is the real lever, not role type.
 - ~~**Salary context**~~ — shipped (`SalaryContext.vue`, `salary` in the payload). Finding: heard-back roles skew ~$10k higher median ($120k vs $110k), small n.
-- **Follow-up nudges** — extend the cron to ping ntfy/Discord when a row enters the attention window. (Needs the cron binding-access caveat resolved + a webhook secret.)
+- **Follow-up nudges** — `stats.attention` is still computed (follow-up + aging rows) but nothing renders it since the dashboard's top slot became the postings preview on 2026-09-10. The natural home is a cron that pings ntfy/Discord when a row enters the attention window, rather than a panel he has to remember to look at. (Needs the cron binding-access caveat resolved + a webhook secret.)
 - **Time-to-response** — needs a `Rejection Date` property or use the page `last_edited_time` as a proxy; could calibrate `STALE_DAYS` from data instead of hardcoding 30.
 - This is the **tracking dashboard**; the **CareerOps** side project is separate (research/apply-packs). Kept distinct on purpose. Interview packs are the one bridge: the site queues and shows them, career-ops on the Mac builds them.
 - ~~**Desktop worker for packs**~~ — shipped, and it lives in the InterviewHelper repo: `Scripts/site_worker.py` runs from launchd, drains `GET /api/packs/queue`, and builds each pack with a headless `claude -p` in career-ops. `career-ops/site-apply-worker.mjs` is its sibling for apply packs.

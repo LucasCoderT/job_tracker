@@ -7,7 +7,7 @@ const notionUrl = computed(() => config.public.notionViewUrl)
 
 // The badge is the whole point of the link: postings only matter while
 // there are some he has not looked at.
-const { open: openPostings } = usePostings()
+const { postings, open: openPostings } = usePostings()
 
 const footer = computed(() => {
   if (!stats.value) return ''
@@ -66,7 +66,7 @@ const footer = computed(() => {
     </PrimeMessage>
 
     <template v-else>
-      <AttentionQueue :items="stats.attention" />
+      <PostingsPreview :postings="postings" />
 
       <div class="grid">
         <PrimeCard class="sec sec--sankey" aria-label="Application flow">
