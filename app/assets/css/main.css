@@ -200,17 +200,6 @@ footer { margin-top: 18px; font-size: 12px; color: var(--faint); }
 :is(.packs-page, .postings-page) .p-message { margin-bottom: 14px; }
 :is(.packs-page, .postings-page) .muted { color: var(--muted); }
 :is(.packs-page, .postings-page) .small { font-size: 12.5px; }
-.packs-list { display: flex; flex-direction: column; gap: 8px; }
-.pack-row {
-  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 14px; align-items: center;
-  text-decoration: none; background: var(--panel); border: 1px solid var(--panel-edge);
-  border-radius: 12px; padding: 12px 16px; transition: border-color 120ms;
-}
-.pack-row:hover { border-color: var(--faint); }
-.pack-row .co { font-size: 14px; font-weight: 600; color: var(--text); margin: 0; }
-.pack-row .role { font-size: 12px; color: var(--muted); margin: 0; }
-.pack-row .counts, .pack-row .stamp { font-size: 11.5px; color: var(--faint); }
-@media (min-width: 720px) { .pack-row { grid-template-columns: minmax(0, 1fr) auto auto auto; } }
 
 .pack-head { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; font-size: 12px; }
 .pack-head b { color: var(--text); font-weight: 500; }
@@ -731,3 +720,93 @@ a.rail-primary.as-link:hover { background: #d9bd71; border-color: #d9bd71; color
 .page-btn.on { background: rgba(194, 162, 75, 0.16); color: var(--amber); border-color: #4a3f1f; }
 
 .apply-list { margin: 0; padding-left: 18px; font-size: 12.5px; line-height: 1.6; }
+
+/* ---- Interview packs listing ---- */
+.packs-panel .pack-rows { display: flex; flex-direction: column; }
+.pack-row {
+  display: flex; align-items: center; gap: 10px; padding-right: 14px;
+  border-bottom: 1px solid #26262c; transition: background 120ms;
+}
+.pack-row:hover { background: var(--card); }
+.pack-main {
+  flex: 1; min-width: 0; display: grid; gap: 4px 14px; align-items: center;
+  text-decoration: none; color: var(--text); padding: 13px 10px 13px 14px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.pack-main:focus-visible { outline: 2px solid var(--amber); outline-offset: -2px; }
+.pack-main .who { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.pack-main .co { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pack-main .role { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pack-main .counts { font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+.pack-main .stamp { font-size: 11.5px; color: var(--faint); white-space: nowrap; }
+@media (min-width: 761px) {
+  .pack-main { grid-template-columns: minmax(0, 1fr) auto auto auto; }
+  .pack-main .stamp { text-align: right; }
+}
+
+/* Status reuses the tracker's pill, tinted per build state. */
+.pack-row .status-pill { justify-self: start; gap: 6px; }
+.status-pill.requested { color: var(--amber); border-color: #4a3f1f; }
+.status-pill.building { color: var(--blue); border-color: #23364a; }
+.status-pill.done { color: var(--green); border-color: #1f4a34; }
+.status-pill.failed { color: var(--danger); border-color: #4a2a25; }
+.status-pill .pi { font-size: 10px; }
+
+.pack-acts { display: flex; gap: 2px; flex: none; }
+.icon-btn {
+  width: 30px; height: 30px; border: 0; background: transparent; border-radius: 6px;
+  color: var(--muted); cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+  transition: background 120ms, color 120ms;
+}
+.icon-btn:hover { background: var(--panel-edge); color: var(--text); }
+.icon-btn:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.icon-btn[disabled] { opacity: 0.6; cursor: default; }
+.icon-btn.danger { color: var(--faint); }
+.icon-btn.danger:hover { background: rgba(217, 138, 127, 0.12); color: var(--danger); }
+.icon-btn .pi { font-size: 13px; }
+
+/* A failed build says why, directly under the row it belongs to. */
+.pack-row-error {
+  margin: 0; padding: 10px 14px; border-bottom: 1px solid #26262c;
+  background: rgba(217, 138, 127, 0.07); font-size: 12px; line-height: 1.5;
+  color: var(--danger); white-space: pre-wrap; text-wrap: pretty;
+}
+
+/* The gap list — the reason to open this page at all. */
+.gaps.p-card, .gaps { background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 14px; padding: 16px 18px; }
+.gaps-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 10px; }
+.gaps-head h2 {
+  margin: 0; font-size: 11px; font-weight: 600; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--muted);
+}
+.gaps-head h2 .n { color: var(--faint); letter-spacing: 0; margin-left: 8px; }
+.gap-rows { display: flex; flex-direction: column; gap: 6px; }
+.gap-row {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 9px 12px; background: var(--card); border: 1px solid var(--panel-edge); border-radius: 10px;
+}
+.gap-row .who { min-width: 0; flex: 1 1 200px; display: flex; flex-direction: column; gap: 2px; }
+.gap-row .co { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gap-row .role { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gap-meta { font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+
+/* Toast */
+.toast {
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 30;
+  display: flex; align-items: center; gap: 10px; max-width: min(560px, 92vw);
+  padding: 10px 14px; border-radius: 8px; border: 1px solid #1f4a34;
+  background: var(--panel); color: var(--text); font-size: 13px; line-height: 1.45;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+.toast > .pi { color: var(--green); font-size: 14px; flex: none; }
+.toast span { text-wrap: pretty; }
+.toast-x {
+  flex: none; border: 0; background: transparent; color: var(--muted); cursor: pointer;
+  width: 24px; height: 24px; border-radius: 50%;
+}
+.toast-x:hover { background: var(--card); }
+.toast-enter-active, .toast-leave-active { transition: opacity 140ms, transform 140ms; }
+.toast-enter-from, .toast-leave-to { opacity: 0; transform: translate(-50%, 8px); }
+@media (prefers-reduced-motion: reduce) {
+  .toast-enter-active, .toast-leave-active { transition: none; }
+}

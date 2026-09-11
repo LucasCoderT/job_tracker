@@ -54,7 +54,7 @@ server/
   api/history.get.ts  | api/snapshot.get.ts | tasks/snapshot.ts (cron)
 app/
   pages/index.vue     assembles the sections; useStats() → SSR data
-  pages/packs/        packs index + the pack page (cards, editor, exports)
+  pages/packs/        packs index (views, gap list) + the pack page
   pages/postings/     the posting listing (saved views + table) + the brief
   components/          ConversionStrip, StatCard, VelocityChart, SourcesBreakdown,
                       TrackerBoard, PostingsPreview, AppTooltip, PackChip, PackCardEditor
