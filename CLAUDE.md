@@ -229,6 +229,45 @@ Decisions that are load-bearing:
   the same convention as the app's Quit and Discard, and no browser
   dialogs, which block automation and screen readers alike.
 
+**Pack detail v2** (2026-09-11, from `Pack Detail v2.dc.html`). The page
+stacked four full-width panels — status, files, lint, then the cards — so the
+only thing actually read before an interview sat below all of it. It is now the
+same two-column layout as the posting brief: the deck on the left, a sticky
+rail of build state beside it. `.pack-grid` / `.pack-rail` share the brief's
+selectors rather than copying them.
+
+- **Running order first, then `reserve`.** Deck cards lead with their budget
+  (`1 · 4:00`); cards outside the deck are labelled `reserve`, not left blank.
+  A reserve card is not spare — it is the fallback when they ask something the
+  deck did not plan for. A bank with no `presentation` says so instead
+  ("No running order yet — every card is reached by its cues or from the
+  picker"), which is the common case: of the three real packs, none has a deck.
+- **Beats are a table** — beat, stance, keys as three columns to scan down
+  rather than one wrapped run each. Stance is coloured on interview-helper's
+  own scale (deliberate blue, measured green, gap amber, unmeasured stone).
+- **Rebuild and pack-delete are dialogs**, the same departure the brief makes
+  and for the same reason: `PrimeDialog` is an in-page modal, not a browser
+  `confirm()`, so it blocks neither automation nor screen readers. Delete
+  *names what goes* ("6 cards, 13 beats and 2 exported files"), which "Really
+  delete?" cannot. Card and export deletes keep the two-step arm.
+- **The rebuild hint does not repeat the design's copy.** The design said
+  "Cards you edited here are overwritten"; here the write-back means the
+  opposite — edits land in Notion first, so a rebuild keeps them, *unless* the
+  write-back was refused. The hint says that instead.
+- **The rail's posting link has two branches.** A posting whose `notionPageId`
+  matches the pack's `jobId` links internally to `/postings/:id`; otherwise it
+  falls back to the job's Notion `Reference Link` from `stats.jobs`. Only
+  postings marked applied *through the site* carry a `notionPageId` (4 of 47),
+  so the fallback is the one that usually fires.
+
+Two bugs this page surfaced, both older than it and both fixed here:
+`grid-template-columns: 1fr` in the stacked media query floors at min-content,
+so one wide table pushed the page to 394px at a 360px viewport — the posting
+brief had the same latent blowout, now `minmax(0, 1fr)` for both. And
+`as="a"` PrimeButtons render real anchors, which the UA underlines: Postings,
+Interview packs, Open in Notion and Prep sheet were all underlined until
+`.p-button { text-decoration: none }`.
+
 Routes (`server/api/packs/`): `GET /` list · `GET /queue` requested+building
 · `GET|DELETE /:jobId` · `POST /:jobId/request` · `POST /:jobId/status`
 (building|done|failed) · `GET /:jobId/bank.json` · `PUT /:jobId/bank`
