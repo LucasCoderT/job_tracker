@@ -395,10 +395,37 @@ These tables are plain `<table>` rather than `PrimeDataTable`: they neither
 sort nor page, and the PrimeVue rule is about controls and containers, not
 static markup.
 
+**Application questions** (2026-09-11). The supplemental questions a form
+asks — "why here", "describe a system you owned", salary, work authorization.
+He pastes them off the form (one per line; numbering, bullets and the
+required-field asterisk are stripped), presses Draft answers, and the Mac
+answers each one through career-ops's `modes/apply.md` from his CV, the JD and
+the posting's own evaluation. He reads, edits and copies them on the phone at
+`/postings/:id/questions`.
+
+Stored at `questions:<id>` in the POSTINGS KV, with the count, answered count
+and status denormalised onto the meta so the list and the brief show them
+without a second fetch. Question ids are a synchronous FNV hash of the text,
+which is what lets a re-paste carry existing answers across: adding one
+question to a form must not discard the seven answers already drafted. A web
+edit flips that answer's `source` to `edited`, so a redraft can say plainly
+that it will replace his own words too.
+
+`done` is refused with nothing answered, the same lie-prevention the pack and
+bank routes use. The worker drains `/api/postings/questions/queue` in the same
+tick as the apply packs and hands answers back through a
+`data/site-answers/<id>.json` manifest, for the same reason the pack worker
+does: an agent that also does the HTTP puts the service token in a prompt and
+makes "did it upload" unverifiable. That queue fetch is wrapped in a
+try/catch — a worker newer than the deployed site would otherwise 404 there
+and take the CV builds down with it.
+
 Routes (`server/api/postings/`): `GET /` list · `GET /queue`
 requested+building, FIFO · `GET|PUT|DELETE /:id` · `POST /:id/state` ·
 `POST /:id/pack` · `POST /:id/pack/status` · `POST /:id/applied` ·
-`GET|PUT|DELETE /:id/artifacts/:name`.
+`GET|PUT|DELETE /:id/artifacts/:name` · `GET|PUT /:id/questions` ·
+`POST /:id/questions/request` · `POST /:id/questions/status` ·
+`PUT /:id/questions/:qid` · `GET /questions/queue`.
 
 Config: `POSTINGS` KV binding (`wrangler kv namespace create POSTINGS`). The
 producers authenticate with a Cloudflare Access **service token** like the

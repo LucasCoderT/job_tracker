@@ -14,10 +14,13 @@
  * `state`/`pack`/artifacts are never clobbered by a push.
  */
 import type {
+  AnswerStatus,
   PostingAnalysis,
   PostingArtifact,
   PostingMeta,
   PostingPack,
+  PostingQuestion,
+  PostingQuestions,
   PostingState,
 } from '../../shared/types'
 import type { AppEnv, KVNamespace } from './notion'
@@ -28,6 +31,10 @@ export { normalizeUrl } from '../../shared/postings'
 
 export const POSTING_STATES: PostingState[] = ['new', 'dismissed', 'applied']
 export const POSTING_PACKS: PostingPack[] = ['none', 'requested', 'building', 'done', 'failed']
+export const ANSWER_STATUSES: AnswerStatus[] = ['none', 'requested', 'building', 'done', 'failed']
+
+/** How many questions one application may carry. Forms are long; not this long. */
+export const MAX_QUESTIONS = 40
 
 /** How many artifacts one posting may hold, and how big each may be. */
 export const MAX_ARTIFACTS = 12
@@ -37,6 +44,7 @@ const metaKey = (id: string) => `meta:${id}`
 const jdKey = (id: string) => `jd:${id}`
 const analysisKey = (id: string) => `analysis:${id}`
 const artifactKey = (id: string, name: string) => `artifact:${id}:${name}`
+const questionsKey = (id: string) => `questions:${id}`
 
 export function postingsKV(env: AppEnv): KVNamespace | null {
   return env.POSTINGS ?? null
@@ -167,7 +175,102 @@ export async function deletePosting(kv: KVNamespace, meta: PostingMeta): Promise
   await Promise.all(meta.artifacts.map((a) => kv.delete(artifactKey(meta.id, a.name))))
   await kv.delete(jdKey(meta.id))
   await kv.delete(analysisKey(meta.id))
+  await kv.delete(questionsKey(meta.id))
   await kv.delete(metaKey(meta.id))
+}
+
+// ---- Application questions ----
+
+/**
+ * A stable id from the question text, so re-pasting the form does not orphan
+ * the answers already drafted. Synchronous on purpose — this runs per question
+ * on every write, and crypto.subtle would make the whole path async for a
+ * value that never leaves this file.
+ */
+export function questionId(text: string): string {
+  let h = 2166136261
+  const s = text.trim().toLowerCase().replace(/\s+/g, ' ')
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i)
+    h = Math.imul(h, 16777619)
+  }
+  return (h >>> 0).toString(16).padStart(8, '0')
+}
+
+export const EMPTY_QUESTIONS = (stamp: string): PostingQuestions => ({
+  questions: [],
+  status: 'none',
+  note: '',
+  requestedAt: null,
+  builtAt: null,
+  error: null,
+  updatedAt: stamp,
+})
+
+export async function getQuestions(kv: KVNamespace, id: string): Promise<PostingQuestions | null> {
+  return ((await kv.get(questionsKey(id), 'json')) as PostingQuestions | null) ?? null
+}
+
+export async function putQuestions(kv: KVNamespace, id: string, q: PostingQuestions): Promise<void> {
+  await kv.put(questionsKey(id), JSON.stringify(q))
+}
+
+/**
+ * One question per line. Numbering, bullets and the trailing asterisk a form
+ * uses to mark a field required are all noise he should not have to strip by
+ * hand before pasting.
+ */
+export function parseQuestions(text: string): string[] {
+  return String(text ?? '')
+    .split('\n')
+    .map((line) =>
+      line
+        .replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '')
+        .replace(/\s*\*\s*$/, '')
+        .trim(),
+    )
+    .filter((line) => line.length > 1)
+    .slice(0, MAX_QUESTIONS)
+}
+
+/**
+ * Merge a new question list over the stored one, carrying answers across by
+ * id. Re-pasting a form with one question added must not discard the seven
+ * answers already drafted.
+ */
+export function mergeQuestions(
+  existing: PostingQuestion[],
+  incoming: { question: string; answer?: string; source?: PostingQuestion['source'] }[],
+  stamp: string,
+): PostingQuestion[] {
+  const byId = new Map(existing.map((q) => [q.id, q]))
+  const out: PostingQuestion[] = []
+  for (const item of incoming.slice(0, MAX_QUESTIONS)) {
+    const question = str(item.question, 2000)
+    if (!question) continue
+    const id = questionId(question)
+    const prev = byId.get(id)
+    const answer = item.answer !== undefined ? str(item.answer, 20000) : (prev?.answer ?? '')
+    const source = item.answer !== undefined ? (item.source ?? 'drafted') : (prev?.source ?? 'pasted')
+    out.push({
+      id,
+      question,
+      answer,
+      source,
+      updatedAt: prev && prev.answer === answer && prev.question === question ? prev.updatedAt : stamp,
+    })
+  }
+  return out
+}
+
+/** The counts the list and the brief show without fetching the answers. */
+export function withQuestionCounts(meta: PostingMeta, q: PostingQuestions | null): PostingMeta {
+  return {
+    ...meta,
+    questions: q?.questions.length ?? 0,
+    answered: q?.questions.filter((x) => x.answer.trim()).length ?? 0,
+    answerStatus: q?.status ?? 'none',
+  }
 }
 
 // ---- Producer input ----
@@ -231,6 +334,10 @@ export function mergePosting(id: string, existing: PostingMeta | null, body: any
     packBuiltAt: existing?.packBuiltAt ?? null,
     notionPageId: existing?.notionPageId ?? null,
     appliedAt: existing?.appliedAt ?? null,
+
+    questions: existing?.questions ?? 0,
+    answered: existing?.answered ?? 0,
+    answerStatus: existing?.answerStatus ?? 'none',
 
     hasJD: has('jd') ? Boolean(str(body.jd, 200_000)) : (existing?.hasJD ?? false),
     hasAnalysis: has('analysis') ? Boolean(body.analysis) : (existing?.hasAnalysis ?? false),

@@ -324,6 +324,10 @@ export interface PostingMeta {
   appliedAt: string | null
   hasJD: boolean
   hasAnalysis: boolean
+  /** Supplemental application questions: how many, and how the draft is going. */
+  questions: number
+  answered: number
+  answerStatus: AnswerStatus
   artifacts: PostingArtifact[]
   createdAt: string
   updatedAt: string
@@ -338,3 +342,36 @@ export interface PostingApplyResult { meta: PostingMeta; notion: NotionWriteResu
 
 /** POST /api/postings — `created: false` means this URL was already here. */
 export interface PostingCreateResult { meta: PostingMeta; created: boolean }
+
+// ---- Application questions (/api/postings/:id/questions) ----
+//
+// The supplemental questions an application form asks — "why here", "describe
+// a system you owned", salary expectations, work authorization. He pastes them
+// off the form; the Mac drafts answers from his CV and the JD through
+// career-ops's modes/apply.md; he reads, edits and copies them on the phone.
+//
+// Same shape of pipeline as an apply pack, and deliberately a separate status
+// from it: the CV and the form answers are built by different runs and either
+// can be wanted without the other.
+
+export type AnswerStatus = 'none' | 'requested' | 'building' | 'done' | 'failed'
+
+export interface PostingQuestion {
+  id: string // stable hash of the question text, so a re-paste keeps answers
+  question: string
+  answer: string // '' until drafted
+  /** Where the current answer text came from. */
+  source: 'pasted' | 'drafted' | 'edited'
+  updatedAt: string
+}
+
+export interface PostingQuestions {
+  questions: PostingQuestion[]
+  status: AnswerStatus
+  /** Steer the whole draft — tone, what to emphasise, anything to avoid. */
+  note: string
+  requestedAt: string | null
+  builtAt: string | null
+  error: string | null
+  updatedAt: string
+}

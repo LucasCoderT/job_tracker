@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { normalizeUrl } from '#shared/postings'
-import type { NotionWriteResult, PostingApplyResult, PostingDetail } from '../../../shared/types'
+import type { NotionWriteResult, PostingApplyResult, PostingDetail } from '../../../../shared/types'
 
 const route = useRoute()
 const id = computed(() => String(route.params.id))
@@ -657,6 +657,18 @@ function onPrimary() {
             </span>
             <i class="pi pi-external-link go" />
           </a>
+
+          <!-- The supplemental questions a form asks, and their drafted answers. -->
+          <NuxtLink class="link-card" :to="`/postings/${id}/questions`">
+            <span class="link-meta">
+              <span class="link-title"><i class="pi pi-list-check" />Application questions</span>
+              <span class="link-sub mono">
+                <template v-if="meta.questions">{{ meta.answered }} of {{ meta.questions }} answered</template>
+                <template v-else>none added yet</template>
+              </span>
+            </span>
+            <i class="pi pi-angle-right go" />
+          </NuxtLink>
 
           <a v-if="notionHref" class="link-card" :href="notionHref" target="_blank" rel="noopener">
             <span class="link-meta">
