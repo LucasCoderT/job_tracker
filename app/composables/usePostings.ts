@@ -6,6 +6,9 @@ export function usePostings() {
   const fetchState = useFetch<PostingsResponse>('/api/postings', { key: 'postings' })
   const postings = computed(() => fetchState.data.value?.postings ?? [])
   const open = computed(() => postings.value.filter((p) => p.state === 'new'))
+  // Not awaitable: Nuxt's asyncData `then` resolves to its own object, so
+  // `await usePostings()` loses these helpers. A page that needs the data
+  // server-side awaits useFetch directly — see pages/postings/index.vue.
   return { ...fetchState, postings, open }
 }
 

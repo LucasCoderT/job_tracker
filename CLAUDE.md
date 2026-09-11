@@ -55,7 +55,7 @@ server/
 app/
   pages/index.vue     assembles the sections; useStats() → SSR data
   pages/packs/        packs index + the pack page (cards, editor, exports)
-  pages/postings/     the ranked posting list + the two-column posting brief
+  pages/postings/     the posting listing (saved views + table) + the brief
   components/          ConversionStrip, StatCard, VelocityChart, SourcesBreakdown,
                       TrackerBoard, PostingsPreview, AppTooltip, PackChip, PackCardEditor
   composables/         useStats (useFetch), useTooltip (shared floating tooltip), usePacks
@@ -322,6 +322,33 @@ Decisions that are load-bearing:
   so; do not "fix" it by dropping the cache.
 - **No `SCHEMA_VERSION` bump.** Postings never touch the `/api/stats` payload,
   and like the pack routes these are uncached.
+
+The listing (`app/pages/postings/index.vue`) was rebuilt from `Postings.dc.html`
+on 2026-09-10: saved views across the top, then one table. The counts on the
+views are the navigation — the number says whether a view is worth opening
+before you open it, which plain tabs cannot. "Ready to send" (a pack built and
+not yet sent) is the only view with something to do right now.
+
+Note the design file is built entirely on *tracker* data — `stats.jobs`,
+buckets, interview packs, "no-reply cutoff" — despite its name. It was applied
+to postings at Lucas's direction, with the columns remapped to what a posting
+actually has: score, state, comp, geo, source, age, apply-pack. "Mark rejected"
+has no meaning for a posting never applied to, so the three bulk actions are
+**Build packs / Mark applied / Dismiss**; Mark applied is the one that writes
+to Notion and therefore the one behind a confirmation listing what it will
+create.
+
+Two SSR traps this page hit, both worth remembering:
+
+- **`usePostings()` is not awaitable.** Nuxt's asyncData `then` resolves to its
+  own object, so `await usePostings()` returns something without the
+  composable's helpers and `postings` comes back undefined. A page that needs
+  rows server-side awaits `useFetch` directly.
+- **A second `useFetch` on the same key from a header component flips `pending`
+  back to true mid-render.** `AddPostingButton` called `usePostings()` for a
+  refresh it did not need (it navigates), and because it renders above the
+  `v-if` chain the page server-rendered its loading skeleton instead of the
+  rows — on every request. The button owns no data now.
 
 The brief (`app/pages/postings/[id].vue`) was rebuilt from the
 `Posting Brief v2` design on 2026-09-10: the decision on the left, a sticky

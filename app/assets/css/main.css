@@ -263,38 +263,6 @@ footer { margin-top: 18px; font-size: 12px; color: var(--faint); }
 
 /* ---- Job postings ---- */
 .postings-page .total { color: var(--muted); font-size: 12.5px; align-self: flex-end; }
-.postings-list { display: flex; flex-direction: column; gap: 8px; }
-.posting-row {
-  display: grid; gap: 4px 14px; align-items: center;
-  grid-template-columns: 44px minmax(0, 1fr);
-  text-decoration: none; background: var(--panel); border: 1px solid var(--panel-edge);
-  border-radius: 12px; padding: 12px 16px; transition: border-color 120ms;
-}
-.posting-row:hover, .posting-row:focus-visible { border-color: var(--faint); }
-.posting-row:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
-.posting-row.is-dismissed { opacity: 0.55; }
-.posting-row .score { font-size: 19px; font-weight: 600; letter-spacing: -0.01em; }
-.posting-row .who { min-width: 0; }
-.posting-row .co { font-size: 14px; font-weight: 600; color: var(--text); margin: 0; }
-.posting-row .role { font-size: 12px; color: var(--muted); margin: 0; }
-.posting-row .facts { grid-column: 2; min-width: 0; }
-/* career-ops writes comp and geo as reasoning, not as fields — a real value
-   runs to a paragraph. The list is a ranked queue and has to stay scannable,
-   so it gets one line each; the detail page carries the whole thing. */
-.posting-row .line {
-  font-size: 12px; color: var(--muted); margin: 0;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.posting-row .line.dim { color: var(--faint); font-size: 11.5px; }
-.posting-row .sep { margin: 0 5px; color: var(--faint); }
-.posting-row .tags { grid-column: 2; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.posting-row .pack-chip { margin-top: 0; }
-@media (min-width: 720px) {
-  .posting-row { grid-template-columns: 44px minmax(0, 1fr) minmax(0, 15em) auto; }
-  .posting-row .facts, .posting-row .tags { grid-column: auto; }
-  .posting-row .tags { justify-content: flex-end; }
-}
-.postings-page .more { margin-top: 12px; }
 
 .postings-page .stamp { margin: 8px 0 0; }
 .jd summary { color: var(--muted); cursor: pointer; font-size: 12.5px; }
@@ -651,7 +619,6 @@ a.rail-primary.as-link:hover { background: #d9bd71; border-color: #d9bd71; color
 @media (max-width: 880px) { .brief-jd { grid-column: auto; } }
 
 /* ---- Add a posting by URL ---- */
-.postings-head-tools { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .add-posting { display: flex; flex-direction: column; gap: 12px; }
 .add-posting label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
 .add-posting label small { color: var(--faint); margin-left: 6px; }
@@ -660,3 +627,107 @@ a.rail-primary.as-link:hover { background: #d9bd71; border-color: #d9bd71; color
 @media (max-width: 480px) { .add-posting .two { grid-template-columns: 1fr; } }
 .add-hint { margin: 0; font-size: 11.5px; color: var(--faint); line-height: 1.45; }
 .add-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 2px; }
+
+/* ---- Postings listing: saved views + a table ---- */
+.listing h1 .count { color: var(--faint); font-weight: 500; font-size: 15px; margin-left: 10px; }
+
+/* Saved views. The count is the navigation — it says whether a view is worth
+   opening before you open it. */
+.views { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; margin-bottom: 14px; scrollbar-width: thin; }
+.view {
+  flex: 0 0 auto; text-align: left; min-width: 132px; border: 1px solid var(--panel-edge);
+  border-radius: 10px; padding: 9px 12px; cursor: pointer; font: inherit; background: transparent;
+  transition: border-color 120ms, background 120ms;
+}
+.view:hover { border-color: var(--faint); }
+.view:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.view.on { background: var(--card); border-color: #4a3f1f; }
+.view-label { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--muted); }
+.view.on .view-label { color: var(--text); }
+.view-label .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.view-n {
+  display: block; margin-top: 4px; font-size: 20px; font-weight: 600;
+  letter-spacing: -0.02em; color: var(--text);
+}
+.view.on .view-n { color: var(--amber); }
+
+.listing-panel {
+  background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 14px;
+  min-width: 0; overflow: hidden;
+}
+.listing-tools {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 12px 14px; border-bottom: 1px solid var(--panel-edge);
+}
+.listing-tools .grow { flex: 1 1 220px; max-width: 300px; }
+.listing-tools .grow .p-inputtext { width: 100%; }
+.inline-field { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); }
+.listing-tools .range { margin-left: auto; font-size: 12.5px; color: var(--faint); }
+
+/* The bulk bar exists only while something is selected, so it never takes
+   space from the list it acts on. */
+.bulk {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 9px 14px; border-bottom: 1px solid #3a3323; background: rgba(194, 162, 75, 0.09);
+}
+.bulk-n { font-size: 13px; color: var(--amber); font-weight: 600; }
+.bulk .clear { margin-left: auto; }
+
+.postings-table { width: 100%; min-width: 860px; border-collapse: collapse; font-size: 13.5px; }
+.postings-table th {
+  padding: 8px 10px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--muted); background: var(--panel); border-bottom: 1px solid var(--panel-edge);
+  white-space: nowrap; text-align: left;
+}
+.postings-table th.sortable { cursor: pointer; user-select: none; }
+.postings-table th.sortable:hover { color: var(--text); }
+.postings-table th.right, .postings-table td.right { text-align: right; }
+.postings-table th.right .th-inner { justify-content: flex-end; }
+.th-inner { display: inline-flex; align-items: center; gap: 4px; }
+.th-inner .arrow { color: var(--amber); }
+.postings-table td { padding: 8px 10px; border-bottom: 1px solid #26262c; vertical-align: top; }
+.postings-table tbody tr { transition: background 120ms; }
+.postings-table tbody tr:hover { background: var(--card); }
+.postings-table tbody tr.picked { background: rgba(194, 162, 75, 0.07); }
+.postings-table th.pick, .postings-table td.pick { width: 36px; padding: 8px 0 8px 14px; }
+.postings-table input[type='checkbox'] { accent-color: var(--amber); width: 14px; height: 14px; cursor: pointer; }
+.postings-table td.pick input { margin-top: 3px; }
+.postings-table td.clip { white-space: nowrap; max-width: 15ch; overflow: hidden; text-overflow: ellipsis; }
+/* Company is the column you read; the nowrap cells beside it would otherwise
+   take their full content width and squeeze the role onto three lines. */
+.postings-table th.col-company, .postings-table td.col-company { min-width: 210px; }
+.postings-table td.col-company .tbl-sub { white-space: normal; }
+/* A LinkedIn source reads "linkedin 4460516355"; unclipped it pushed the pack
+   column off the panel at desktop width. */
+.postings-table td.src { max-width: 13ch; }
+.postings-table .score { font-weight: 600; }
+.postings-table td:last-child { padding-right: 14px; }
+.postings-table .pack-chip { margin-top: 0; }
+
+.group-row td { padding: 9px 14px; background: #191920; border-bottom: 1px solid #26262c; }
+.group-label {
+  display: inline-flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600;
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted);
+}
+.group-label .dot { width: 7px; height: 7px; border-radius: 50%; }
+.group-label .n { color: var(--faint); letter-spacing: 0; }
+
+.tbl-empty { padding: 52px 20px; text-align: center; }
+.tbl-empty .empty-title { margin: 0; font-size: 14px; color: var(--text); }
+.tbl-empty .small { margin: 4px 0 12px; }
+
+.listing-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 14px; border-top: 1px solid var(--panel-edge); font-size: 12.5px; flex-wrap: wrap;
+}
+.pager { display: flex; align-items: center; gap: 4px; }
+.page-btn {
+  min-width: 32px; height: 32px; border-radius: 6px; border: 1px solid transparent; cursor: pointer;
+  font: inherit; font-size: 12.5px; font-family: "Spline Sans Mono", ui-monospace, monospace;
+  background: transparent; color: var(--muted);
+}
+.page-btn:hover { background: var(--card); }
+.page-btn:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.page-btn.on { background: rgba(194, 162, 75, 0.16); color: var(--amber); border-color: #4a3f1f; }
+
+.apply-list { margin: 0; padding-left: 18px; font-size: 12.5px; line-height: 1.6; }

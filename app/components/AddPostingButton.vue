@@ -11,8 +11,6 @@ import type { PostingCreateResult } from '../../shared/types'
  * with no valid evaluation is exactly what it drains, so pasting a link is
  * the whole job.
  */
-const { refresh } = usePostings()
-
 const open = ref(false)
 const url = ref('')
 const company = ref('')
@@ -48,7 +46,9 @@ async function submit() {
     })
     open.value = false
     reset()
-    await refresh()
+    // No refresh: this navigates, and a second useFetch on the 'postings' key
+    // from inside a header component flips the list page's `pending` back to
+    // true mid-render, so it server-renders its skeleton instead of the rows.
     await navigateTo(`/postings/${res.meta.id}`)
   } catch (err: any) {
     error.value = err?.data?.statusMessage || err?.message || "Couldn't add that posting"
