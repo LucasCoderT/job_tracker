@@ -11,6 +11,24 @@ useHead({ title: 'Postings' })
 const { data, pending, error, refresh } = await useFetch<PostingsResponse>('/api/postings', { key: 'postings' })
 const postings = computed(() => data.value?.postings ?? [])
 
+const config = useRuntimeConfig()
+const notionUrl = computed(() => config.public.notionViewUrl)
+
+/**
+ * The stamp is the newest posting's updatedAt, not "now": this list is not
+ * edge-cached the way /api/stats is, so "cached 5 min" would be a lie here.
+ * What he actually wants to know is whether the Mac has touched anything.
+ */
+const footer = computed(() => {
+  const newest = postings.value
+    .map((p) => p.updatedAt)
+    .filter(Boolean)
+    .sort()
+    .pop()
+  const stamp = newest ? new Date(newest).toLocaleString() : 'never'
+  return `Last change ${stamp} · evaluations run hourly · packs build every 20 min`
+})
+
 /**
  * Saved views. The counts are the navigation: the number tells him whether a
  * view is worth opening before he opens it, which a row of plain tabs cannot.
@@ -286,7 +304,22 @@ function resetFilters() {
         <NuxtLink to="/" class="crumb"><i class="pi pi-arrow-left" /> Pipeline</NuxtLink>
         <h1>Postings<span class="count mono">{{ postings.length }}</span></h1>
       </div>
-      <div class="header-tools"><AddPostingButton /></div>
+      <div class="header-tools">
+        <PrimeButton
+          v-if="notionUrl"
+          as="a"
+          :href="notionUrl"
+          target="_blank"
+          rel="noopener"
+          label="Open in Notion"
+          icon="pi pi-external-link"
+          icon-pos="right"
+          severity="secondary"
+          outlined
+          size="small"
+        />
+        <AddPostingButton />
+      </div>
     </header>
 
     <p v-if="!pending && !error && postings.length" class="lede">
@@ -487,6 +520,12 @@ function resetFilters() {
           <PrimeButton label="Mark applied" icon="pi pi-send" size="small" :loading="busy === 'applied'" @click="bulkApply" />
         </template>
       </PrimeDialog>
+
+      <!-- Client-only: toLocaleString() is locale/timezone-dependent, so SSR
+           and the client disagree (hydration text mismatch). -->
+      <ClientOnly>
+        <footer class="mono">{{ footer }}</footer>
+      </ClientOnly>
     </template>
   </div>
 </template>
