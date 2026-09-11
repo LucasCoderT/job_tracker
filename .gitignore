@@ -23,3 +23,6 @@ yarn-error.log*
 .idea/
 .vscode/
 *.swp
+
+# Browser snapshots from the playwright MCP server — session artefacts.
+.playwright-mcp/
