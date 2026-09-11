@@ -391,7 +391,8 @@ footer { margin-top: 18px; font-size: 12px; color: var(--faint); }
 .status-pill .dot { width: 6px; height: 6px; border-radius: 50%; }
 .next-flag { display: inline-flex; align-items: center; gap: 6px; color: var(--amber); white-space: nowrap; }
 .next-flag .pi { font-size: 11px; }
-.age-cell { display: inline-flex; align-items: center; gap: 8px; justify-content: flex-end; }
+.age-cell { display: inline-flex; align-items: center; gap: 8px; justify-content: flex-end; white-space: nowrap; }
+.postings-table .age-cell > span:last-child { min-width: 6ch; text-align: right; }
 .age-track { display: inline-block; width: 40px; height: 4px; border-radius: 2px; background: #26262c; position: relative; overflow: hidden; }
 .age-fill { position: absolute; inset: 0 auto 0 0; border-radius: 2px; }
 .tracker-table .p-paginator { background: transparent; border: 0; padding: 12px 4px 0; }

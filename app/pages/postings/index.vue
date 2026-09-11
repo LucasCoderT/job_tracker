@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
+import { postingChannel } from '#shared/postings'
 import type { PostingApplyResult, PostingMeta, PostingsResponse } from '../../../shared/types'
 
 useHead({ title: 'Postings' })
@@ -46,6 +47,7 @@ const VIEWS: { key: string; label: string; dot: string; match: (p: PostingMeta) 
 ]
 
 const STORE_KEY = 'postings.view'
+const SORT_KEY = 'postings.sort'
 const view = ref('new')
 const page = ref(0)
 const selected = ref<Record<string, boolean>>({})
@@ -56,6 +58,12 @@ onMounted(() => {
   try {
     const saved = localStorage.getItem(STORE_KEY)
     if (saved && VIEWS.some((v) => v.key === saved)) view.value = saved
+    const savedSort = localStorage.getItem(SORT_KEY)
+    if (savedSort) {
+      const [k, d] = savedSort.split(':')
+      if (k) sortKey.value = k
+      if (d === '1' || d === '-1') sortDir.value = Number(d)
+    }
   } catch {
     /* private mode, blocked storage — the default is fine */
   }
@@ -78,12 +86,22 @@ const source = ref('all')
 const grouped = ref(false)
 const per = ref(12)
 
+/**
+ * The board it came from, off the URL. A posting's stored `source` is
+ * free-text provenance from career-ops — "linkedin 4461192634",
+ * "ats-full:greenhouse-full", "Lever board enumeration (not on LinkedIn
+ * sweep)" — which was 34 distinct values across 37 rows and made the filter
+ * useless. Anything that is not a board he uses repeatedly reads as "Company
+ * site"; the raw provenance string stays available on hover.
+ */
+const channel = (p: PostingMeta) => postingChannel(p.url)
+
 const matches = computed(() => {
   const q = search.value.trim().toLowerCase()
   return postings.value.filter(
     (p) =>
-      (!q || `${p.company} ${p.role} ${p.source}`.toLowerCase().includes(q)) &&
-      (source.value === 'all' || p.source === source.value),
+      (!q || `${p.company} ${p.role} ${p.source} ${channel(p)}`.toLowerCase().includes(q)) &&
+      (source.value === 'all' || channel(p) === source.value),
   )
 })
 
@@ -91,16 +109,31 @@ const views = computed(() =>
   VIEWS.map((v) => ({ ...v, n: matches.value.filter(v.match).length, on: view.value === v.key })),
 )
 
-const sourceOpts = computed(() => [
-  { value: 'all', label: 'All sources' },
-  ...[...new Set(postings.value.map((p) => p.source).filter(Boolean))].sort().map((s) => ({ value: s, label: s })),
-])
+const sourceOpts = computed(() => {
+  const counted = new Map<string, number>()
+  for (const p of postings.value) counted.set(channel(p), (counted.get(channel(p)) ?? 0) + 1)
+  return [
+    { value: 'all', label: 'All sources' },
+    ...[...counted.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([name, n]) => ({ value: name, label: `${name} (${n})` })),
+  ]
+})
 
 const inView = computed(() => VIEWS.find((v) => v.key === view.value)?.match ?? (() => true))
 const list = computed(() => matches.value.filter(inView.value))
 
 // ---- sorting ----
-const sortKey = ref('score')
+//
+// Newest first, NOT highest score first. Sorting by score buries every new
+// find behind an accumulating backlog of older high-scored postings: on
+// 2026-09-11 all ten of that morning's finds sat at ranks 14-24, so page one
+// was entirely two-week-old rows and the day's work was invisible. That is
+// the same reasoning the dashboard's "Worth a look" panel already uses.
+// `firstSeen` is date-only, so same-day ties are the normal case and score
+// breaks them. Clicking the Score header still sorts by score, and the choice
+// is remembered.
+const sortKey = ref('age')
 const sortDir = ref(-1)
 const STATE_ORDER = ['new', 'applied', 'dismissed']
 
@@ -110,7 +143,7 @@ function sortValue(p: PostingMeta): string | number {
     case 'company': return p.company.toLowerCase()
     case 'comp': return p.comp || ''
     case 'geo': return p.geo || p.location || ''
-    case 'source': return p.source || ''
+    case 'source': return channel(p)
     case 'state': return STATE_ORDER.indexOf(p.state)
     case 'age': return Date.parse(p.firstSeen || p.createdAt) || 0
     default: return 0
@@ -125,6 +158,11 @@ function sortBy(key: string) {
     sortDir.value = key === 'score' || key === 'age' ? -1 : 1
   }
   page.value = 0
+  try {
+    localStorage.setItem(SORT_KEY, `${sortKey.value}:${sortDir.value}`)
+  } catch {
+    /* the sort still applies for this visit */
+  }
 }
 
 const sorted = computed(() =>
@@ -132,6 +170,9 @@ const sorted = computed(() =>
     const x = sortValue(a)
     const y = sortValue(b)
     const cmp = typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y))
+    // Same-day ties are the common case when sorting by age, so fall back to
+    // score rather than leaving the order arbitrary.
+    if (cmp === 0 && sortKey.value !== 'score') return (b.score ?? -1) - (a.score ?? -1)
     return cmp * sortDir.value
   }),
 )
@@ -143,7 +184,7 @@ const HEADS: { key: string; label: string; right?: boolean }[] = [
   { key: 'comp', label: 'Comp' },
   { key: 'geo', label: 'Where' },
   { key: 'source', label: 'Source' },
-  { key: 'age', label: 'Seen', right: true },
+  { key: 'age', label: 'Added', right: true },
   { key: '', label: 'Pack', right: true },
 ]
 
@@ -261,11 +302,34 @@ async function bulkApply() {
 /** The window push-postings uses when deciding what is still worth sending. */
 const STALE = 21
 
+function addedAt(p: PostingMeta): string {
+  return p.firstSeen || p.createdAt || ''
+}
+
 function ageDays(p: PostingMeta): number | null {
-  const iso = p.firstSeen || p.createdAt
+  const iso = addedAt(p)
   if (!iso) return null
   const d = Math.floor((Date.now() - Date.parse(iso)) / 86_400_000)
   return Number.isFinite(d) ? Math.max(0, d) : null
+}
+
+/** The day it landed. A date-only value would otherwise render as the evening
+ *  before, since it parses as UTC midnight. Year only when it is not this one. */
+function addedLabel(p: PostingMeta): string {
+  const iso = addedAt(p)
+  if (!iso) return '—'
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? new Date(`${iso}T12:00:00`) : new Date(iso)
+  if (Number.isNaN(d.getTime())) return '—'
+  const opts: Intl.DateTimeFormatOptions =
+    d.getFullYear() === new Date().getFullYear()
+      ? { month: 'short', day: 'numeric' }
+      : { month: 'short', day: 'numeric', year: '2-digit' }
+  return d.toLocaleDateString('en-CA', opts)
+}
+
+function addedTitle(p: PostingMeta): string {
+  const n = ageDays(p)
+  return n === null ? '' : n === 0 ? 'added today' : `added ${n} day${n === 1 ? '' : 's'} ago`
 }
 
 const PACK_LABEL: Record<string, string> = {
@@ -443,10 +507,10 @@ function resetFilters() {
                   </td>
                   <td class="mono clip">{{ p.comp || '—' }}</td>
                   <td class="muted clip">{{ p.geo || p.location || '—' }}</td>
-                  <td class="muted clip src">{{ p.source || '—' }}</td>
+                  <td class="muted clip src" :title="p.source || ''">{{ channel(p) }}</td>
                   <td class="right">
                     <ClientOnly>
-                      <span class="age-cell mono">
+                      <span class="age-cell mono" :title="addedTitle(p)">
                         <span class="age-track" aria-hidden="true">
                           <span
                             class="age-fill"
@@ -456,7 +520,7 @@ function resetFilters() {
                             }"
                           />
                         </span>
-                        <span :class="(ageDays(p) ?? 0) > STALE ? 'muted' : ''">{{ ageDays(p) === null ? '—' : ageDays(p) + 'd' }}</span>
+                        <span :class="(ageDays(p) ?? 0) > STALE ? 'muted' : ''">{{ addedLabel(p) }}</span>
                       </span>
                     </ClientOnly>
                   </td>

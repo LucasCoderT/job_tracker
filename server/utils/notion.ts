@@ -4,6 +4,8 @@
  */
 import type { H3Event } from 'h3'
 import type { NotionPage } from '../../shared/types'
+// The board a posting came from — shared with the browser (see shared/postings.ts).
+export { sourceDomain, channelOf } from '../../shared/postings'
 import {
   NOTION_VERSION,
   STATUS_PROP,
@@ -184,16 +186,6 @@ export function classifyRole(position: string): RoleType {
 
 // Registrable-ish domain: ca.indeed.com → indeed.com, www.linkedin.com → linkedin.com
 // Registrable domain of a URL (e.g. "job-boards.greenhouse.io" → "greenhouse.io").
-export function sourceDomain(url: string | null): string | null {
-  if (!url) return null
-  try {
-    const host = new URL(url).hostname.toLowerCase()
-    const parts = host.split('.')
-    return parts.length > 2 ? parts.slice(-2).join('.') : host
-  } catch {
-    return null
-  }
-}
 
 // Friendly "source channel" of an application, derived from its Job Posting
 // URL. Known job boards and ATS vendors get a readable label; anything else
@@ -201,28 +193,6 @@ export function sourceDomain(url: string | null): string | null {
 // registrable domain. This is the apply/posting channel — a good proxy for
 // where a role came from without a manual per-row field. Returns null for
 // rows with no Job Posting URL so they can be counted as "unknown" upstream.
-const CHANNEL_BY_DOMAIN: Record<string, string> = {
-  'linkedin.com': 'LinkedIn',
-  'indeed.com': 'Indeed',
-  'remoteok.com': 'RemoteOK',
-  'ashbyhq.com': 'Ashby',
-  'greenhouse.io': 'Greenhouse',
-  'lever.co': 'Lever',
-  'myworkdayjobs.com': 'Workday',
-  'myworkdaysite.com': 'Workday',
-  'rippling.com': 'Rippling',
-  'breezy.hr': 'Breezy',
-  'wellfound.com': 'Wellfound',
-  'angel.co': 'Wellfound',
-  'jobbank.gc.ca': 'Job Bank',
-  'hrsdc-rhdcc.gc.ca': 'Job Bank',
-}
-
-export function channelOf(url: string | null): string | null {
-  const domain = sourceDomain(url)
-  if (!domain) return null
-  return CHANNEL_BY_DOMAIN[domain] ?? domain
-}
 
 // Monday of the week containing the given ISO date (UTC).
 export function weekStartISO(iso: string): string | null {
