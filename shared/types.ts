@@ -375,3 +375,87 @@ export interface PostingQuestions {
   error: string | null
   updatedAt: string
 }
+
+// ---- EI job-search activity ----
+//
+// His record of job-search activity for Service Canada, kept in the Notion
+// "EI Job Search Activity Log". Every automation on this project does work
+// *for* him — the Mac evaluates postings, drafts CVs, drafts form answers,
+// often while he is asleep — and none of that is his job-search time. So the
+// site assembles candidate rows out of things it can prove *he* did (pressed
+// Mark applied, requested a pack, dismissed a posting, pasted a form's
+// questions), shows the evidence for each, and leaves `timeSpent` empty.
+// He sets the hours and confirms; nothing is written until he does.
+
+/** The Method select, verbatim from the Notion database. */
+export type EiMethod =
+  | 'Networking'
+  | 'Searched online'
+  | 'Applied online'
+  | 'Email application'
+  | 'Attended interview'
+  | 'Resume/cover letter prep'
+
+/** The Outcome select, verbatim from the Notion database. */
+export type EiOutcome = 'Waiting on reply' | 'Applied' | 'No suitable postings found' | 'Interview scheduled'
+
+/** The Time Spent select. A closed set — Notion rejects anything else. */
+export type EiTimeSpent = '30 min' | '1 hour' | '1.5 hours' | '2 hours'
+
+export const EI_TIME_OPTIONS: EiTimeSpent[] = ['30 min', '1 hour', '1.5 hours', '2 hours']
+
+/** One proposed row, with what the site saw that makes it a candidate. */
+export interface EiCandidate {
+  /** Stable across regenerations of the same week, so a dismissal sticks. */
+  key: string
+  date: string // YYYY-MM-DD, America/Edmonton
+  method: EiMethod
+  activity: string
+  /** The employer this row is about — what a logged row is matched against. */
+  subject: string
+  notes: string
+  outcome: EiOutcome
+  /** What the site actually observed, in local time. Shown, never inferred. */
+  evidence: string[]
+  /** A row already in Notion that looks like this one — do not double-log. */
+  alreadyLogged: boolean
+  /**
+   * Other entries the log already holds for this day and method. His own rows
+   * are freehand and often summarise several applications at once, which no
+   * matcher can pair up reliably — so the page shows them and he decides.
+   */
+  sameDayLogged: string[]
+}
+
+/** A row already in the Notion log, for the "already recorded" list. */
+export interface EiLogged {
+  date: string
+  method: string
+  activity: string
+  timeSpent: string | null
+}
+
+export interface EiWeek {
+  enabled: boolean
+  monday: string
+  sunday: string
+  candidates: EiCandidate[]
+  logged: EiLogged[]
+  /** Set when the log cannot be read — the page says so rather than inventing. */
+  error: string | null
+}
+
+/** What he confirms. `timeSpent` is required: the site never guesses it. */
+export interface EiEntryInput {
+  date: string
+  method: EiMethod
+  activity: string
+  notes?: string
+  outcome: EiOutcome
+  timeSpent: EiTimeSpent
+}
+
+export interface EiWriteResult {
+  written: number
+  failed: { activity: string; error: string }[]
+}

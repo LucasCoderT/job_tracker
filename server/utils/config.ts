@@ -93,3 +93,17 @@ export const BUCKET_SPEC: { key: BucketKey; label: string; color: string }[] = [
 // var; the integration must be connected to that database or every
 // write-back reports "not connected" (the KV copy still saves).
 export const DEFAULT_BANK_DATABASE_ID = '02910f231fd644d6b1f3a552be3c5328'
+
+// The EI Job Search Activity Log (Personal Life / Job Hunting). His record of
+// job-search activity for Service Canada; `Time Spent` is a declaration only
+// he can make, so nothing here ever fills it in.
+export const DEFAULT_EI_DATABASE_ID = '088e128f3c404932b932a59176fa7cd2'
+
+/**
+ * The EI record is a local-time document — "what did you do on Thursday" —
+ * while the Worker runs in UTC and every timestamp it holds is UTC. Applying
+ * at 6pm Edmonton is 00:11 UTC the next day, so using UTC dates would file a
+ * whole evening's applications under the wrong day. All EI date maths goes
+ * through this zone.
+ */
+export const EI_TIMEZONE = 'America/Edmonton'

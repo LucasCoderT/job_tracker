@@ -44,6 +44,10 @@ export interface AppEnv {
   NOTION_VIEW_URL?: string
   SNAPSHOTS?: KVNamespace
   PACKS?: KVNamespace
+  // The EI Job Search Activity Log, and optionally a token from an
+  // integration connected to it (falls back to NOTION_TOKEN).
+  NOTION_EI_DATABASE_ID?: string
+  NOTION_EI_TOKEN?: string
   // Job postings career-ops pushes up before they are applied to.
   POSTINGS?: KVNamespace
 }

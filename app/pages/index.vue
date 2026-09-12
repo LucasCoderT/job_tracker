@@ -83,6 +83,15 @@ const footer = computed(() => {
           size="small"
         />
         <PrimeButton
+          as="a"
+          href="/ei"
+          label="EI activity"
+          icon="pi pi-calendar-clock"
+          severity="secondary"
+          outlined
+          size="small"
+        />
+        <PrimeButton
           v-if="notionUrl"
           as="a"
           :href="notionUrl"
