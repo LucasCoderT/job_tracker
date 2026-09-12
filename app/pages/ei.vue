@@ -132,6 +132,7 @@ async function confirmAll() {
 
     <template v-else-if="data">
       <PrimeCard v-if="pendingRows.length" class="sec" aria-label="To confirm">
+        <template #content>
         <div class="deck-head">
           <h2>To confirm<span class="mono faint"> {{ pendingRows.length }}</span></h2>
           <span class="mono faint">{{ ready.length }} ready · {{ missing.length }} need a time</span>
@@ -195,6 +196,7 @@ async function confirmAll() {
             @click="confirmAll"
           />
         </div>
+        </template>
       </PrimeCard>
 
       <PrimeMessage v-else severity="success" :closable="false">
@@ -202,6 +204,7 @@ async function confirmAll() {
       </PrimeMessage>
 
       <PrimeCard class="sec" aria-label="Already logged">
+        <template #content>
         <div class="deck-head">
           <h2>Already in the log<span class="mono faint"> {{ logged.length }}</span></h2>
         </div>
@@ -216,6 +219,7 @@ async function confirmAll() {
             </tr>
           </tbody>
         </table>
+        </template>
       </PrimeCard>
 
       <Transition name="toast">
