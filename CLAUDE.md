@@ -37,6 +37,7 @@ wrangler.toml         deploy config — custom domain, workers_dev=false, KV, cr
 shared/types.ts       the /api/stats payload types — single source of truth, server + client
 shared/bank.ts        answer-bank helpers shared by Worker + browser (lint, beat lines)
 shared/postings.ts    normalizeUrl — the posting key, shared with career-ops
+shared/pipeline.ts    the interview ladder + which rungs a job can move to (menu and route agree)
 server/
   utils/aggregate.ts  aggregate() — the core fold (see "The data model")
   utils/packs.ts      PACKS KV store + prep-sheet renderer  |  utils/bank-notion.ts  Notion write-back
@@ -48,8 +49,10 @@ server/
   utils/mock.ts       fake Notion pages for tokenless local dev
   utils/postings.ts   POSTINGS KV store + the Machine Summary reader
   utils/posting-route.ts  shared plumbing for the /api/postings routes
-  utils/applications-notion.ts  the one write into DB Applications
+  utils/applications-notion.ts  the two writes into DB Applications: create (Mark applied), status change
   api/postings/**     the postings API (list, queue, upsert, pack, artifacts)
+  api/jobs/[id]/status.post.ts  mark an application rejected / moved on a round
+  utils/stats-cache.ts  the /api/stats cache key, shared by the route that fills it and the one that purges it
   api/stats.get.ts    edge-cached via caches.default keyed by SCHEMA_VERSION
   api/history.get.ts  | api/snapshot.get.ts | tasks/snapshot.ts (cron)
 app/
@@ -554,6 +557,63 @@ was itself built against `DESIGN.md` §7. What changed and why:
   keyboard behaviour stay library-owned) restyled to the design, with the
   status pill, the age-against-cutoff bar, and sort indicators hidden until
   hover or active.
+
+## Rejected / moved on a round (2026-09-15)
+
+Every job card and table row has a ⋮ button opening one shared `PrimeMenu`:
+**Progressed to** (the rungs it can still reach) and **Closed → Rejected**. It
+writes the Notion row through `POST /api/jobs/:id/status` and the card moves
+at once, with an Undo toast.
+
+**"Progressing" is not a Notion status.** The live Status enum is Applied ·
+Interviewing · On Hold · Offer · Accepted · Rejected; the `progressing` bucket
+only exists for historical rows. Moving forward is three properties together:
+
+| Action | Status | Furthest Stage | Interviewed | Next Action |
+|---|---|---|---|---|
+| reject | Rejected | *unchanged* | *unchanged* | Nothing |
+| advance to a round | Interviewing | the chosen rung | ✓ | Prepare Interview |
+| advance to Offer | Offer | Offer | ✓ | Decide |
+| restore (Undo) | exactly the snapshot the previous call returned | | | |
+
+Decisions that are load-bearing:
+
+- **Rejecting never clears Furthest Stage or Interviewed.** A rejection at
+  Round 2 still reached Round 2, and `readInterviewed` is what routes it
+  through `rejectedAfterInterview` instead of counting it as a form rejection.
+  Clearing them would quietly lower the interview rate.
+- **Furthest Stage only goes up**, except through Undo. `reachableStages()` in
+  `shared/pipeline.ts` is used by both the menu and the route, so the menu can
+  never offer a move the server refuses. Two repeats are allowed: Round 3+
+  again (it is a range), and the current rung on a job that is not actively
+  interviewing (reopening a rejected or paused process where it stopped).
+- **The route refuses any page not in DB Applications** (422). It takes a page
+  id from the browser, and the answer bank and EI log are shared with the same
+  integration — a stale id must not be able to set "Status: Rejected" on them.
+- **Undo instead of a confirm step.** A status change is fully reversible, so a
+  mis-tap on a phone costs one tap to fix rather than every change costing two.
+  The toast also explains where a rejected card went — it leaves the default
+  "In conversation" filter the moment it is marked.
+- **Two caches sit in front of the read**, and both have to be handled:
+  `/api/stats` is edge-cached 5 min *and* sent `max-age=300`, so a plain
+  refetch after a change returns the old payload and the card slides back.
+  So the route returns the row rebuilt from Notion's own PATCH response
+  (`jobFromPage`, extracted from `aggregate()` and verified byte-identical on
+  the mock set) and the card moves from that; the route purges the edge copy;
+  and 1.5s later the page makes one `?fresh=1` read to bring the counts in
+  line. **`?fresh=1` skips the cache in both directions** — if Notion's query
+  lags its own write, caching that answer would undo the purge for five
+  minutes. Rows changed in the last two minutes keep the PATCH's version even
+  if that read disagrees.
+- **Nuxt 4 `useFetch` data is a shallow ref** — `useJobStatus` replaces
+  `stats.value` whole; editing a job in place re-renders nothing. Board cards
+  are keyed by job id for the same reason cards now move: an index key hands
+  one job's DOM (and its busy spinner) to whichever card slides into its slot.
+
+Not done, deliberately: marking progress creates **no EI entry** — the site
+knows when the button was pressed, not when the interview happened, and the EI
+log records the latter. And career-ops's `data/applications.md` is not updated;
+it was already drifting from Notion (70 of 177 applications are not in it).
 
 ## Tunable constants (`server/utils/config.ts`)
 

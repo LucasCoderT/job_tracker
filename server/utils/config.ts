@@ -4,6 +4,7 @@
  * CLAUDE.md "The data model").
  */
 import type { BucketKey } from '../../shared/types'
+import { STAGE_ORDER as LADDER } from '../../shared/pipeline'
 
 export const NOTION_VERSION = '2022-06-28'
 export const CACHE_TTL_SECONDS = 300
@@ -35,7 +36,9 @@ export const INTERVIEWED_PROP = 'Interviewed' // checkbox; added to Notion 2026-
 // Manager", "Technical") because round names differ per company and ordinal
 // labels stay comparable across all of them. Order here IS the ladder order.
 export const STAGE_PROP = 'Furthest Stage'
-export const STAGE_ORDER = ['Round 1 — Screen', 'Round 2', 'Round 3+', 'Offer']
+// The ladder itself lives in shared/pipeline.ts so the status menu in the
+// browser and the route that applies it read the same list.
+export const STAGE_ORDER: readonly string[] = LADDER
 
 // Notion Status option (case-insensitive) → funnel bucket.
 // The live Notion enum (set 2026-07-14) is:

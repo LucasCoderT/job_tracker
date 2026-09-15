@@ -13,7 +13,8 @@ import type { Stats } from '../../shared/types'
 import { getCloudflareEnv, resolveStaleDays, queryAllPages } from '../utils/notion'
 import { aggregate } from '../utils/aggregate'
 import { mockPages } from '../utils/mock'
-import { SCHEMA_VERSION, CACHE_TTL_SECONDS } from '../utils/config'
+import { CACHE_TTL_SECONDS } from '../utils/config'
+import { statsCacheKey } from '../utils/stats-cache'
 
 export default defineEventHandler(async (event): Promise<Stats | Response | { error: string }> => {
   const env = getCloudflareEnv(event)
@@ -21,12 +22,17 @@ export default defineEventHandler(async (event): Promise<Stats | Response | { er
   const staleDays = resolveStaleDays(env)
   const now = Date.now()
 
+  // `?fresh=1` is the read the tracker makes straight after he changes a
+  // job's status. It skips the edge cache in BOTH directions. Skipping the
+  // read is the point; skipping the write matters as much — if Notion's query
+  // lags a moment behind the PATCH, writing that answer back would re-cache
+  // the old status for five minutes, undoing the purge the change just did.
+  // The next ordinary load refills the cache once Notion has caught up.
+  const fresh = getQuery(event).fresh === '1'
+
   // Edge cache (real deploy only — mock/dev responses aren't cached).
   const caches = (globalThis as any).caches
-  const canCache = !useMock && caches?.default
-  const cacheKey = canCache
-    ? new Request(new URL('/api/stats?v=' + SCHEMA_VERSION, getRequestURL(event)).toString())
-    : null
+  const cacheKey = !useMock && !fresh ? statsCacheKey(event) : null
 
   if (cacheKey) {
     const hit = await caches.default.match(cacheKey)
@@ -70,5 +76,8 @@ export default defineEventHandler(async (event): Promise<Stats | Response | { er
     return res
   }
 
+  // Never let a browser keep the fresh read: the ordinary response carries
+  // max-age=300, and the whole reason for this one is that it isn't stale.
+  if (fresh) setResponseHeader(event, 'cache-control', 'no-store')
   return stats
 })

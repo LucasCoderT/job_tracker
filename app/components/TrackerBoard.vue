@@ -9,7 +9,13 @@ const props = defineProps<{
   jobs: Job[]
   searching: boolean
   packs: Map<string, PackMeta>
+  busyId: string | null
 }>()
+// The status menu lives in TrackerSection; a card only says which job.
+const emit = defineEmits<{ status: [event: MouseEvent, job: Job] }>()
+
+// An accepted or declined offer is where a process ends; nothing to move.
+const movable = (job: Job) => job.bucket !== 'offerAccepted' && job.bucket !== 'offerDeclined'
 
 function dotColor(color: string): string {
   return `var(--${color})`
@@ -69,7 +75,21 @@ const columns = computed(() =>
         <div v-if="!col.hadAny" class="empty-col">No jobs yet</div>
         <!-- The card is a div: the Notion link and the pack chip are both
              links, and an anchor cannot nest an anchor. -->
-        <div v-for="(job, i) in col.jobs" :key="i" class="card">
+        <!-- Keyed by id, not index: cards now move between columns, and an
+             index key would hand one job's DOM (and its busy spinner) to
+             whichever card slid into its slot. -->
+        <div v-for="job in col.jobs" :key="job.id" class="card">
+          <button
+            v-if="movable(job)"
+            type="button"
+            class="icon-btn job-status-btn"
+            :aria-label="`Change status for ${job.company}`"
+            aria-haspopup="menu"
+            :disabled="busyId === job.id"
+            @click.stop="emit('status', $event, job)"
+          >
+            <i :class="busyId === job.id ? 'pi pi-spin pi-spinner' : 'pi pi-ellipsis-v'" />
+          </button>
           <a class="card-main" :href="job.url || '#'" target="_blank" rel="noopener">
             <p class="co">{{ job.company }}</p>
             <p v-if="job.position" class="role">{{ job.position }}</p>

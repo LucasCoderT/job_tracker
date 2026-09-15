@@ -7,7 +7,9 @@ const props = defineProps<{
   packs: Map<string, PackMeta>
   buckets: Bucket[]
   staleDays: number
+  busyId: string | null
 }>()
+const emit = defineEmits<{ status: [event: MouseEvent, job: Job] }>()
 
 const BUCKET_LABEL: Record<string, string> = {
   awaiting: 'Awaiting',
@@ -122,6 +124,22 @@ const rows = computed(() =>
 
       <PrimeColumn header="Pack" class="col-right">
         <template #body="{ data }"><PackChip :job="data" :pack="packs.get(data.id)" /></template>
+      </PrimeColumn>
+
+      <PrimeColumn class="col-right col-status-action">
+        <template #body="{ data }">
+          <button
+            v-if="data.bucket !== 'offerAccepted' && data.bucket !== 'offerDeclined'"
+            type="button"
+            class="icon-btn"
+            :aria-label="`Change status for ${data.company}`"
+            aria-haspopup="menu"
+            :disabled="busyId === data.id"
+            @click.stop="emit('status', $event, data)"
+          >
+            <i :class="busyId === data.id ? 'pi pi-spin pi-spinner' : 'pi pi-ellipsis-v'" />
+          </button>
+        </template>
       </PrimeColumn>
     </PrimeDataTable>
   </div>

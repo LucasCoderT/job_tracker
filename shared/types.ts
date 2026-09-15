@@ -459,3 +459,27 @@ export interface EiWriteResult {
   written: number
   failed: { activity: string; error: string }[]
 }
+
+// ---- Moving an application along (rejected / next round) ----
+
+/** The four Notion properties a status change touches, as they stand. */
+export interface JobStatusSnapshot {
+  status: string | null
+  stage: string | null
+  interviewed: boolean
+  nextAction: string | null
+}
+
+/**
+ * `reject` and `advance` are the two moves; `restore` puts back a snapshot the
+ * route returned earlier, which is what Undo sends.
+ */
+export type JobStatusAction = 'reject' | 'advance' | 'restore'
+
+export interface JobStatusResult {
+  /** The row as the board builds it, straight from Notion's PATCH response. */
+  job: Job
+  /** What was there before — Undo sends this back as-is. */
+  previous: JobStatusSnapshot
+  current: JobStatusSnapshot
+}

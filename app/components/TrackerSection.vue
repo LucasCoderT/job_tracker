@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import type { Bucket, BucketKey, Job } from '../../shared/types'
+import { reachableStages } from '#shared/pipeline'
 
 const props = defineProps<{
   buckets: Bucket[]
@@ -11,6 +12,50 @@ const props = defineProps<{
 
 // Pack state per row (one shared request; see usePacks).
 const { byJob: packs } = usePacks()
+
+// ---- Rejected / moved on a round ----
+//
+// One menu for the whole tracker, re-anchored to whichever card's button was
+// pressed: a PrimeMenu per card would be ~180 overlays on the All filter.
+const { busyId, toast, reject, advance, dismiss } = useJobStatus()
+const menu = ref<any>(null)
+const menuJob = ref<Job | null>(null)
+const menuOpen = ref(false)
+
+const menuItems = computed(() => {
+  const job = menuJob.value
+  if (!job) return []
+  const interviewing = job.bucket === 'interviewed' || job.bucket === 'progressing'
+  const rungs = reachableStages(job.stage, interviewing, job.bucket === 'offerAccepted')
+  const groups: any[] = []
+  if (rungs.length) {
+    groups.push({
+      label: 'Progressed to',
+      items: rungs.map((stage) => ({
+        label: stage,
+        icon: stage === 'Offer' ? 'pi pi-star' : 'pi pi-arrow-right',
+        command: () => advance(job, stage),
+      })),
+    })
+  }
+  if (job.bucket !== 'rejected') {
+    groups.push({
+      label: 'Closed',
+      items: [{ label: 'Rejected', icon: 'pi pi-times', class: 'is-reject', command: () => reject(job) }],
+    })
+  }
+  return groups
+})
+
+function openStatusMenu(event: MouseEvent, job: Job) {
+  if (menuOpen.value && menuJob.value?.id === job.id) return menu.value?.hide()
+  // Captured now: by the time nextTick runs the event has finished dispatching
+  // and currentTarget is null, which would anchor the menu to nothing.
+  const target = event.currentTarget as HTMLElement
+  menu.value?.hide()
+  menuJob.value = job
+  nextTick(() => menu.value?.show(event, target))
+}
 
 const view = ref<'board' | 'table'>('board')
 const viewOptions = [
@@ -141,8 +186,40 @@ const filters = computed(() =>
         :jobs="filtered"
         :searching="searching"
         :packs="packs"
+        :busy-id="busyId"
+        @status="openStatusMenu"
       />
-      <ApplicationsTable v-else :jobs="filtered" :packs="packs" :buckets="buckets" :stale-days="staleDays" />
+      <ApplicationsTable
+        v-else
+        :jobs="filtered"
+        :packs="packs"
+        :buckets="buckets"
+        :stale-days="staleDays"
+        :busy-id="busyId"
+        @status="openStatusMenu"
+      />
+
+      <PrimeMenu
+        ref="menu"
+        :model="menuItems"
+        popup
+        class="status-menu"
+        @show="menuOpen = true"
+        @hide="menuOpen = false"
+      />
+
+      <!-- A rejected job leaves the default "In conversation" filter the moment
+           it is marked, so the toast is what says where it went — and Undo is
+           the safety net for a mis-tap on a phone, instead of a confirm step
+           on every change. -->
+      <Transition name="toast">
+        <div v-if="toast" class="toast" :class="{ 'is-error': toast.error }" role="status">
+          <i :class="toast.error ? 'pi pi-exclamation-triangle' : 'pi pi-check-circle'" />
+          <span>{{ toast.text }}</span>
+          <button v-if="toast.undo" type="button" class="toast-undo" @click="toast.undo()">Undo</button>
+          <button type="button" class="toast-x" aria-label="Dismiss" @click="dismiss"><i class="pi pi-times" /></button>
+        </div>
+      </Transition>
     </template>
   </PrimeCard>
 </template>

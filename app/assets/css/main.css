@@ -146,6 +146,14 @@ h1 { font-size: 20px; font-weight: 600; letter-spacing: 0.01em; margin: 0; }
   border-radius: 10px; padding: 10px 12px; transition: border-color 120ms;
 }
 .card:hover, .card:focus-within { border-color: var(--faint); }
+/* The status button sits in the card's top-right corner; the company line
+   leaves room for it so a long name does not run underneath. */
+.card { position: relative; }
+.card .co { padding-right: 24px; }
+.job-status-btn { position: absolute; top: 5px; right: 4px; width: 28px; height: 28px; color: var(--faint); }
+.job-status-btn .pi { font-size: 12px; }
+.card:hover .job-status-btn, .job-status-btn:focus-visible, .job-status-btn[disabled] { color: var(--muted); }
+.col-status-action { width: 1%; }
 .card-main { display: block; text-decoration: none; }
 .card-main:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 .card .co { font-size: 13.5px; font-weight: 600; color: var(--text); margin: 0 0 2px; }
@@ -946,6 +954,20 @@ a.rail-primary.as-link:hover { background: #d9bd71; border-color: #d9bd71; color
 .ei-logged tr:last-child td { border-bottom: 0; }
 .ei-logged tr:hover { background: var(--card); }
 .ei-logged td:last-child { padding-right: 0; text-align: right; white-space: nowrap; }
+
+/* ---- Tracker: mark rejected / moved on a round ---- */
+.status-menu.p-menu { min-width: 190px; }
+.status-menu .p-menu-submenu-label {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint);
+}
+.status-menu .is-reject .p-menu-item-label, .status-menu .is-reject .p-menu-item-icon { color: var(--danger); }
+.toast.is-error { border-color: #4a2a25; }
+.toast.is-error > .pi { color: var(--danger); }
+.toast-undo {
+  flex: none; border: 1px solid var(--panel-edge); background: transparent; color: var(--amber);
+  font: inherit; font-size: 12.5px; font-weight: 600; border-radius: 6px; padding: 3px 10px; cursor: pointer;
+}
+.toast-undo:hover, .toast-undo:focus-visible { border-color: var(--amber); }
 
 /* ---- Application questions ---- */
 .questions-page { max-width: 820px; }

@@ -57,6 +57,28 @@ function summarize(arr: number[]): SalaryGroup {
   return { n: s.length, median, min: s[0]!, max: s[s.length - 1]! }
 }
 
+/**
+ * One Notion row as the dashboard sees it. Exported so a route that has just
+ * changed a row (POST /api/jobs/:id/status) hands back exactly the shape the
+ * board built, rather than a second hand-kept copy of these fields.
+ */
+export function jobFromPage(page: NotionPage, bucket: BucketKey, now: number): Job {
+  const dateMs = readDateMs(page)
+  return {
+    id: String(page.id ?? page.url ?? ''),
+    company: readTitle(page) || 'Untitled',
+    position: readRichText(page, POSITION_PROP),
+    bucket,
+    date: page.properties?.[DATE_PROP]?.date?.start ?? null,
+    ageDays: dateMs !== null ? Math.floor((now - dateMs) / 86_400_000) : null,
+    url: page.url ?? null,
+    salary: readNumber(page, SALARY_PROP),
+    source: channelOf(readUrl(page, SOURCE_PROP)),
+    nextAction: readSelect(page, NEXT_ACTION_PROP),
+    stage: readStage(page),
+  }
+}
+
 export function aggregate(
   pages: NotionPage[],
   { staleDays, now }: { staleDays: number; now: number },
@@ -110,14 +132,10 @@ export function aggregate(
       counts.pendingAfterInterview++
     }
 
-    const dateIso = page.properties?.[DATE_PROP]?.date?.start ?? null
+    const job = jobFromPage(page, bucket, now)
+    const { ageDays, nextAction, source, salary, stage, date: dateIso } = job
     const dateMs = readDateMs(page)
-    const ageDays = dateMs !== null ? Math.floor((now - dateMs) / dayMs) : null
     const replied = HEARD_BACK_BUCKETS.has(bucket)
-    const nextAction = readSelect(page, NEXT_ACTION_PROP)
-    const source = channelOf(readUrl(page, SOURCE_PROP))
-    const salary = readNumber(page, SALARY_PROP)
-    const stage = readStage(page)
     if (stage) {
       stageStopped.set(stage, (stageStopped.get(stage) ?? 0) + 1)
       // Where the process went after its furthest rung: closed out, or still
@@ -126,19 +144,6 @@ export function aggregate(
       sink.set(stage, (sink.get(stage) ?? 0) + 1)
     }
 
-    const job: Job = {
-      id: String(page.id ?? page.url ?? ''),
-      company: readTitle(page) || 'Untitled',
-      position: readRichText(page, POSITION_PROP),
-      bucket,
-      date: dateIso,
-      ageDays,
-      url: page.url ?? null,
-      salary,
-      source,
-      nextAction,
-      stage,
-    }
     jobs.push(job)
 
     // Attention queue.
