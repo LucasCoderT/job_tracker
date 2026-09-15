@@ -19,7 +19,14 @@ export default defineEventHandler(async (event): Promise<PostingMeta> => {
   if (state !== 'new' && state !== 'dismissed') {
     throw createError({ statusCode: 400, statusMessage: 'state must be new or dismissed.' })
   }
-  const next: PostingMeta = { ...meta, state, updatedAt: now() }
+  const stamp = now()
+  // dismissedAt is the EI record's evidence that he reviewed it; see the type.
+  const next: PostingMeta = {
+    ...meta,
+    state,
+    dismissedAt: state === 'dismissed' ? (meta.state === 'dismissed' ? (meta.dismissedAt ?? stamp) : stamp) : null,
+    updatedAt: stamp,
+  }
   await putMeta(ctx.kv, next)
   announce(event, 'posting.state', ctx.id, { state, company: next.company, role: next.role })
   return next

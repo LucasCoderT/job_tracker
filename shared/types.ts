@@ -322,6 +322,12 @@ export interface PostingMeta {
   packBuiltAt: string | null
   notionPageId: string | null // set once applied; what an interview pack keys on
   appliedAt: string | null
+  /**
+   * When he dismissed it — written only by POST /:id/state. `updatedAt` cannot
+   * stand in: every producer push stamps it, so it says when the Mac last
+   * touched the posting, not when he decided anything.
+   */
+  dismissedAt: string | null
   hasJD: boolean
   hasAnalysis: boolean
   /** Supplemental application questions: how many, and how the draft is going. */
@@ -417,6 +423,14 @@ export interface EiCandidate {
   outcome: EiOutcome
   /** What the site actually observed, in local time. Shown, never inferred. */
   evidence: string[]
+  /**
+   * A time to start from, worked out from what the evidence shows (how many
+   * applications, how many packs), with the reasoning beside it. Only ever a
+   * starting value on screen: nothing is logged until he presses Log, and
+   * what goes to Notion is what he left in the box.
+   */
+  suggested: EiTimeSpent
+  suggestedWhy: string
   /** A row already in Notion that looks like this one — do not double-log. */
   alreadyLogged: boolean
   /**
@@ -439,13 +453,15 @@ export interface EiWeek {
   enabled: boolean
   monday: string
   sunday: string
+  /** Today in his timezone, so "Log today" never has to work out Edmonton. */
+  today: string
   candidates: EiCandidate[]
   logged: EiLogged[]
   /** Set when the log cannot be read — the page says so rather than inventing. */
   error: string | null
 }
 
-/** What he confirms. `timeSpent` is required: the site never guesses it. */
+/** What he confirms. `timeSpent` is required: the server never fills it in. */
 export interface EiEntryInput {
   date: string
   method: EiMethod
@@ -482,4 +498,20 @@ export interface JobStatusResult {
   /** What was there before — Undo sends this back as-is. */
   previous: JobStatusSnapshot
   current: JobStatusSnapshot
+}
+
+/**
+ * A status change he made from the tracker (rejected, moved on a round),
+ * kept so the EI day can see it. Notion keeps no history of its own, and its
+ * last_edited_time is useless here: the Mac's email classifier edits the same
+ * rows, and its work is not his job-search time.
+ */
+export interface ActivityEvent {
+  at: string
+  day: string // YYYY-MM-DD, America/Edmonton
+  pageId: string
+  company: string
+  position: string
+  action: 'reject' | 'advance'
+  stage: string | null
 }

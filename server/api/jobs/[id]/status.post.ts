@@ -23,10 +23,12 @@
  */
 import type { JobStatusResult, JobStatusSnapshot, BucketKey } from '../../../../shared/types'
 import { STAGE_ORDER, reachableStages, nextStage, stageRank } from '../../../../shared/pipeline'
-import { getCloudflareEnv, resolveStaleDays, classify } from '../../../utils/notion'
+import { getCloudflareEnv, resolveStaleDays, classify, readTitle, readRichText } from '../../../utils/notion'
+import { POSITION_PROP } from '../../../utils/config'
 import { jobFromPage } from '../../../utils/aggregate'
 import { readApplication, snapshotOf, updateJobStatus } from '../../../utils/applications-notion'
 import { purgeStats } from '../../../utils/stats-cache'
+import { recordActivity, cancelLatestActivity } from '../../../utils/activity'
 
 const STATUSES = new Set(['Applied', 'Interviewing', 'On Hold', 'Offer', 'Accepted', 'Rejected'])
 const NEXT_ACTIONS = new Set(['Follow up', 'Waiting', 'Prepare Interview', 'Send email', 'Decide', 'Nothing'])
@@ -102,6 +104,26 @@ export default defineEventHandler(async (event): Promise<JobStatusResult> => {
   }
 
   purgeStats(event)
+
+  // What the EI day sees. Best effort: a missed event costs one suggested row
+  // on the EI page, and must not turn a change Notion already accepted into an
+  // error on the card.
+  if (env.POSTINGS) {
+    const kv = env.POSTINGS
+    const note = action === 'restore'
+      ? cancelLatestActivity(kv, id)
+      : recordActivity(kv, {
+          pageId: id,
+          company: readTitle(updated) || 'an employer',
+          position: readRichText(updated, POSITION_PROP),
+          action,
+          stage: next.stage,
+        })
+    const cfCtx = (event.context as any)?.cloudflare?.context
+    const safe = note.catch(() => {})
+    if (typeof cfCtx?.waitUntil === 'function') cfCtx.waitUntil(safe)
+    else await safe
+  }
 
   // Rebuild from what Notion says the row now is, not from what we asked for:
   // if it silently ignored a property, the card should show that, not a guess.

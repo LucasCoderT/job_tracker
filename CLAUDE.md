@@ -53,6 +53,9 @@ server/
   api/postings/**     the postings API (list, queue, upsert, pack, artifacts)
   api/jobs/[id]/status.post.ts  mark an application rejected / moved on a round
   utils/stats-cache.ts  the /api/stats cache key, shared by the route that fills it and the one that purges it
+  api/ei/**           the EI week (candidates + what is logged) and the write into the EI log
+  utils/ei-week.ts    assembles EI candidates from timestamps only his actions write
+  utils/activity.ts   status changes he made, one KV document per day, for the EI day
   api/stats.get.ts    edge-cached via caches.default keyed by SCHEMA_VERSION
   api/history.get.ts  | api/snapshot.get.ts | tasks/snapshot.ts (cron)
 app/
@@ -557,6 +560,66 @@ was itself built against `DESIGN.md` §7. What changed and why:
   keyboard behaviour stay library-owned) restyled to the design, with the
   status pill, the age-against-cutoff bar, and sort indicators hidden until
   hover or active.
+
+## EI job-search activity (2026-09-11; "Log EI time" 2026-09-15)
+
+His record for Service Canada lives in the Notion **EI Job Search Activity
+Log** (Activity · Date · Method · Outcome · Time Spent · Notes) and has already
+been through one audit interview. Every path that used to write it was a Claude
+session run by hand, so when the site became where he applies, the log went
+stale. Two surfaces write it now, from the same candidates:
+
+- **"Log EI time"** on the dashboard header — end of day. A dialog with what
+  the site saw him do *today*, each row pre-filled with a suggested time, plus
+  **Nothing suitable today** (a search with nothing worth applying to, still
+  job-search activity, in his own wording) and **Add something else** for what
+  the site cannot see (an interview, a call). One press of Log writes it.
+- **`/ei`** — the week, rows not pre-filled, for a careful review or a missed
+  day. Both render `EiEntryRow`, so they cannot drift.
+
+Decisions that are load-bearing:
+
+- **Only his actions produce rows, and only timestamps his actions write date
+  them.** The Mac evaluates postings, builds CVs and drafts answers overnight;
+  none of that is his job-search time. The sources are `appliedAt`,
+  `packRequestedAt`, `dismissedAt`, the questions record (pasted and edited
+  answers, and his draft request — never an answer the Mac drafted), and
+  activity events from the status menu. **Never date a candidate by a
+  posting's `updatedAt`**: every producer push stamps it. That was the first
+  version's bug — a posting the eval worker re-pushed overnight appeared as a
+  dismissal he made that day. `dismissedAt` was added for this and is kept by
+  `mergePosting`; dismissals from before it existed produce no row, which is
+  right, because nothing records when they happened.
+- **Suggested times are shown with their arithmetic** ("3 tailored CVs and
+  cover letters × 30 min") and only ever pre-fill the box. The server never
+  fills `Time Spent` in: `POST /api/ei/entries` refuses a row without one. What
+  reaches Notion is what was on screen when he pressed Log. (The first version
+  offered no suggestions at all; he asked for the day to be assumable, and a
+  visible, editable starting value is that without the site writing hours he
+  never saw.)
+- **Dates are America/Edmonton.** He applies in the evening, which in UTC is the
+  next day.
+- **Applications dedupe on the Notion page id**, not company+date: the site's
+  `appliedAt` is a local date and Notion's Application Date is UTC, so matching
+  on date proposed every evening application twice.
+- **Matching against rows he already wrote is conservative.** His entries are
+  freehand and often summarise ("Submitted four applications"), which pairs
+  with nothing; the row shows what the day already holds under that method and
+  he drops it. A missed match costs a tap; a silent double entry lands in an
+  audited record.
+- **Status changes are recorded in KV** (`activity:<day>` in POSTINGS, one JSON
+  document per day, 180-day TTL) because Notion keeps no history and its
+  `last_edited_time` includes the Mac's email classifier. They propose one
+  "Processed employer correspondence" row per day; Undo removes the event.
+  **Read by exact key, never `list()`.** The first version wrote a key per
+  event and listed by prefix; KV listings trail writes by up to a minute, so
+  the EI day could not see a rejection made a second earlier, and Undo — also
+  listing — could not find the event to delete, leaving an undone rejection in
+  the record. Caught in production testing and fixed before use.
+
+Config: the EI database must be shared with the dashboard's integration (Notion
+→ the database → ••• → Connections), or set `NOTION_EI_TOKEN`;
+`NOTION_EI_DATABASE_ID` overrides the default database.
 
 ## Rejected / moved on a round (2026-09-15)
 

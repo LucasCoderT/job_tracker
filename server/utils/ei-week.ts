@@ -5,18 +5,34 @@
  * CVs and drafts form answers on a schedule, often overnight. None of that is
  * his job-search time and none of it produces a candidate row. What does:
  *
- *   pressed "Mark applied"      → Applied online
- *   pressed "Build pack"        → Resume/cover letter prep  (he chose the job
- *                                 and reviewed what came back before sending)
- *   dismissed a posting         → Searched online  (a human decision on a real
- *                                 posting, which is what "reviewed" means)
- *   pasted a form's questions   → Resume/cover letter prep
+ *   pressed "Mark applied"           → Applied online            (appliedAt)
+ *   pressed "Build pack"             → Resume/cover letter prep  (packRequestedAt)
+ *   dismissed a posting              → Searched online           (dismissedAt)
+ *   pasted / edited a form's answers,
+ *     or asked for them to be drafted → Resume/cover letter prep  (the questions record)
+ *   marked a job rejected or moved on → Email application        (activity events)
+ *
+ * **Every timestamp above is one only his action writes.** That is the whole
+ * trick, and it was wrong once: dismissals and questions used to be dated by
+ * the posting's `updatedAt`, which every producer push stamps — so a posting
+ * the eval worker re-pushed overnight showed up as something he did that day.
+ * Never date a candidate by `updatedAt`.
  *
  * Each candidate carries the timestamps behind it so he can check it against
- * his own memory and drop anything that did not happen the way it looks. No
- * candidate carries a `timeSpent` — see ei-notion.ts.
+ * his own memory and drop anything that did not happen the way it looks, and
+ * a suggested time with the arithmetic behind it. The suggestion is a starting
+ * value on screen, never a write — see ei-notion.ts.
  */
-import type { EiCandidate, EiLogged, EiMethod, PostingMeta, NotionPage } from '../../shared/types'
+import type {
+  ActivityEvent,
+  EiCandidate,
+  EiLogged,
+  EiMethod,
+  EiTimeSpent,
+  NotionPage,
+  PostingMeta,
+  PostingQuestions,
+} from '../../shared/types'
 import { EI_TIMEZONE, DATE_PROP, POSITION_PROP } from './config'
 import { readTitle, readRichText } from './notion'
 
@@ -62,21 +78,52 @@ export function todayLocal(): string {
 }
 
 const inWeek = (day: string | null, monday: string, sunday: string) => !!day && day >= monday && day <= sunday
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
+
+type Draft = Omit<EiCandidate, 'suggested' | 'suggestedWhy'> & { units: number }
 
 function push(
-  map: Map<string, EiCandidate>,
+  map: Map<string, Draft>,
   key: string,
   base: { date: string; method: EiMethod; activity: string; outcome: EiCandidate['outcome']; subject: string },
   note: string,
   evidence: string,
+  units = 1,
 ) {
   const found = map.get(key)
   if (found) {
-    if (note && !found.notes.includes(note)) found.notes = found.notes ? `${found.notes}; ${note}` : note
+    if (note && !found.notes.split('; ').includes(note)) found.notes = found.notes ? `${found.notes}; ${note}` : note
     found.evidence.push(evidence)
+    found.units += units
     return
   }
-  map.set(key, { key, ...base, notes: note, evidence: [evidence], alreadyLogged: false, sameDayLogged: [] })
+  map.set(key, { key, ...base, notes: note, evidence: [evidence], alreadyLogged: false, sameDayLogged: [], units })
+}
+
+/**
+ * A starting time for a row, from what the evidence counts — and the sum
+ * shown beside it, so the number is checkable rather than a black box. Round
+ * figures on purpose: the Notion column only has four options, and false
+ * precision would read as measurement when it is an estimate.
+ */
+const MINUTES: [prefix: string, per: number, unit: string, many?: string][] = [
+  ['applied:', 30, 'application'],
+  ['notion:', 30, 'application'],
+  ['prep:', 30, 'tailored CV and cover letter', 'tailored CVs and cover letters'],
+  ['questions:', 10, 'form question'],
+  ['search:', 5, 'posting reviewed', 'postings reviewed'],
+  ['correspondence:', 15, 'employer update'],
+]
+function suggest(d: Draft): { suggested: EiTimeSpent; suggestedWhy: string } {
+  const [, per, unit, many] = MINUTES.find(([p]) => d.key.startsWith(p)) ?? ['', 30, 'activity', 'activities']
+  const minutes = Math.max(30, d.units * per)
+  const suggested: EiTimeSpent =
+    minutes <= 30 ? '30 min' : minutes <= 60 ? '1 hour' : minutes <= 90 ? '1.5 hours' : '2 hours'
+  // Say when the column's options bent the sum, or "1 posting × 5 min" sits
+  // beside "30 min" and looks like an error.
+  const raw = d.units * per
+  const bent = raw < 30 ? ', rounded up to the shortest entry' : raw > 120 ? ', capped at the longest entry' : ''
+  return { suggested, suggestedWhy: `${plural(d.units, unit, many)} × ${per} min${bent}` }
 }
 
 /**
@@ -113,8 +160,10 @@ export function buildCandidates(
   logged: EiLogged[],
   monday: string,
   sunday: string,
+  questionsById: Map<string, PostingQuestions> = new Map(),
+  events: ActivityEvent[] = [],
 ): EiCandidate[] {
-  const map = new Map<string, EiCandidate>()
+  const map = new Map<string, Draft>()
   // Applications already represented by a site posting, by Notion page id.
   // Matching on company+date does NOT work here: the site's appliedAt becomes
   // a local date while Notion's Application Date is the UTC one, so an evening
@@ -159,7 +208,7 @@ export function buildCandidates(
           method: 'Resume/cover letter prep',
           activity: 'Prepared tailored resumes and cover letters',
           outcome: 'Applied',
-          subject: company,
+          subject: '',
         },
         company,
         `requested an apply pack for ${who} at ${stamp(p.packRequestedAt!)}`,
@@ -167,44 +216,82 @@ export function buildCandidates(
     }
 
     // Dismissed: he read it and said no. That is the reviewing.
-    if (p.state === 'dismissed') {
-      const seen = localDate(p.updatedAt)
-      if (inWeek(seen, monday, sunday)) {
-        push(
-          map,
-          `search:${seen}`,
-          {
-            date: seen!,
-            method: 'Searched online',
-            activity: 'Reviewed job postings and shortlisted openings',
-            outcome: 'No suitable postings found',
-            subject: company,
-          },
-          company,
-          `dismissed ${who} at ${stamp(p.updatedAt)}`,
-        )
-      }
+    const dismissed = p.state === 'dismissed' ? localDate(p.dismissedAt) : null
+    if (inWeek(dismissed, monday, sunday)) {
+      push(
+        map,
+        `search:${dismissed}`,
+        {
+          date: dismissed!,
+          method: 'Searched online',
+          activity: 'Reviewed job postings and shortlisted openings',
+          outcome: 'No suitable postings found',
+          subject: '',
+        },
+        company,
+        `dismissed ${who} at ${stamp(p.dismissedAt!)}`,
+      )
     }
 
-    // Pasted a form's supplemental questions off the employer's site.
-    if (p.questions > 0) {
-      const q = localDate(p.updatedAt)
-      if (inWeek(q, monday, sunday)) {
-        push(
-          map,
-          `questions:${p.id}`,
-          {
-            date: q!,
-            method: 'Resume/cover letter prep',
-            activity: `Completed ${company}'s application questions`,
-            outcome: 'Applied',
-            subject: company,
-          },
-          `${p.questions} question${p.questions === 1 ? '' : 's'} on the ${company} form`,
-          `${p.questions} questions entered for ${who}, ${p.answered} answered`,
-        )
+    // A form's supplemental questions. His part is pasting them, editing the
+    // answers and asking for a draft; the draft itself is the Mac's, so an
+    // answer whose text came from a draft contributes nothing here.
+    const q = questionsById.get(p.id)
+    if (q) {
+      const byDay = new Map<string, string[]>()
+      const add = (iso: string | null | undefined, what: string) => {
+        const day = localDate(iso)
+        if (!inWeek(day, monday, sunday)) return
+        byDay.set(day!, [...(byDay.get(day!) ?? []), `${what} at ${stamp(iso!)}`])
+      }
+      const pasted = q.questions.filter((x) => x.source === 'pasted')
+      const edited = q.questions.filter((x) => x.source === 'edited')
+      for (const x of pasted) add(x.updatedAt, `entered "${x.question.slice(0, 60)}"`)
+      for (const x of edited) add(x.updatedAt, `edited the answer to "${x.question.slice(0, 60)}"`)
+      add(q.requestedAt, `asked for drafts of ${plural(q.questions.length, 'question')}`)
+      for (const [day, evidence] of byDay) {
+        for (const e of evidence) {
+          push(
+            map,
+            `questions:${p.id}:${day}`,
+            {
+              date: day,
+              method: 'Resume/cover letter prep',
+              activity: `Completed ${company}'s application questions`,
+              outcome: 'Applied',
+              subject: company,
+            },
+            `${plural(q.questions.length, 'question')} on the ${company} form`,
+            e,
+            0,
+          )
+        }
+        // Sized by the form, not by how many timestamps it left behind.
+        map.get(`questions:${p.id}:${day}`)!.units = q.questions.length
       }
     }
+  }
+
+  // Status changes he made from the tracker: the reply came in, he recorded it.
+  for (const e of events) {
+    if (!inWeek(e.day, monday, sunday)) continue
+    const what = e.action === 'reject' ? 'rejection' : e.stage === 'Offer' ? 'offer' : `moved on to ${e.stage}`
+    push(
+      map,
+      `correspondence:${e.day}`,
+      {
+        date: e.day,
+        method: 'Email application',
+        activity: 'Processed employer correspondence',
+        outcome: 'Waiting on reply',
+        subject: '',
+      },
+      `${e.company}: ${what}`,
+      `marked ${e.company} ${e.action === 'reject' ? 'rejected' : `as ${e.stage}`} at ${stamp(e.at)}`,
+    )
+    // An interview being set up is the outcome worth recording, if any update
+    // that day was one.
+    if (e.action === 'advance' && e.stage !== 'Offer') map.get(`correspondence:${e.day}`)!.outcome = 'Interview scheduled'
   }
 
   // Applications that never went through the site — referred, applied direct,
@@ -232,7 +319,9 @@ export function buildCandidates(
     )
   }
 
-  const candidates = [...map.values()].sort((a, b) => a.date.localeCompare(b.date) || a.method.localeCompare(b.method))
+  const candidates: EiCandidate[] = [...map.values()]
+    .map(({ units, ...c }) => ({ ...c, ...suggest({ ...c, units } as Draft) }))
+    .sort((a, b) => a.date.localeCompare(b.date) || a.method.localeCompare(b.method))
   markLogged(candidates, logged)
   return candidates
 }

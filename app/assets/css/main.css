@@ -948,6 +948,37 @@ a.rail-primary.as-link:hover { background: #d9bd71; border-color: #d9bd71; color
 @media (min-width: 760px) {
   .ei-row { grid-template-columns: 170px minmax(0, 1fr) auto; }
 }
+/* In the day dialog every row is the same day, so the date column goes and the
+   method sits above the activity instead. */
+@media (min-width: 560px) {
+  .ei-row.compact { grid-template-columns: minmax(0, 1fr) auto; }
+  .ei-row.compact .ei-when { grid-column: 1 / -1; }
+}
+.ei-time-col { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+/* The suggestion says where its number came from, so it reads as arithmetic
+   rather than as the site claiming to know how long he took. */
+.ei-suggest { margin: 0; font-size: 11px; color: var(--faint); text-align: right; line-height: 1.4; }
+.ei-suggest .linkish { font-size: 11px; color: var(--amber); }
+
+.ei-day-dialog .p-dialog-content { display: flex; flex-direction: column; gap: 12px; }
+.ei-day-lede { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.5; text-wrap: pretty; }
+.ei-day-loading { display: flex; flex-direction: column; gap: 8px; }
+.ei-day-empty { padding: 14px 0 4px; }
+.ei-day-empty-lead { margin: 0 0 4px; font-size: 14px; font-weight: 600; }
+.ei-day-empty .small { margin: 0; line-height: 1.5; text-wrap: pretty; }
+.ei-day-extras { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.ei-add { border: 1px solid var(--panel-edge); border-radius: 10px; padding: 12px; background: var(--card); }
+.ei-add-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.ei-add .p-select { width: 100%; }
+.ei-day-logged summary { cursor: pointer; font-size: 12px; color: var(--faint); }
+.ei-day-logged ul { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.ei-day-logged li { font-size: 12.5px; line-height: 1.45; display: flex; gap: 8px; flex-wrap: wrap; }
+.ei-day-logged li .mono:last-child { margin-left: auto; }
+.ei-day-week { margin-right: auto; font-size: 12.5px; color: var(--muted); text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+.ei-day-week:hover, .ei-day-week:focus-visible { color: var(--amber); }
+.ei-day-week .pi { font-size: 10px; }
+.ei-day-total { font-size: 12px; }
+.ei-day-dialog .p-dialog-footer { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
 .ei-logged { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 .ei-logged td { padding: 6px 12px 6px 0; vertical-align: top; line-height: 1.45; border-bottom: 1px solid #26262c; }

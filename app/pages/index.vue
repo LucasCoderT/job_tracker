@@ -82,15 +82,8 @@ const footer = computed(() => {
           outlined
           size="small"
         />
-        <PrimeButton
-          as="a"
-          href="/ei"
-          label="EI activity"
-          icon="pi pi-calendar-clock"
-          severity="secondary"
-          outlined
-          size="small"
-        />
+        <!-- The end-of-day button; the week page is one link inside it. -->
+        <LogEiButton />
         <PrimeButton
           v-if="notionUrl"
           as="a"

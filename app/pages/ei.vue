@@ -1,9 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import type { EiCandidate, EiTimeSpent, EiWeek } from '../../shared/types'
-// Runtime value, so it goes through the #shared alias like #shared/bank does;
-// a relative import of a .ts file is not resolvable from the built bundle.
-import { EI_TIME_OPTIONS } from '#shared/types'
 
 /**
  * The EI week: what the site saw him do, ready to confirm into the Notion log.
@@ -29,7 +26,6 @@ const logged = computed(() => data.value?.logged ?? [])
 // ---- per-row state: hours he sets, and rows he says did not happen ----
 const hours = ref<Record<string, EiTimeSpent | null>>({})
 const dropped = ref<Record<string, boolean>>({})
-const open = ref<Record<string, boolean>>({})
 
 watch(
   candidates,
@@ -41,15 +37,6 @@ watch(
 
 const ready = computed(() => pendingRows.value.filter((c) => !dropped.value[c.key] && hours.value[c.key]))
 const missing = computed(() => pendingRows.value.filter((c) => !dropped.value[c.key] && !hours.value[c.key]))
-
-const METHOD_ICON: Record<string, string> = {
-  'Applied online': 'pi pi-send',
-  'Resume/cover letter prep': 'pi pi-file-edit',
-  'Searched online': 'pi pi-search',
-  'Attended interview': 'pi pi-users',
-  'Email application': 'pi pi-envelope',
-  Networking: 'pi pi-share-alt',
-}
 
 function shiftWeek(days: number) {
   const base = new Date(`${data.value?.monday ?? new Date().toISOString().slice(0, 10)}T12:00:00Z`)
@@ -139,48 +126,17 @@ async function confirmAll() {
         </div>
 
         <div class="ei-rows">
-          <div v-for="c in pendingRows" :key="c.key" class="ei-row" :class="{ dropped: dropped[c.key] }">
-            <div class="ei-when mono">
-              <span class="ei-day">{{ dayName(c.date) }}</span>
-              <span class="ei-method"><i :class="METHOD_ICON[c.method] || 'pi pi-circle'" />{{ c.method }}</span>
-            </div>
-
-            <div class="ei-what">
-              <p class="ei-activity">{{ c.activity }}</p>
-              <p v-if="c.notes" class="ei-notes">{{ c.notes }}</p>
-              <p v-if="c.sameDayLogged.length" class="ei-dupe">
-                <i class="pi pi-exclamation-triangle" />
-                Already logged that day under {{ c.method }}:
-                <span v-for="(l, i) in c.sameDayLogged" :key="i" class="mono">{{ i ? ' · ' : '' }}“{{ l }}”</span>
-              </p>
-              <button type="button" class="linkish ei-why" @click="open[c.key] = !open[c.key]">
-                {{ open[c.key] ? 'hide' : 'why this is here' }} ({{ c.evidence.length }})
-              </button>
-              <ul v-if="open[c.key]" class="ei-evidence mono">
-                <li v-for="(e, i) in c.evidence" :key="i">{{ e }}</li>
-              </ul>
-            </div>
-
-            <div class="ei-time">
-              <PrimeSelect
-                v-model="hours[c.key]"
-                :options="EI_TIME_OPTIONS"
-                placeholder="Time"
-                size="small"
-                :disabled="dropped[c.key]"
-                class="ei-select"
-              />
-              <button
-                type="button"
-                class="icon-btn danger"
-                :title="dropped[c.key] ? 'Put it back' : 'This did not happen — drop it'"
-                :aria-label="dropped[c.key] ? `Restore ${c.activity}` : `Drop ${c.activity}`"
-                @click="dropped[c.key] = !dropped[c.key]"
-              >
-                <i :class="dropped[c.key] ? 'pi pi-undo' : 'pi pi-times'" />
-              </button>
-            </div>
-          </div>
+          <!-- Suggestions show beside each box but are not pre-filled here: the
+               week page is the careful review. The day dialog on the dashboard
+               starts from them. -->
+          <EiEntryRow
+            v-for="c in pendingRows"
+            :key="c.key"
+            v-model:hours="hours[c.key]"
+            v-model:dropped="dropped[c.key]"
+            :row="c"
+            show-day
+          />
         </div>
 
         <div class="ei-actions">

@@ -334,6 +334,7 @@ export function mergePosting(id: string, existing: PostingMeta | null, body: any
     packBuiltAt: existing?.packBuiltAt ?? null,
     notionPageId: existing?.notionPageId ?? null,
     appliedAt: existing?.appliedAt ?? null,
+    dismissedAt: existing?.dismissedAt ?? null,
 
     questions: existing?.questions ?? 0,
     answered: existing?.answered ?? 0,

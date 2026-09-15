@@ -3,8 +3,9 @@
  *
  * Every row must carry a `timeSpent` from the closed set. A row without one is
  * rejected rather than defaulted: this is his declaration to Service Canada
- * about his own hours, and a plausible guess in that column would be the site
- * putting words in his mouth on an audited form.
+ * about his own hours. The page may pre-fill a suggestion, shown with its
+ * reasoning and editable, but the value that arrives here is the one he saw
+ * and confirmed — the server never supplies it.
  */
 import type { EiEntryInput, EiWriteResult } from '../../../shared/types'
 import { EI_TIME_OPTIONS } from '#shared/types'

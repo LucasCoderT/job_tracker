@@ -26,7 +26,7 @@ export interface KVNamespace {
   // arrayBuffer is how posting artifacts (a CV is a ~110KB PDF) come back;
   // packs only ever store text.
   get(key: string, type?: 'text' | 'json' | 'arrayBuffer'): Promise<any>
-  put(key: string, value: string | ArrayBuffer, opts?: { metadata?: unknown }): Promise<void>
+  put(key: string, value: string | ArrayBuffer, opts?: { metadata?: unknown; expirationTtl?: number }): Promise<void>
   delete(key: string): Promise<void>
   list(opts?: { prefix?: string; limit?: number; cursor?: string }): Promise<{
     keys: { name: string; metadata?: unknown }[]

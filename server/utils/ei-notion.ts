@@ -4,10 +4,12 @@
  * This is his record for Service Canada, and he has already sat one audit
  * interview on it, so two rules shape everything here:
  *
- * 1. **`Time Spent` is never written by software.** It is a declaration about
- *    his own hours. The route refuses a row without it rather than defaulting
- *    to something plausible — a guessed number is exactly what an auditor
- *    pulls on, and it would be his signature on it, not ours.
+ * 1. **`Time Spent` is never written without him seeing it.** It is a
+ *    declaration about his own hours. The page may start a row from a
+ *    suggestion worked out from the evidence (and says how), but the server
+ *    never fills the column in: a row that arrives without a time is refused,
+ *    not defaulted. What reaches Notion is whatever he left on screen when he
+ *    pressed Log.
  * 2. **Dates are America/Edmonton**, not UTC. He applies in the evening; in
  *    UTC that is the next day, which would file a whole evening under a day
  *    he can't account for.
