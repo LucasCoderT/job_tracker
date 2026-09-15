@@ -89,7 +89,7 @@ function save() {
         <PrimeTextarea v-model="cues" auto-resize rows="3" />
       </label>
       <label>
-        <span>Beats — one per line: <code>text [STANCE] :: key, key</code>. Under 8 words; keys are the words you actually say; six at most.</span>
+        <span>Beats — one per line: <code>text [STANCE] :: key, key</code>. Under 8 words; keys are the words you actually say; six at most. Put <code>[WHY]</code> on the beat that carries the reason — it stays on the card once said and ticks only with a because.</span>
         <PrimeTextarea v-model="beats" auto-resize rows="5" class="mono" placeholder="Rolled back first, debugged second [DELIBERATE] :: rolled back, revert" />
       </label>
       <label>

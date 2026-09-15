@@ -162,6 +162,8 @@ export interface Beat {
   text: string
   keys: string[]
   stance?: 'DELIBERATE' | 'GAP' | 'MEASURED' | 'UNMEASURED' | string
+  /** The pin: the beat that carries the WHY. `[WHY]` in the line format. */
+  pin?: boolean
 }
 
 export interface Answer {

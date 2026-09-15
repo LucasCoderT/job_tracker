@@ -35,6 +35,7 @@ export function cleanAnswer(a: any): Answer {
           const beat: Beat = { text, keys: strings(b?.keys) }
           const stance = String(b?.stance ?? '').toUpperCase()
           if (['DELIBERATE', 'GAP', 'MEASURED', 'UNMEASURED'].includes(stance)) beat.stance = stance
+          if (b?.pin === true) beat.pin = true
           return beat
         })
         .filter(Boolean)
@@ -77,7 +78,9 @@ export function cleanBank(input: any): AnswerBank {
 //
 //   Rolled back first, debugged second [DELIBERATE] :: rolled back, revert
 
-const STANCE_RE = /\s*\[(DELIBERATE|GAP|MEASURED|UNMEASURED)\]\s*$/i
+// Trailing tags, any order: a stance and/or [WHY] — the pin, the beat that
+// carries the reason (renders last, stays once said, ticks only with a because).
+const TAG_RE = /\s*\[(DELIBERATE|GAP|MEASURED|UNMEASURED|WHY)\]\s*$/i
 
 export function parseBeats(raw: string): Beat[] {
   const beats: Beat[] = []
@@ -97,10 +100,11 @@ export function parseBeats(raw: string): Beat[] {
     }
     text = text.trim()
     const beat: Beat = { text, keys }
-    const m = STANCE_RE.exec(text)
-    if (m) {
-      beat.stance = m[1]!.toUpperCase()
-      beat.text = text.slice(0, m.index).trim()
+    for (let m = TAG_RE.exec(beat.text); m; m = TAG_RE.exec(beat.text)) {
+      const tag = m[1]!.toUpperCase()
+      if (tag === 'WHY') beat.pin = true
+      else beat.stance = tag
+      beat.text = beat.text.slice(0, m.index).trim()
     }
     if (beat.text) beats.push(beat)
   }
@@ -111,8 +115,9 @@ export function beatsToLines(beats: Beat[]): string {
   return beats
     .map((b) => {
       const stance = b.stance ? ` [${b.stance}]` : ''
+      const pin = b.pin ? ' [WHY]' : ''
       const keys = b.keys?.length ? ` :: ${b.keys.join(', ')}` : ''
-      return `${b.text}${stance}${keys}`
+      return `${b.text}${stance}${pin}${keys}`
     })
     .join('\n')
 }
@@ -129,6 +134,9 @@ export function splitList(raw: string): string[] {
 export function lintAnswer(a: Answer, cueOwner?: Map<string, string>): string[] {
   const issues: string[] = []
   const aid = a.id
+  if (a.beats?.length >= 3 && !a.beats.some((b) => b.pin)) {
+    issues.push(`[${aid}] no [WHY] pin — mark the beat that carries the reason; it is the one that gets dropped`)
+  }
   if (!a.cues?.length) issues.push(`[${aid}] no cues — can only be reached from the picker`)
   if (!a.beats?.length) issues.push(`[${aid}] no beats — an empty card`)
   if (a.beats?.length > 6) issues.push(`[${aid}] ${a.beats.length} beats — more than the card fits`)
