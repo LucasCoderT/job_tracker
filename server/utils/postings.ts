@@ -335,6 +335,10 @@ export function mergePosting(id: string, existing: PostingMeta | null, body: any
     notionPageId: existing?.notionPageId ?? null,
     appliedAt: existing?.appliedAt ?? null,
     dismissedAt: existing?.dismissedAt ?? null,
+    jdSource: existing?.jdSource ?? null,
+    jdCapturedAt: existing?.jdCapturedAt ?? null,
+    jdError: existing?.jdError ?? null,
+    jdAttemptedAt: existing?.jdAttemptedAt ?? null,
 
     questions: existing?.questions ?? 0,
     answered: existing?.answered ?? 0,

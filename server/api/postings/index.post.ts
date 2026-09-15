@@ -16,6 +16,7 @@ import type { PostingCreateResult } from '../../../shared/types'
 import { getCloudflareEnv, sourceDomain, channelOf } from '../../utils/notion'
 import { postingsKV, getMeta, putMeta, postingIdFor, mergePosting } from '../../utils/postings'
 import { now } from '../../utils/posting-route'
+import { captureForPosting, inBackground } from '../../utils/jd-store'
 
 export default defineEventHandler(async (event): Promise<PostingCreateResult> => {
   const kv = postingsKV(getCloudflareEnv(event))
@@ -47,5 +48,7 @@ export default defineEventHandler(async (event): Promise<PostingCreateResult> =>
   }, stamp)
 
   await putMeta(kv, meta)
+  // A friend's link is exactly the posting no evaluation will ever reach.
+  inBackground(event, captureForPosting(getCloudflareEnv(event), kv, meta))
   return { meta, created: true }
 })

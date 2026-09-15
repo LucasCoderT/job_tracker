@@ -126,6 +126,87 @@ const kb = (n: number) => `${Math.max(1, Math.round(n / 1024))} KB`
 const jdSize = computed(() =>
   jd.value.length >= 1000 ? `${Math.round(jd.value.length / 1000)}k characters` : `${jd.value.length} characters`,
 )
+
+// ---- the job description ----
+//
+// Captured straight from the posting when it arrives (server/utils/jd-capture.ts),
+// fetched on the Mac for LinkedIn, or pasted here. It is third-party text, so
+// it is escaped first and only the light Markdown the capture writes — ##
+// headings, - bullets, **bold**, https links — is turned back into markup.
+
+const JD_SOURCE: Record<string, string> = {
+  greenhouse: 'Greenhouse', lever: 'Lever', ashby: 'Ashby', linkedin: 'LinkedIn',
+  page: 'the posting page', pasted: 'pasted by you', 'career-ops': 'the career-ops evaluation',
+}
+const jdFrom = computed(() => (meta.value?.jdSource ? JD_SOURCE[meta.value.jdSource] ?? meta.value.jdSource : ''))
+
+const escapeHtml = (s: string) =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+function inlineMd(s: string) {
+  return s
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener nofollow">$1</a>')
+}
+const jdHtml = computed(() => {
+  const out: string[] = []
+  let list: string[] = []
+  const endList = () => {
+    if (list.length) out.push(`<ul>${list.map((i) => `<li>${i}</li>`).join('')}</ul>`)
+    list = []
+  }
+  for (const block of escapeHtml(jd.value).split(/\n{2,}/)) {
+    for (const line of block.split('\n')) {
+      const t = line.trim()
+      if (!t) continue
+      const h = t.match(/^#{1,6}\s+(.*)$/)
+      const b = t.match(/^[-*•]\s+(.*)$/)
+      if (h) { endList(); out.push(`<h4>${inlineMd(h[1]!)}</h4>`) }
+      else if (b) list.push(inlineMd(b[1]!))
+      else { endList(); out.push(`<p>${inlineMd(t)}</p>`) }
+    }
+    endList()
+  }
+  return out.join('')
+})
+
+const pasting = ref(false)
+const pasteText = ref('')
+
+function fetchJD() {
+  return act('jd', async () => {
+    const res = await $fetch<{ jd: string | null; error: string | null }>(`/api/postings/${id.value}/jd/capture`, { method: 'POST' })
+    notice.value = res.jd
+      ? { text: 'Job description fetched from the posting.', severity: 'success' }
+      : { text: `Couldn't fetch it: ${res.error}. You can paste it instead.`, severity: 'warn' }
+  })
+}
+
+function saveJD() {
+  return act(
+    'jd',
+    () => $fetch(`/api/postings/${id.value}/jd`, { method: 'PUT', body: { text: pasteText.value } }),
+    () => {
+      pasting.value = false
+      pasteText.value = ''
+      notice.value = { text: 'Job description saved.', severity: 'success' }
+    },
+  )
+}
+
+function syncNotion() {
+  return act('notion', async () => {
+    const res = await $fetch<{ ok: boolean; created: string[]; wroteSummary: boolean; error?: string }>(
+      `/api/postings/${id.value}/notion-sync`,
+      { method: 'POST' },
+    )
+    if (!res.ok) notice.value = { text: `Notion page not updated: ${res.error}`, severity: 'warn' }
+    else if (!res.created.length && !res.wroteSummary) notice.value = { text: 'The Notion page already has everything.', severity: 'info' }
+    else {
+      const added = [...(res.wroteSummary ? ['the summary and Timeline'] : []), ...res.created]
+      notice.value = { text: `Added to the Notion page: ${added.join(', ')}.`, severity: 'success' }
+    }
+  })
+}
 const ICON: Record<string, string> = {
   cv: 'pi pi-file-pdf',
   'cover-letter': 'pi pi-envelope',
@@ -677,18 +758,49 @@ function onPrimary() {
             </span>
             <i class="pi pi-external-link go" />
           </a>
+          <!-- Fills in the page's summary and the Job Description / Apply Pack /
+               Analytics sub-pages that are missing; never touches what is there. -->
+          <button v-if="notionHref" type="button" class="linkish notion-sync" :disabled="busy === 'notion'" @click="syncNotion">
+            <i :class="busy === 'notion' ? 'pi pi-spin pi-spinner' : 'pi pi-sync'" /> Update Notion page
+          </button>
         </aside>
 
         <!-- The posting itself. Its own grid child rather than part of the
              main column: stacked on a phone that keeps the JD — the longest
              block and the least often read — below the actions, instead of
              burying "Build pack" under two hundred lines of it. -->
-        <PrimeCard v-if="jd" class="sec brief-jd" aria-label="Job description">
+        <PrimeCard class="sec brief-jd" aria-label="Job description">
           <template #content>
-            <details class="jd">
-              <summary>Job description<span class="mono muted"> · {{ jdSize }}</span></summary>
-              <pre class="jd-body">{{ jd }}</pre>
+            <!-- Open by default when there is no evaluation: then the JD is the
+                 substance of the page, not the long tail beneath it. -->
+            <details v-if="jd" class="jd" :open="!analysis">
+              <summary>
+                Job description<span class="mono muted"> · {{ jdSize }}<template v-if="jdFrom"> · from {{ jdFrom }}</template></span>
+              </summary>
+              <div class="jd-body" v-html="jdHtml" />
             </details>
+
+            <div v-else class="jd-missing">
+              <div class="eval-sec jd-missing-head">
+                <h3>Job description</h3>
+              </div>
+              <p class="jd-missing-why">
+                <template v-if="meta.jdError">Couldn't fetch it: {{ meta.jdError }}.</template>
+                <template v-else>Not fetched yet.</template>
+                <template v-if="meta.jdError && /LinkedIn/.test(meta.jdError)"> The Mac fetches LinkedIn descriptions every half hour, so this usually fills in on its own.</template>
+              </p>
+              <div v-if="!pasting" class="jd-missing-actions">
+                <PrimeButton label="Fetch it" icon="pi pi-download" size="small" severity="secondary" outlined :loading="busy === 'jd'" @click="fetchJD" />
+                <PrimeButton label="Paste it" icon="pi pi-clipboard" size="small" severity="secondary" text @click="pasting = true" />
+              </div>
+              <div v-else class="jd-paste">
+                <PrimeTextarea v-model="pasteText" rows="10" placeholder="Paste the job description from the posting…" autocomplete="off" />
+                <div class="jd-missing-actions">
+                  <PrimeButton label="Cancel" size="small" severity="secondary" text @click="pasting = false" />
+                  <PrimeButton label="Save" icon="pi pi-check" size="small" :disabled="pasteText.trim().length < 100" :loading="busy === 'jd'" @click="saveJD" />
+                </div>
+              </div>
+            </div>
           </template>
         </PrimeCard>
       </div>

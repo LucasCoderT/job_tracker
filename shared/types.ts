@@ -331,6 +331,17 @@ export interface PostingMeta {
    */
   dismissedAt: string | null
   hasJD: boolean
+  /**
+   * Where the JD came from — "greenhouse", "lever", "ashby", "linkedin",
+   * "page", "pasted", or "career-ops" when an evaluation pushed it — and when.
+   * Captured straight from the posting, so it no longer waits on an evaluation.
+   */
+  jdSource: string | null
+  jdCapturedAt: string | null
+  /** Why the last capture failed ("Indeed blocks automated fetches"), until one works. */
+  jdError: string | null
+  /** When a capture was last tried, so a producer push does not retry every half hour. */
+  jdAttemptedAt: string | null
   hasAnalysis: boolean
   /** Supplemental application questions: how many, and how the draft is going. */
   questions: number

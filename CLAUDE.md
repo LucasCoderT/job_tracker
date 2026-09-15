@@ -50,6 +50,11 @@ server/
   utils/postings.ts   POSTINGS KV store + the Machine Summary reader
   utils/posting-route.ts  shared plumbing for the /api/postings routes
   utils/applications-notion.ts  the two writes into DB Applications: create (Mark applied), status change
+  utils/jd-capture.ts  fetch a JD straight from the posting (ATS APIs, LinkedIn guest, page)
+  utils/jd-store.ts    store a captured / pasted JD on the posting, never clobbering a better one
+  utils/application-page.ts  the Notion application page: summary, Timeline, JD / Apply Pack / Analytics sub-pages
+  utils/notion-blocks.ts     light Markdown → Notion blocks
+scripts/capture-jds.mjs      the same capture, run on the Mac for what Cloudflare cannot reach (LinkedIn)
   api/postings/**     the postings API (list, queue, upsert, pack, artifacts)
   api/jobs/[id]/status.post.ts  mark an application rejected / moved on a round
   utils/stats-cache.ts  the /api/stats cache key, shared by the route that fills it and the one that purges it
@@ -560,6 +565,68 @@ was itself built against `DESIGN.md` §7. What changed and why:
   keyboard behaviour stay library-owned) restyled to the design, with the
   status pill, the age-against-cutoff bar, and sort indicators hidden until
   hover or active.
+
+## Job descriptions and the Notion application page (2026-09-15)
+
+**Every posting gets its JD, captured straight from the posting — no model
+involved.** Until now a JD only reached the site as a side effect of a full
+career-ops evaluation (the eval worker's `claude -p` archived it under jds/,
+and `push-postings --upgrade` pushed it). Anything not evaluated never got one:
+unscored postings, anything under the eval worker's `--min-score`, and
+everything queued while Claude was over its usage limit. On 2026-09-15, 72 new
+postings had none.
+
+`server/utils/jd-capture.ts` fetches it instead, one strategy per source:
+Greenhouse's boards API, Lever's postings API, Ashby's job-board API,
+LinkedIn's public guest endpoint, and for anything else the page itself
+(JSON-LD `JobPosting` → schema.org microdata, which is how Job Bank publishes →
+a long `og:description`). Output is light Markdown.
+
+Where it runs, because the sources disagree about who may ask:
+
+| Source | From the Worker (Cloudflare) | From the Mac |
+|---|---|---|
+| Greenhouse, Lever, Ashby, Workday, Job Bank | ✅ | ✅ |
+| LinkedIn | ❌ 429 — it rate-limits Cloudflare's addresses | ✅ |
+| Indeed | ❌ blocked | ❌ blocked → paste it on the brief |
+
+- **The Worker captures on arrival** — in the background after a producer
+  `PUT /api/postings/:id`, after "Add posting", and before the Notion page is
+  set up on "Mark applied". A push retries a failed capture at most once a
+  day (`jdAttemptedAt`), so the eval worker's half-hourly pushes do not
+  hammer a source that said no.
+- **`scripts/capture-jds.mjs` runs on the Mac** every 30 minutes
+  (`dev.codertheory.jobtracker.jd-capture`, plist in `scripts/`, log in
+  `~/Library/Logs/job-tracker-jd-capture.log`) for what Cloudflare cannot
+  reach. It loads the same TypeScript through jiti — one parser, two places —
+  paces one posting per 4s, caps a run at 20, and stops the run on a 429.
+- **A capture never replaces a JD already stored**: career-ops's archived copy
+  or one he pasted is at least as good as a fresh scrape, and a posting that
+  has since closed would swap a real description for an error page. A paste
+  (`PUT /:id/jd`, source `pasted`) does replace — that one is his call.
+- **The meta is re-read before a capture writes**, because it runs a second or
+  two after the push that triggered it; writing back the copy it started from
+  would undo whatever he did to the posting meanwhile.
+- Provenance is on the meta: `jdSource`, `jdCapturedAt`, and `jdError` (why
+  the last attempt failed, shown on the brief). The brief renders the JD —
+  escaped first, since it is third-party text, then only the Markdown the
+  capture writes — open by default when there is no evaluation, and offers
+  Fetch it / Paste it when there is none.
+
+**The Notion application page is organised again.** Pages he built by hand
+before the site (Insignia Software is the model) had a summary line, a
+Timeline, a sub-page index, and 📋 Job Description / 📦 Apply Pack /
+📊 Analytics sub-pages. `createApplication` only ever set properties, so every
+application sent from the site had an empty page. `syncApplicationPage`
+restores that layout from what the site holds — the JD, the artifacts and form
+answers, the evaluation — and runs after "Mark applied", whenever a JD arrives
+for an applied posting, and from "Update Notion page" on the brief.
+
+**It only adds.** The summary and Timeline are written only onto a page with
+no content (an empty paragraph counts as none); a sub-page is created only
+when no child page of that name exists. So it can run again whenever something
+arrives late, and never touches his writing. Interview Prep, transcripts and
+round reviews stay his to add.
 
 ## EI job-search activity (2026-09-11; "Log EI time" 2026-09-15)
 

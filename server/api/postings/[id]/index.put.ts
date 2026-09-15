@@ -16,8 +16,7 @@ import {
   getMeta, putMeta, getJD, putJD, getAnalysis, putAnalysis,
   mergePosting, cleanAnalysis, postingIdFor,
 } from '../../../utils/postings'
-
-const MAX_JD = 200_000
+import { MAX_JD, wantsCapture, captureForPosting, inBackground } from '../../../utils/jd-store'
 
 export default defineEventHandler(async (event): Promise<PostingDetail> => {
   const ctx = postingContext(event)
@@ -44,6 +43,10 @@ export default defineEventHandler(async (event): Promise<PostingDetail> => {
   if (typeof body.jd === 'string' && body.jd.trim()) {
     await putJD(ctx.kv, ctx.id, body.jd.slice(0, MAX_JD))
     meta.hasJD = true
+    // The archived JD from an evaluation is the best copy there is.
+    meta.jdSource = 'career-ops'
+    meta.jdCapturedAt = stamp
+    meta.jdError = null
   } else {
     meta.hasJD = existing?.hasJD ?? false
   }
@@ -56,6 +59,9 @@ export default defineEventHandler(async (event): Promise<PostingDetail> => {
   }
 
   await putMeta(ctx.kv, meta)
+  // No JD yet: fetch it from the posting after the response has gone, rather
+  // than waiting for an evaluation that may never be run for this one.
+  if (wantsCapture(meta)) inBackground(event, captureForPosting(ctx.env, ctx.kv, meta))
   const [jd, analysis] = await Promise.all([getJD(ctx.kv, ctx.id), getAnalysis(ctx.kv, ctx.id)])
   return { meta, jd, analysis }
 })

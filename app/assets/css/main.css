@@ -267,10 +267,26 @@ footer { margin-top: 18px; font-size: 12px; color: var(--faint); }
 .postings-page .stamp { margin: 8px 0 0; }
 .jd summary { color: var(--muted); cursor: pointer; font-size: 12.5px; }
 .jd-body {
-  white-space: pre-wrap; font-family: inherit; font-size: 13px; line-height: 1.6;
-  color: var(--text); margin: 12px 0 0; padding-left: 14px;
-  border-left: 1px solid var(--panel-edge); max-width: 68ch;
+  font-size: 13.5px; line-height: 1.6; color: var(--text); margin: 12px 0 0;
+  padding-left: 14px; border-left: 1px solid var(--panel-edge); max-width: 70ch;
+  overflow-wrap: anywhere;
 }
+.jd-body h4 { font-size: 12px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); margin: 20px 0 6px; }
+.jd-body h4:first-child { margin-top: 0; }
+.jd-body p { margin: 0 0 10px; text-wrap: pretty; }
+.jd-body ul { margin: 0 0 10px; padding-left: 18px; }
+.jd-body li { margin: 3px 0; text-wrap: pretty; }
+.jd-body strong { font-weight: 600; }
+.jd-body a { color: var(--amber); }
+.jd-missing-head { margin-top: 0; padding-top: 0; border-top: 0; }
+.jd-missing-why { margin: 0 0 10px; font-size: 13px; color: var(--muted); line-height: 1.5; text-wrap: pretty; max-width: 64ch; }
+.jd-missing-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-start; }
+.jd-paste { display: flex; flex-direction: column; gap: 8px; }
+.jd-paste .p-textarea { width: 100%; }
+.jd-paste .jd-missing-actions { justify-content: flex-end; }
+.notion-sync { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; font-size: 12px; color: var(--muted); padding: 2px 4px; }
+.notion-sync:hover { color: var(--amber); }
+.notion-sync .pi { font-size: 11px; }
 /* Report fields with no dedicated slot — the Machine Summary schema drifts,
    so these are whatever the evaluation happened to carry. */
 .facts-grid.extras { margin-top: 14px; }

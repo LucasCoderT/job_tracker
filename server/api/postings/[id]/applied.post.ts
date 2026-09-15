@@ -13,6 +13,8 @@ import type { PostingApplyResult, PostingMeta } from '../../../../shared/types'
 import { postingContext, requirePosting, now } from '../../../utils/posting-route'
 import { putMeta } from '../../../utils/postings'
 import { createApplication } from '../../../utils/applications-notion'
+import { captureForPosting, inBackground } from '../../../utils/jd-store'
+import { syncApplicationPage } from '../../../utils/application-page'
 
 export default defineEventHandler(async (event): Promise<PostingApplyResult> => {
   const ctx = postingContext(event)
@@ -31,6 +33,16 @@ export default defineEventHandler(async (event): Promise<PostingApplyResult> => 
     updatedAt: stamp,
   }
   await putMeta(ctx.kv, next)
+  // Organise the new Notion page the way his own application pages are:
+  // summary, Timeline, and the Job Description / Apply Pack / Analytics
+  // sub-pages. A JD that never arrived is fetched first so it makes the page.
+  if (next.notionPageId) {
+    inBackground(event, (async () => {
+      let m = next
+      if (!m.hasJD) m = (await captureForPosting(ctx.env, ctx.kv, m, { sync: false })).meta ?? m
+      await syncApplicationPage(ctx.env, ctx.kv, m)
+    })())
+  }
   announce(event, 'posting.applied', ctx.id, {
     company: next.company, role: next.role, appliedAt: stamp, notionOk: notion.ok,
   })
