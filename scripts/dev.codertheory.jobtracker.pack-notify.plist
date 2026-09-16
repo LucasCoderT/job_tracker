@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>dev.codertheory.jobtracker.pack-notify</string>
+
+    <!-- Pushes to the career-ops ntfy topic when a pack finishes. Runs here
+         rather than in the Worker because ntfy.sh rate limits by IP and
+         Cloudflare's egress quota is always spent — see the script header. -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/homebrew/bin/node</string>
+        <string>/Users/lucas/Developer/job_tracker/scripts/notify-packs.mjs</string>
+    </array>
+
+    <key>StartInterval</key>
+    <integer>120</integer>
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/lucas/Developer/job_tracker</string>
+    <key>StandardOutPath</key>
+    <string>/Users/lucas/Library/Logs/job-tracker-pack-notify.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/lucas/Library/Logs/job-tracker-pack-notify.log</string>
+</dict>
+</plist>

@@ -566,6 +566,43 @@ was itself built against `DESIGN.md` §7. What changed and why:
   status pill, the age-against-cutoff bar, and sort indicators hidden until
   hover or active.
 
+## Pack-finished notifications (2026-09-16)
+
+A pack takes a **median of 41 minutes** to build (fastest 11, slowest 176
+across the first ten), so "watch the page" was never a real option.
+`scripts/notify-packs.mjs` pushes to the ntfy topic career-ops already sends
+the morning standup to (`career-ops/local/ntfy-topic`), so it is one feed with
+nothing new to subscribe to. launchd runs it every two minutes
+(`dev.codertheory.jobtracker.pack-notify`, plist in `scripts/`, log in
+`~/Library/Logs/job-tracker-pack-notify.log`). Tapping the notification opens
+the posting — or the pack, for an interview pack — with `?from=/` so the back
+arrow lands on the dashboard.
+
+**Why it is on the Mac and not in the Worker, which is where it belongs.**
+The obvious design is a call in the route that marks a pack done, and that was
+built first. ntfy.sh answered the Worker with `429 daily message quota
+reached` while the identical publish from the Mac returned 200: ntfy
+identifies a "visitor" **by IP address**, and authenticating does not change
+that, so a Worker shares one anonymous quota with every other Cloudflare
+customer's egress and it is permanently spent. Only a paid plan (account-based
+on the hosted service) or self-hosting would fix it. If either ever happens,
+move the send back into `pack/status` routes and delete the launchd agent —
+the Worker knows the moment a pack lands, with no polling and no dependency on
+the Mac being awake.
+
+Two details worth keeping:
+
+- **The first run says nothing.** It records every finished pack as already
+  seen and exits; otherwise installing it would announce every pack ever built
+  at once. `--reset` re-seeds the same way.
+- **State is keyed by the build, not the pack** (`done@<builtAt>`), so
+  rebuilding a pack he has already been told about notifies again, while a
+  status that has not moved stays quiet. A send that fails keeps the old state
+  so the next run retries.
+- **Notification titles are ASCII.** HTTP header values are not UTF-8 — a "·"
+  in a title arrives on the phone as a replacement character. The body is the
+  request body and keeps its punctuation.
+
 ## Job descriptions and the Notion application page (2026-09-15)
 
 **Every posting gets its JD, captured straight from the posting — no model
