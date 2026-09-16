@@ -28,6 +28,7 @@ const { data: postingsData } = await useFetch<PostingsResponse>('/api/postings',
 const meta = computed(() => data.value?.meta)
 const bank = computed(() => data.value?.bank ?? null)
 const lintIssues = computed(() => data.value?.lint ?? [])
+const { crumbs } = useTrail(() => [{ label: meta.value?.company || 'Pack' }], '/packs')
 useHead({ title: () => (meta.value ? `${meta.value.company} — pack` : 'Pack') })
 
 const STATUS_LABEL: Record<string, string> = {
@@ -326,7 +327,7 @@ async function saveDetails() {
   <div class="packs-page pack-detail">
     <header>
       <div>
-        <NuxtLink to="/packs" class="crumb"><i class="pi pi-arrow-left" /> Packs</NuxtLink>
+        <AppCrumbs :crumbs="crumbs" />
         <h1 v-if="meta">{{ meta.company }}<span v-if="meta.position" class="pos"> · {{ meta.position }}</span></h1>
         <h1 v-else>Pack</h1>
       </div>

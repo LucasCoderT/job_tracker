@@ -14,6 +14,11 @@ const { data, pending, error, refresh } = await useFetch<PostingQuestions>(
 )
 
 const meta = computed(() => posting.value?.meta)
+
+const { crumbs } = useTrail(
+  () => [{ label: meta.value?.company || 'Posting', to: `/postings/${id.value}` }, { label: 'Questions' }],
+  '/postings',
+)
 const questions = computed(() => data.value?.questions ?? [])
 useHead({ title: () => (meta.value ? `${meta.value.company} — questions` : 'Questions') })
 
@@ -160,7 +165,7 @@ const words = (s: string) => (s.trim() ? s.trim().split(/\s+/).length : 0)
   <div class="postings-page questions-page">
     <header>
       <div>
-        <NuxtLink :to="`/postings/${id}`" class="crumb"><i class="pi pi-arrow-left" /> Back to the posting</NuxtLink>
+        <AppCrumbs :crumbs="crumbs" />
         <h1 v-if="meta">
           Application questions<span class="pos"> · {{ meta.company }}</span>
         </h1>

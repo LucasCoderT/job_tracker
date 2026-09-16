@@ -42,7 +42,10 @@ h1 { font-size: 20px; font-weight: 600; letter-spacing: 0.01em; margin: 0; }
    nothing to say it has. Column counts are pinned rather than auto-filled —
    there are always five cards, and auto-fill lands on four at common widths,
    orphaning the fifth on a row of its own. 1 → 2 → 3 → 5 never does that. */
-.pv-row { display: grid; gap: 10px; grid-template-columns: 1fr; }
+/* minmax(0, …), not 1fr: a bare 1fr floors at min-content, and the company
+   line is nowrap — so each card demanded its full untruncated width and the
+   dashboard scrolled sideways on a phone instead of ellipsing. */
+.pv-row { display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); }
 @media (min-width: 520px) { .pv-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (min-width: 760px) { .pv-row { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (min-width: 1040px) { .pv-row { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
@@ -56,7 +59,43 @@ h1 { font-size: 20px; font-weight: 600; letter-spacing: 0.01em; margin: 0; }
 .pv-score { position: absolute; top: 8px; right: 11px; font-size: 13px; font-weight: 600; letter-spacing: -0.02em; }
 .pv-card .co { font-size: 13px; font-weight: 600; color: var(--text); margin: 0 0 1px; padding-right: 30px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pv-card .role { font-size: 11.5px; color: var(--muted); margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pv-card .when { font-size: 11px; color: var(--faint); margin: 6px 0 0; }
+.pv-card .when { font-size: 11px; color: var(--faint); }
+.pv-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px; min-height: 19px; }
+.pv-meta .pack-chip { margin-top: 0; font-size: 10.5px; padding: 2px 7px; }
+.pv-meta .pack-chip .pi { font-size: 9px; }
+
+/* Unopened: a left edge and a dot on the company. Both, because the edge is
+   what he sees scanning the row and the dot is what survives the edge being
+   the same colour as the card on a dim phone screen. */
+.pv-card.unread { border-left: 2px solid var(--amber); }
+.pv-dot {
+  display: inline-block; width: 5px; height: 5px; border-radius: 50%;
+  background: var(--amber); margin-right: 6px; position: relative; top: -2px;
+}
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* Breadcrumbs: PrimeBreadcrumb's markup, the old crumb's weight. */
+.crumbs { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+/* A 12px glyph is not a tap target: the hit area is 32px square, pulled back
+   with negative margin so the trail still sits tight against the heading. */
+.crumb-back {
+  color: var(--muted); text-decoration: none; display: inline-flex;
+  align-items: center; justify-content: center; width: 32px; height: 32px;
+  margin: -6px -6px -6px -8px; border-radius: 6px; flex: none;
+}
+.crumb-back:focus-visible { outline: 2px solid var(--amber); outline-offset: -2px; }
+.crumb-back:hover, .crumb-back:focus-visible { color: var(--amber); }
+.crumb-back .pi { font-size: 12px; }
+.crumbs .p-breadcrumb { background: transparent; border: 0; padding: 0; overflow: visible; }
+.crumbs .p-breadcrumb-list { gap: 4px; flex-wrap: wrap; }
+.crumb-link, .crumb-here { font-size: 12.5px; }
+.crumb-link { color: var(--muted); text-decoration: none; }
+.crumb-link:hover, .crumb-link:focus-visible { color: var(--amber); }
+.crumb-here { color: var(--faint); }
+.crumb-sep { font-size: 10px; color: var(--panel-edge); }
 
 .grid { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr) 250px; align-items: stretch; }
 @media (max-width: 880px) { .grid { grid-template-columns: 1fr; } }

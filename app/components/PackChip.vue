@@ -17,7 +17,7 @@ async function request() {
       method: 'POST',
       body: { company: props.job.company, position: props.job.position },
     })
-    await navigateTo(`/packs/${props.job.id}`)
+    await navigateTo(`/packs/${props.job.id}?from=/`)
   } catch (err: any) {
     failed.value = err?.data?.statusMessage || err?.message || 'failed'
   } finally {
@@ -27,7 +27,7 @@ async function request() {
 </script>
 
 <template>
-  <NuxtLink v-if="pack" :to="`/packs/${job.id}`" class="pack-chip" :class="'is-' + pack.status" @click.stop>
+  <NuxtLink v-if="pack" :to="`/packs/${job.id}?from=/`" class="pack-chip" :class="'is-' + pack.status" @click.stop>
     <i class="pi pi-book" />
     {{ PACK_STATUS_LABEL[pack.status] || pack.status }}
     <span v-if="pack.status === 'done'" class="mono n">{{ pack.answers }}</span>

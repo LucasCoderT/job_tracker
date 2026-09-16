@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { normalizeUrl } from '#shared/postings'
 import type { NotionWriteResult, PostingApplyResult, PostingDetail } from '../../../../shared/types'
 
@@ -12,6 +12,18 @@ const { data, pending, error, refresh } = await useFetch<PostingDetail>(() => `/
 const { refresh: refreshIndex } = usePostings()
 
 const meta = computed(() => data.value?.meta)
+
+// Back goes where he came from — the dashboard's "Worth a look", the postings
+// list, or a pack — rather than always to /postings. See useTrail.
+const { crumbs, parent } = useTrail(() => [{ label: meta.value?.company || 'Posting' }], '/postings')
+
+// Opening the brief is what marks a posting read on the dashboard. Client-side
+// only and fire-and-forget: it must not delay the page or fail it.
+onMounted(() => {
+  if (meta.value && !meta.value.openedAt) {
+    $fetch(`/api/postings/${id.value}/opened`, { method: 'POST' }).catch(() => {})
+  }
+})
 const jd = computed(() => data.value?.jd ?? '')
 const analysis = computed(() => data.value?.analysis ?? null)
 useHead({ title: () => (meta.value ? `${meta.value.company} — posting` : 'Posting') })
@@ -445,7 +457,7 @@ function onPrimary() {
   <div class="postings-page brief">
     <header>
       <div class="brief-head">
-        <NuxtLink to="/postings" class="crumb"><i class="pi pi-arrow-left" /> Postings</NuxtLink>
+        <AppCrumbs :crumbs="crumbs" />
         <h1 v-if="meta">{{ meta.company }}<span v-if="meta.role" class="pos"> · {{ meta.role }}</span></h1>
       </div>
       <div v-if="meta" class="brief-meta mono">
@@ -740,7 +752,7 @@ function onPrimary() {
           </a>
 
           <!-- The supplemental questions a form asks, and their drafted answers. -->
-          <NuxtLink class="link-card" :to="`/postings/${id}/questions`">
+          <NuxtLink class="link-card" :to="`/postings/${id}/questions?from=${parent}`">
             <span class="link-meta">
               <span class="link-title"><i class="pi pi-list-check" />Application questions</span>
               <span class="link-sub mono">

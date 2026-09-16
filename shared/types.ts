@@ -325,6 +325,13 @@ export interface PostingMeta {
   notionPageId: string | null // set once applied; what an interview pack keys on
   appliedAt: string | null
   /**
+   * When he first opened the brief. Unset means he has not looked at it yet,
+   * which is what the dashboard's unread marker reads. Server-side rather than
+   * localStorage on purpose: he triages on a phone and acts on a laptop, and a
+   * posting read this morning should not be bold again this afternoon.
+   */
+  openedAt: string | null
+  /**
    * When he dismissed it — written only by POST /:id/state. `updatedAt` cannot
    * stand in: every producer push stamps it, so it says when the Mac last
    * touched the posting, not when he decided anything.
