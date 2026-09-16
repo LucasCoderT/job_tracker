@@ -25,6 +25,7 @@ import type {
 } from '../../shared/types'
 import type { AppEnv, KVNamespace } from './notion'
 import { normalizeUrl } from '../../shared/postings'
+import { createKvIndex } from './kv-index'
 
 // Routes import it from here, as the pack routes import lint from utils/packs.
 export { normalizeUrl } from '../../shared/postings'
@@ -85,18 +86,23 @@ export function artifactKind(name: string): PostingArtifact['kind'] {
 
 // ---- KV ----
 
-export async function listPostings(kv: KVNamespace): Promise<PostingMeta[]> {
-  const metas: PostingMeta[] = []
-  let cursor: string | undefined
-  do {
-    const page = await kv.list({ prefix: 'meta:', limit: 1000, cursor })
-    const got = await Promise.all(page.keys.map((k) => kv.get(k.name, 'json')))
-    for (const m of got) if (m) metas.push(m as PostingMeta)
-    cursor = page.list_complete === false ? page.cursor : undefined
-  } while (cursor)
+/**
+ * Listings come from one index document rather than a scan — see
+ * `utils/kv-index.ts` for why (it is a quota story, and a sharp one).
+ * `meta:<id>` stays authoritative; only the listing is served from here.
+ */
+const postingIndex = createKvIndex<PostingMeta>({
+  key: 'index:postings',
+  version: 1,
+  prefix: 'meta:',
+  idOf: (m) => m.id,
+  updatedAtOf: (m) => m.updatedAt,
   // Best first, then newest — the list is a ranked queue, not a log.
-  metas.sort((a, b) => (b.score ?? -1) - (a.score ?? -1) || b.createdAt.localeCompare(a.createdAt))
-  return metas
+  sort: (metas) => metas.sort((a, b) => (b.score ?? -1) - (a.score ?? -1) || b.createdAt.localeCompare(a.createdAt)),
+})
+
+export function listPostings(kv: KVNamespace, opts: { fresh?: boolean } = {}): Promise<PostingMeta[]> {
+  return postingIndex.list(kv, opts)
 }
 
 export async function getMeta(kv: KVNamespace, id: string): Promise<PostingMeta | null> {
@@ -105,6 +111,7 @@ export async function getMeta(kv: KVNamespace, id: string): Promise<PostingMeta 
 
 export async function putMeta(kv: KVNamespace, meta: PostingMeta): Promise<void> {
   await kv.put(metaKey(meta.id), JSON.stringify(meta))
+  await postingIndex.upsert(kv, meta)
 }
 
 export async function getJD(kv: KVNamespace, id: string): Promise<string | null> {
@@ -177,6 +184,7 @@ export async function deletePosting(kv: KVNamespace, meta: PostingMeta): Promise
   await kv.delete(analysisKey(meta.id))
   await kv.delete(questionsKey(meta.id))
   await kv.delete(metaKey(meta.id))
+  await postingIndex.remove(kv, meta.id)
 }
 
 // ---- Application questions ----

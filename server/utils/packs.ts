@@ -15,6 +15,7 @@
 import type { Answer, AnswerBank, PackExport, PackMeta, PackStatus } from '../../shared/types'
 import type { AppEnv, KVNamespace } from './notion'
 import { slugify } from '../../shared/bank'
+import { createKvIndex } from './kv-index'
 
 export { slugify, cleanAnswer, cleanBank, parseBeats, beatsToLines, lint } from '../../shared/bank'
 
@@ -47,17 +48,24 @@ export function safeExportName(name: string): string {
 
 // ---- KV ----
 
-export async function listPacks(kv: KVNamespace): Promise<PackMeta[]> {
-  const metas: PackMeta[] = []
-  let cursor: string | undefined
-  do {
-    const page = await kv.list({ prefix: 'meta:', limit: 1000, cursor })
-    const got = await Promise.all(page.keys.map((k) => kv.get(k.name, 'json')))
-    for (const m of got) if (m) metas.push(m as PackMeta)
-    cursor = page.list_complete === false ? page.cursor : undefined
-  } while (cursor)
-  metas.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-  return metas
+/**
+ * Listings come from one index document rather than a scan — see
+ * `utils/kv-index.ts`. Packs are only a handful, so the reads were never the
+ * problem here; the *list request* was. The desktop worker polls
+ * /api/packs/queue every 10 minutes and the notifier every 2, which on its own
+ * is most of a free plan's 1,000 list requests a day.
+ */
+const packIndex = createKvIndex<PackMeta>({
+  key: 'index:packs',
+  version: 1,
+  prefix: 'meta:',
+  idOf: (m) => m.jobId,
+  updatedAtOf: (m) => m.updatedAt,
+  sort: (metas) => metas.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
+})
+
+export function listPacks(kv: KVNamespace, opts: { fresh?: boolean } = {}): Promise<PackMeta[]> {
+  return packIndex.list(kv, opts)
 }
 
 export async function getMeta(kv: KVNamespace, jobId: string): Promise<PackMeta | null> {
@@ -66,6 +74,7 @@ export async function getMeta(kv: KVNamespace, jobId: string): Promise<PackMeta 
 
 export async function putMeta(kv: KVNamespace, meta: PackMeta): Promise<void> {
   await kv.put(metaKey(meta.jobId), JSON.stringify(meta))
+  await packIndex.upsert(kv, meta)
 }
 
 export async function getBank(kv: KVNamespace, jobId: string): Promise<AnswerBank | null> {
@@ -121,6 +130,7 @@ export async function deletePack(kv: KVNamespace, meta: PackMeta): Promise<void>
   await Promise.all(meta.exports.map((e) => kv.delete(exportKey(meta.jobId, e.name))))
   await kv.delete(bankKey(meta.jobId))
   await kv.delete(metaKey(meta.jobId))
+  await packIndex.remove(kv, meta.jobId)
 }
 
 /** Recount answers/beats from a bank onto the meta (does not save). */

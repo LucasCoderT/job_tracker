@@ -782,6 +782,59 @@ knows when the button was pressed, not when the interview happened, and the EI
 log records the latter. And career-ops's `data/applications.md` is not updated;
 it was already drifting from Notion (70 of 177 applications are not in it).
 
+## KV quota: listings come from an index, never a scan (2026-09-16)
+
+He started getting "close to 100% of your daily quota" alerts. The cause was
+not growth, it was the listing shape — and it is the kind of thing that only
+shows up once machines outnumber people.
+
+`listPostings`/`listPacks` were `list({prefix:'meta:'})` followed by a `get`
+per key. At 123 postings **one call is 124 KV operations**, and the callers are
+five launchd agents, not a person: `pack-notify` every 2 min, `site-apply`
+every 20, `jd-capture` every 30, `site-eval` hourly, InterviewHelper's worker
+every 10 — on top of a full scan for every dashboard load, and he had been
+refreshing constantly waiting for packs to build. Measured: **~118,000 reads
+and ~1,800 list requests a day** against a free plan's **100,000 reads / 1,000
+writes / 1,000 deletes / 1,000 list requests**.
+
+Free-plan limits do not throttle. From the pricing page: *"If you exceed any
+one of these limits, further operations of that type will fail with an error"*
+until 00:00 UTC. So this was not a bill, it was a **daily outage** — the site
+and both desktop workers going down mid-afternoon, every day.
+
+`server/utils/kv-index.ts` holds one document per store (`index:postings`,
+`index:packs`) with every meta in it, so a listing is **one read**. Same
+traffic: ~1,800 reads/day and almost no list requests. The listing also got
+30× faster (1,890ms → 65ms), which is the part he will actually notice.
+
+- **The index is a cache, never the record.** `meta:<id>` stays authoritative
+  and every item route still reads it directly. A stale or missing index costs
+  a stale listing, never a lost posting.
+- **It is fresher than the scan it replaced**, not staler: `putMeta` patches
+  the index in the same breath as the write, while `list()` trails a write by
+  up to 60s — which is why a just-requested pack could previously sit invisible
+  to the queue. Verified: request → visible in `/api/postings/queue` at once.
+- **Patches are best-effort.** The meta is written first and unconditionally;
+  an index write that fails is swallowed. Failing his "Build pack" tap because
+  a cache write failed is the worse trade.
+- **Rebuilt hourly**, and on `?fresh=1`. A rebuild unions the scan with index
+  entries written in the last 5 minutes, so a lagging `list()` cannot delete a
+  just-created posting. `?fresh=1` is also the repair for an index that drifted
+  (two concurrent writers can drop one patch — KV has no compare-and-set).
+- **The cost it adds: a meta write is now two writes.** Writes are the tightest
+  remaining meter at 1,000/day, so a bulk `push-postings --upgrade` over the
+  whole corpus (~480 writes) is now the thing to watch, not listings.
+
+Verified on production against real data: `/api/postings` and `/api/packs`
+match `?fresh=1` byte-for-byte, and create/update/delete all reach the index
+immediately.
+
+**A KV trap this re-confirmed:** a `get` by exact key is read-your-own-writes
+in the same colo but is edge-cached ~60s elsewhere, so a record read back
+seconds after a `DELETE` can still answer 200. `jd-store.ts`'s "deleted while
+we were fetching" guard is subject to exactly this. Don't diagnose delete bugs
+inside that window — check the namespace with `wrangler kv key get --remote`.
+
 ## Tunable constants (`server/utils/config.ts`)
 
 `DEFAULT_STALE_DAYS` 30 · `ATTENTION_MIN_DAYS` 10 · `MAX_SOURCES` 6 · `CACHE_TTL_SECONDS` 300 · `SCHEMA_VERSION` (bump on payload change).
