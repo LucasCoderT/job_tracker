@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>dev.codertheory.jobtracker.agent-notify</string>
+
+    <!-- Replaces the pack-only notifier. Anything requested on the site and
+         built on the Mac is a wait he should not have to sit and refresh
+         through: CV packs, drafted application answers, interview packs.
+
+         Two minutes because the cost is two KV reads since listings moved to an
+         index document — the whole poll is now cheaper than one page load used
+         to be. -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/homebrew/bin/node</string>
+        <string>/Users/lucas/Developer/job_tracker/scripts/notify-agent-work.mjs</string>
+    </array>
+
+    <key>StartInterval</key>
+    <integer>120</integer>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/lucas/Developer/job_tracker</string>
+
+    <key>StandardOutPath</key>
+    <string>/Users/lucas/Library/Logs/job-tracker-agent-notify.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/lucas/Library/Logs/job-tracker-agent-notify.log</string>
+
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>

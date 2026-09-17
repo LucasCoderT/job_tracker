@@ -566,42 +566,57 @@ was itself built against `DESIGN.md` §7. What changed and why:
   status pill, the age-against-cutoff bar, and sort indicators hidden until
   hover or active.
 
-## Pack-finished notifications (2026-09-16)
+## Notifications for anything handed to an agent (2026-09-16, generalised 2026-09-17)
 
-A pack takes a **median of 41 minutes** to build (fastest 11, slowest 176
-across the first ten), so "watch the page" was never a real option.
-`scripts/notify-packs.mjs` pushes to the ntfy topic career-ops already sends
-the morning standup to (`career-ops/local/ntfy-topic`), so it is one feed with
-nothing new to subscribe to. launchd runs it every two minutes
-(`dev.codertheory.jobtracker.pack-notify`, plist in `scripts/`, log in
-`~/Library/Logs/job-tracker-pack-notify.log`). Tapping the notification opens
-the posting — or the pack, for an interview pack — with `?from=/` so the back
-arrow lands on the dashboard.
+Anything requested on the site and built on the Mac is a wait: an apply pack
+takes a **median of 41 minutes** (fastest 11, slowest 176 across the first ten),
+an interview pack longer, and drafted answers ride the apply worker's 20-minute
+tick. `scripts/notify-agent-work.mjs` pushes to the ntfy topic career-ops
+already sends the morning standup to, so it is one feed with nothing new to
+subscribe to. launchd runs it every two minutes
+(`dev.codertheory.jobtracker.agent-notify`, plist in `scripts/`, log in
+`~/Library/Logs/job-tracker-agent-notify.log`). Tapping the notification opens
+the posting, the answers, or the pack with `?from=/` so the back arrow lands on
+the dashboard.
 
-**Why it is on the Mac and not in the Worker, which is where it belongs.**
-The obvious design is a call in the route that marks a pack done, and that was
-built first. ntfy.sh answered the Worker with `429 daily message quota
-reached` while the identical publish from the Mac returned 200: ntfy
-identifies a "visitor" **by IP address**, and authenticating does not change
-that, so a Worker shares one anonymous quota with every other Cloudflare
-customer's egress and it is permanently spent. Only a paid plan (account-based
-on the hosted service) or self-hosting would fix it. If either ever happens,
-move the send back into `pack/status` routes and delete the launchd agent —
-the Worker knows the moment a pack lands, with no polling and no dependency on
-the Mac being awake.
+**It started as a pack-only notifier and had exactly the gap you would expect:**
+he submitted application questions for drafting and nothing told him when the
+answers landed. So the watchers are a **list**, not three code paths — `ns`,
+what rows to pull, what counts as finished, and the stamp that makes a re-run
+count as new. Everything the site can hand to an agent belongs in `WATCHERS`
+(apply packs, drafted answers, interview packs) and the next one is one entry.
 
-Two details worth keeping:
+Details worth keeping:
 
-- **The first run says nothing.** It records every finished pack as already
-  seen and exits; otherwise installing it would announce every pack ever built
-  at once. `--reset` re-seeds the same way.
-- **State is keyed by the build, not the pack** (`done@<builtAt>`), so
-  rebuilding a pack he has already been told about notifies again, while a
-  status that has not moved stays quiet. A send that fails keeps the old state
-  so the next run retries.
-- **Notification titles are ASCII.** HTTP header values are not UTF-8 — a "·"
-  in a title arrives on the phone as a replacement character. The body is the
-  request body and keeps its punctuation.
+- **A new watcher seeds silently.** A namespace absent from the state file has
+  no history, so every already-finished item under it would look new — adding
+  "questions" would have announced every set of answers ever drafted at once.
+  Unseen namespaces are recorded and skipped on their first run, the same
+  courtesy the whole script gets on *its* first run.
+- **State is keyed by the build, not the item** (`done@<builtAt>`), so a rebuild
+  notifies again and a status that has not moved stays quiet. Answers carry no
+  build time, so their stamp is `done@<answered>/<questions>`; a redraft passes
+  through `requested`, which drops the key out of the watched set and makes its
+  return count as new even if the count is unchanged.
+- **A failed send keeps the old state** so the next run retries.
+- **Titles are ASCII.** HTTP header values are not UTF-8 — a "·" in a title
+  arrives on the phone as a replacement character. The body is the request body
+  and keeps its punctuation.
+
+**Why it is on the Mac and not in the Worker, which is where it belongs.** The
+obvious design is a call in the route that marks work done, and that was built
+first. ntfy.sh answered the Worker with `429 daily message quota reached` while
+the identical publish from the Mac returned 200: ntfy identifies a "visitor"
+**by IP address**, and authenticating does not change that, so a Worker shares
+one anonymous quota with every other Cloudflare customer's egress and it is
+permanently spent. Only a paid plan (account-based on the hosted service) or
+self-hosting would fix it. If either ever happens, move the send into the
+`status` routes and delete the launchd agent — the Worker knows the moment work
+lands, with no polling and no dependency on the Mac being awake.
+
+**Deliberately not watched:** posting evaluations. The eval worker grinds
+through the whole backlog three at a time, so notifying on those would be a
+stream of alerts for work he never asked for. The rule is *things he requested*.
 
 ## Job descriptions and the Notion application page (2026-09-15)
 
