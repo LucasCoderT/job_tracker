@@ -782,6 +782,42 @@ knows when the button was pressed, not when the interview happened, and the EI
 log records the latter. And career-ops's `data/applications.md` is not updated;
 it was already drifting from Notion (70 of 177 applications are not in it).
 
+## Screen prep — the stage that was losing (2026-09-17)
+
+Of the ten applications that have ever reached an interview, **seven stopped at
+the first screen** and none produced an offer. Everything the site builds sits
+on one side or the other of that call: apply packs and drafted question answers
+before it, the interview pack after. `/postings/:id/screen` is the half hour
+before it.
+
+Two kinds of prompt, and the difference is the design:
+
+- **Standing** — the six questions every screen opens with. Their answers do not
+  change per company, so they **carry forward**: the last answer he wrote is
+  what the next call starts from, marked `carried` until he revisits it. Without
+  that he retypes "tell me about yourself" ten times and stops using the page by
+  the third. Stored once at `screen:standing` in POSTINGS KV, so carrying
+  forward is one read rather than a scan of every posting.
+- **Probe** — assembled from *this* posting's evaluation: its hard stops and the
+  high-importance requirements it rated his match partial on, capped at five.
+  Those have been sitting in `analysis` unread since the first push, and they
+  are exactly what an interviewer pushes on.
+
+**Nothing here writes his answers**, the same rule the answer bank has. The
+prompts are questions and the `because` lines are quoted from the evaluation; a
+generated answer fails in the room. Two details that follow from the page being
+read ten minutes before a call: the length shown is **spoken** length (~150 wpm,
+not reading speed), because the failure mode is a two-minute answer to a
+sixty-second question; and a standing answer over 90 seconds is flagged.
+
+The evaluation's `evidence` column is free text and often degenerate — plenty of
+rows say just "stated" — so anything under 24 characters is dropped for a
+sentence that at least explains why the prompt is there.
+
+Routes: `GET /api/postings/:id/screen` (assembles, stores nothing) ·
+`PUT /api/postings/:id/screen/:promptId` (stores, and updates the standing doc
+when the prompt is a standing one).
+
 ## Apply where the job lives (2026-09-17)
 
 `PostingMeta.employerUrl` is the employer's own req for a job discovered on an

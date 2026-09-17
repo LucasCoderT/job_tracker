@@ -1081,3 +1081,58 @@ a.rail-primary.as-link:hover { background: #d9bd71; border-color: #d9bd71; color
 
 /* The draft's own status, reusing the pill the packs list uses. */
 .status-pill.none { color: var(--muted); border-color: var(--panel-edge); }
+
+/* ---- First-call prep (2026-09-17) ---------------------------------------
+   The screen is where 7 of 10 interview processes stop, so this page is built
+   to be read on a phone in the ten minutes before a call: one question per
+   card, his answer under it, and the spoken length of what he has written. */
+.screen-head { margin-bottom: 26px; }
+.screen-head h1 { font-size: 24px; margin: 0 0 6px; }
+.screen-sub { color: var(--muted); font-size: 14px; margin: 0 0 10px; font-family: var(--mono, monospace); }
+.screen-note { color: var(--dim); font-size: 14px; margin: 0; max-width: 62ch; line-height: 1.55; }
+
+.screen-block { margin-bottom: 34px; }
+.screen-h2 { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--amber); margin: 0 0 4px; }
+.screen-h2-sub { color: var(--muted); font-size: 13px; margin: 0 0 16px; max-width: 62ch; }
+
+.screen-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  padding: 16px 16px 12px;
+  margin-bottom: 12px;
+}
+.screen-card--probe { border-left: 3px solid var(--amber); }
+.screen-card h3 { font-size: 16px; margin: 0 0 6px; line-height: 1.35; }
+.screen-because { color: var(--muted); font-size: 13px; margin: 0 0 12px; line-height: 1.5; }
+
+.screen-input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.55;
+  resize: vertical;
+}
+.screen-input:focus-visible { outline: none; border-color: var(--amber); }
+
+.screen-foot { display: flex; align-items: center; gap: 12px; margin-top: 10px; flex-wrap: wrap; }
+.screen-flags { display: flex; gap: 10px; flex-wrap: wrap; flex: 1 1 auto; font-size: 12px; }
+.screen-flags .flag { color: var(--muted); }
+.screen-flags .flag.carried { color: var(--green, #7fb069); }
+.screen-flags .flag.warn { color: var(--amber); }
+
+.screen-empty { color: var(--muted); font-size: 14px; max-width: 62ch; }
+.screen-back { display: inline-block; margin-top: 8px; color: var(--muted); font-size: 14px; }
+.screen-toast {
+  position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%);
+  background: var(--panel); border: 1px solid var(--amber); color: var(--text);
+  padding: 9px 16px; border-radius: 999px; font-size: 14px; z-index: 40;
+  max-width: calc(100vw - 32px);
+}

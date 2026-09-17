@@ -785,6 +785,19 @@ function onPrimary() {
             <i class="pi pi-external-link go" />
           </a>
 
+          <!--
+            First-call prep. Seven of the ten applications that reached an
+            interview stopped at the first screen, so this is reachable from
+            every posting, not only the ones with a booked call.
+          -->
+          <NuxtLink class="link-card" :to="`/postings/${id}/screen?from=${parent}`">
+            <span class="link-meta">
+              <span class="link-title">Screen prep</span>
+              <span class="link-sub mono">the first call, in your words</span>
+            </span>
+            <i class="pi pi-angle-right go" />
+          </NuxtLink>
+
           <!-- The supplemental questions a form asks, and their drafted answers. -->
           <NuxtLink class="link-card" :to="`/postings/${id}/questions?from=${parent}`">
             <span class="link-meta">

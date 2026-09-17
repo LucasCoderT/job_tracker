@@ -390,6 +390,42 @@ export interface PostingCreateResult { meta: PostingMeta; created: boolean }
 
 export type AnswerStatus = 'none' | 'requested' | 'building' | 'done' | 'failed'
 
+/**
+ * First-call preparation. Seven of the ten applications that ever reached an
+ * interview stopped at the first screen, and it is the one stage with no
+ * tooling pointed at it.
+ *
+ * A prompt is either `standing` — the handful of questions every screen asks,
+ * whose answers carry forward from the last call he prepared for — or `probe`,
+ * assembled from this posting's own evaluation: the hard stops and the
+ * high-importance requirements it recorded him as weak on, which are what an
+ * interviewer will actually push on.
+ *
+ * The site stores and edits his words here and generates none of them, exactly
+ * as the answer bank does.
+ */
+export type ScreenPromptKind = 'standing' | 'probe'
+export interface ScreenPrompt {
+  id: string
+  prompt: string
+  kind: ScreenPromptKind
+  /** Why this is being asked of him — for a probe, the evaluation's own words. */
+  because: string
+  answer: string
+  /** `carried` = his answer from the last screen he prepared, not yet revisited. */
+  source: 'blank' | 'carried' | 'edited'
+  updatedAt: string
+}
+export interface ScreenPrep {
+  prompts: ScreenPrompt[]
+  updatedAt: string
+}
+/** The latest version of each standing answer, so the next call starts from it. */
+export interface ScreenStanding {
+  answers: Record<string, { answer: string; updatedAt: string }>
+  updatedAt: string
+}
+
 export interface PostingQuestion {
   id: string // stable hash of the question text, so a re-paste keeps answers
   question: string
