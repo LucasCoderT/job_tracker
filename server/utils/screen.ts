@@ -26,11 +26,22 @@
  * have in his own words, and a generated one would fail in the room.
  */
 import type { KVNamespace } from './notion'
-import type { PostingAnalysis, PostingMeta, ScreenPrep, ScreenPrompt, ScreenStanding } from '../../shared/types'
+import type {
+  PostingAnalysis,
+  PostingMeta,
+  ScreenAsked,
+  ScreenPrep,
+  ScreenPrompt,
+  ScreenStanding,
+} from '../../shared/types'
 import { questionId } from './postings'
 
 const prepKey = (id: string) => `screen:${id}`
 const STANDING_KEY = 'screen:standing'
+const ASKED_KEY = 'screen:asked'
+
+/** How many real questions from past calls ride along into the next prep. */
+const MAX_ASKED = 6
 
 /** How many evaluation findings become probes. A call is 30 minutes. */
 const MAX_PROBES = 5
@@ -127,6 +138,42 @@ export function probesFrom(analysis: PostingAnalysis | null): { prompt: string; 
     .slice(0, MAX_PROBES)
 }
 
+export async function getAsked(kv: KVNamespace): Promise<ScreenAsked> {
+  const doc = (await kv.get(ASKED_KEY, 'json')) as ScreenAsked | null
+  return doc && Array.isArray(doc.questions) ? doc : { questions: [], updatedAt: '' }
+}
+
+/**
+ * Record a question he was actually asked. Newest first, deduped on the text,
+ * so the same opener asked by three companies is one prompt rather than three.
+ */
+export async function addAsked(
+  kv: KVNamespace,
+  text: string,
+  company: string,
+  stamp: string,
+): Promise<ScreenAsked> {
+  const asked = clean(text, 300)
+  if (!asked) throw new Error('empty question')
+  const doc = await getAsked(kv)
+  const id = questionId(asked)
+  doc.questions = [
+    { id, text: asked, company, at: stamp },
+    ...doc.questions.filter((q) => q.id !== id),
+  ].slice(0, 40)
+  doc.updatedAt = stamp
+  await kv.put(ASKED_KEY, JSON.stringify(doc))
+  return doc
+}
+
+/** Drop a recorded question — a mistyped one would otherwise ride along forever. */
+export async function removeAsked(kv: KVNamespace, promptId: string, stamp: string): Promise<void> {
+  const doc = await getAsked(kv)
+  doc.questions = doc.questions.filter((q) => q.id !== promptId)
+  doc.updatedAt = stamp
+  await kv.put(ASKED_KEY, JSON.stringify(doc))
+}
+
 export async function getStanding(kv: KVNamespace): Promise<ScreenStanding> {
   const doc = (await kv.get(STANDING_KEY, 'json')) as ScreenStanding | null
   return doc && typeof doc.answers === 'object' ? doc : { answers: {}, updatedAt: '' }
@@ -146,7 +193,7 @@ export async function buildPrep(
   meta: PostingMeta,
   analysis: PostingAnalysis | null,
 ): Promise<ScreenPrep> {
-  const [saved, standing] = await Promise.all([getPrep(kv, meta.id), getStanding(kv)])
+  const [saved, standing, asked] = await Promise.all([getPrep(kv, meta.id), getStanding(kv), getAsked(kv)])
   const bySavedId = new Map((saved?.prompts ?? []).map((p) => [p.id, p]))
 
   const build = (kind: ScreenPrompt['kind']) => (src: { prompt: string; because: string }): ScreenPrompt => {
@@ -165,9 +212,17 @@ export async function buildPrep(
     }
   }
 
+  // Questions he was actually asked outrank anything assembled from a JD: they
+  // are the only prompts in this list with evidence behind them.
+  const fromCalls = asked.questions
+    .filter((q) => !STANDING_PROMPTS.some((s) => questionId(s.prompt) === q.id))
+    .slice(0, MAX_ASKED)
+    .map((q) => ({ prompt: q.text, because: `Asked at ${q.company || 'a previous screen'}.` }))
+
   return {
     prompts: [
       ...STANDING_PROMPTS.map(build('standing')),
+      ...fromCalls.map(build('asked')),
       ...probesFrom(analysis).map(build('probe')),
     ],
     updatedAt: saved?.updatedAt ?? '',
@@ -198,7 +253,7 @@ export async function saveAnswer(
 
   await kv.put(prepKey(meta.id), JSON.stringify(prep))
 
-  if (prompt.kind === 'standing') {
+  if (prompt.kind === 'standing' || prompt.kind === 'asked') {
     const standing = await getStanding(kv)
     standing.answers[promptId] = { answer: prompt.answer, updatedAt: stamp }
     standing.updatedAt = stamp

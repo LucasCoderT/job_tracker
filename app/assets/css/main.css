@@ -1150,3 +1150,11 @@ a.rail-primary.as-link:hover { background: #d9bd71; border-color: #d9bd71; color
   margin-right: 6px;
   vertical-align: 1px;
 }
+.screen-card--asked { border-left: 3px solid var(--teal, #4f9e88); }
+.screen-retro { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.screen-retro .screen-input { flex: 1 1 260px; }
+.screen-forget {
+  background: none; border: none; color: var(--muted); font: inherit; font-size: 12.5px;
+  cursor: pointer; padding: 2px 4px; text-decoration: underline; text-underline-offset: 3px;
+}
+.screen-forget:hover:not(:disabled) { color: var(--rust); }

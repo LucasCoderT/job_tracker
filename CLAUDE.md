@@ -814,9 +814,21 @@ The evaluation's `evidence` column is free text and often degenerate — plenty 
 rows say just "stated" — so anything under 24 characters is dropped for a
 sentence that at least explains why the prompt is there.
 
+- **Asked** — questions from real calls, recorded afterwards in "After the
+  call". At one interview per eighteen applications these are the rarest input
+  the system gets and none of it was captured anywhere before. A recorded
+  question becomes a prompt on **every** future screen prep, deduped on its
+  text, newest first, capped at six carried forward — so each call prepares the
+  next one. They sort above probes, because a question actually asked outranks
+  one guessed from a JD. Their answers carry forward like standing ones.
+  "Not asked" removes one: a mistyped question would otherwise ride along
+  forever.
+
 Routes: `GET /api/postings/:id/screen` (assembles, stores nothing) ·
 `PUT /api/postings/:id/screen/:promptId` (stores, and updates the standing doc
-when the prompt is a standing one).
+when the prompt is standing or asked) · `POST /api/postings/:id/screen/asked` ·
+`DELETE /api/postings/:id/screen/asked?prompt=<id>`. Documents:
+`screen:<postingId>`, `screen:standing`, `screen:asked`.
 
 ## Apply where the job lives (2026-09-17)
 

@@ -404,7 +404,7 @@ export type AnswerStatus = 'none' | 'requested' | 'building' | 'done' | 'failed'
  * The site stores and edits his words here and generates none of them, exactly
  * as the answer bank does.
  */
-export type ScreenPromptKind = 'standing' | 'probe'
+export type ScreenPromptKind = 'standing' | 'probe' | 'asked'
 export interface ScreenPrompt {
   id: string
   prompt: string
@@ -420,6 +420,16 @@ export interface ScreenPrep {
   prompts: ScreenPrompt[]
   updatedAt: string
 }
+/**
+ * Questions he was actually asked on a call, recorded afterwards. At one
+ * interview per eighteen applications these are the rarest input the system
+ * gets, and until now none of it was captured anywhere.
+ */
+export interface ScreenAsked {
+  questions: { id: string; text: string; company: string; at: string }[]
+  updatedAt: string
+}
+
 /** The latest version of each standing answer, so the next call starts from it. */
 export interface ScreenStanding {
   answers: Record<string, { answer: string; updatedAt: string }>

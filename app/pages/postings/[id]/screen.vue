@@ -34,6 +34,7 @@ useHead({ title: () => (meta.value ? `${meta.value.company} — screen prep` : '
 const prompts = computed<ScreenPrompt[]>(() => data.value?.prompts ?? [])
 const standing = computed(() => prompts.value.filter((p) => p.kind === 'standing'))
 const probes = computed(() => prompts.value.filter((p) => p.kind === 'probe'))
+const fromCalls = computed(() => prompts.value.filter((p) => p.kind === 'asked'))
 const ready = computed(() => prompts.value.filter((p) => p.answer.trim()).length)
 
 /**
@@ -52,6 +53,7 @@ const spoken = (text: string) => {
 }
 const longFor = (p: ScreenPrompt) => p.kind === 'standing' && seconds(p.answer) > 90
 
+const askedText = ref('')
 const drafts = ref<Record<string, string>>({})
 const busy = ref('')
 const toast = ref('')
@@ -64,6 +66,45 @@ function say(text: string) {
 
 const valueFor = (p: ScreenPrompt) => drafts.value[p.id] ?? p.answer
 const dirty = (p: ScreenPrompt) => (drafts.value[p.id] ?? p.answer) !== p.answer
+
+/**
+ * After the call. A question he was actually asked outranks anything assembled
+ * from a JD, and at one interview per eighteen applications it is the rarest
+ * input here — so it is recorded once and prompts every future screen.
+ */
+async function recordAsked() {
+  const text = askedText.value.trim()
+  if (!text || busy.value) return
+  busy.value = 'asked'
+  try {
+    data.value = await $fetch<ScreenPrep>(`/api/postings/${id.value}/screen/asked`, {
+      method: 'POST',
+      body: { text },
+    })
+    askedText.value = ''
+    say('Recorded — it will come up on every screen from now on')
+  } catch (err: any) {
+    say(err?.statusMessage || 'Could not record that')
+  } finally {
+    busy.value = ''
+  }
+}
+
+/** Remove a question recorded by mistake, so it stops appearing on every prep. */
+async function forget(p: ScreenPrompt) {
+  if (busy.value) return
+  busy.value = p.id
+  try {
+    data.value = await $fetch<ScreenPrep>(`/api/postings/${id.value}/screen/asked?prompt=${p.id}`, {
+      method: 'DELETE',
+    })
+    say('Removed')
+  } catch (err: any) {
+    say(err?.statusMessage || 'Could not remove that')
+  } finally {
+    busy.value = ''
+  }
+}
 
 async function save(p: ScreenPrompt) {
   if (busy.value) return
@@ -134,6 +175,39 @@ async function save(p: ScreenPrompt) {
         </article>
       </section>
 
+      <section v-if="fromCalls.length" class="screen-block">
+        <h2 class="screen-h2">Asked on real calls</h2>
+        <p class="screen-h2-sub">Questions you were actually asked. These outrank anything guessed from a job description.</p>
+
+        <article v-for="p in fromCalls" :key="p.id" class="screen-card screen-card--asked">
+          <h3>{{ p.prompt }}</h3>
+          <p class="screen-because">{{ p.because }}</p>
+          <textarea
+            :id="`prompt-${p.id}`"
+            class="screen-input"
+            rows="3"
+            :value="valueFor(p)"
+            placeholder="In your own words…"
+            @input="drafts[p.id] = ($event.target as HTMLTextAreaElement).value"
+          />
+          <div class="screen-foot">
+            <span class="screen-flags mono">
+              <span v-if="p.source === 'carried' && !dirty(p)" class="flag carried">from your last screen</span>
+              <span v-if="valueFor(p).trim()" class="flag">{{ spoken(valueFor(p)) }}</span>
+            </span>
+            <button class="screen-forget" type="button" :disabled="busy === p.id" @click="forget(p)">
+              Not asked
+            </button>
+            <PrimeButton
+              size="small"
+              :label="busy === p.id ? 'Saving…' : 'Save'"
+              :disabled="!dirty(p) || busy === p.id"
+              @click="save(p)"
+            />
+          </div>
+        </article>
+      </section>
+
       <section v-if="probes.length" class="screen-block">
         <h2 class="screen-h2">What this one will push on</h2>
         <p class="screen-h2-sub">From the evaluation of this posting — its hard stops and the requirements it rated you weak on.</p>
@@ -163,7 +237,28 @@ async function save(p: ScreenPrompt) {
         </article>
       </section>
 
-      <p v-else class="screen-empty">
+      <section class="screen-block">
+        <h2 class="screen-h2">After the call</h2>
+        <p class="screen-h2-sub">What did they actually ask? Each one becomes a prompt on every screen from here on.</p>
+        <div class="screen-retro">
+          <input
+            id="asked-input"
+            v-model="askedText"
+            class="screen-input"
+            type="text"
+            placeholder="e.g. How do you decide what to test?"
+            @keyup.enter="recordAsked"
+          />
+          <PrimeButton
+            size="small"
+            :label="busy === 'asked' ? 'Saving…' : 'Record'"
+            :disabled="!askedText.trim() || busy === 'asked'"
+            @click="recordAsked"
+          />
+        </div>
+      </section>
+
+      <p v-if="!probes.length" class="screen-empty">
         No evaluation on this posting yet, so there is nothing specific to prepare for beyond the standing questions.
       </p>
 
