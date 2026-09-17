@@ -782,6 +782,51 @@ knows when the button was pressed, not when the interview happened, and the EI
 log records the latter. And career-ops's `data/applications.md` is not updated;
 it was already drifting from Notion (70 of 177 applications are not in it).
 
+## The site did not know what it had applied to (2026-09-17)
+
+`state: applied` was only ever set by pressing **Mark applied**, and that is not
+how most applications happen. The ones that convert are sent on the employer's
+own careers page, where the Notion row is written there and then and the site
+never hears about it. So of the 107 postings the dashboard called untouched,
+**14 had already been applied to — including every posting scoring 4.0 or
+better.** The "what should I apply to today" list was actively wrong, and no
+measurement of which recommendations converted was possible at all.
+
+`server/utils/reconcile.ts` links a posting to the Notion row it became, behind
+`GET /api/postings/reconcile` (report) and `POST` (apply), run daily at 07:30 by
+`scripts/reconcile-postings.mjs` (plist in `scripts/`) just after career-ops
+pushes the morning's postings.
+
+- **It links, it never creates.** The invariant the applied state was given in
+  the first place still holds: `applied` is a consequence of a Notion row
+  existing, never a claim made without one.
+- **Two matches, both exact.** `url` — the row's `Job Posting` URL runs through
+  the same `normalizeUrl` + sha256 the posting id comes from, so a match means
+  both sides resolved the same posting. `title` — same company and an
+  *identical* role title, and only where that pair names exactly one row on
+  each side.
+- **Everything weaker is reported, never written.** This is the one rule that
+  matters. Company-plus-role similarity is what produced a confident wrong
+  answer when the drift was first investigated: two Sophos roles and two
+  Mozilla roles collapsed onto one tracker row each. Token overlap is worse
+  than it looks — "Applied AI Engineer (P4)" scores a perfect 1.0 against
+  "AI Engineer (P3)" because one title's tokens are a subset of the other's,
+  and they are different jobs. Hence exact titles, with parenthetical parts
+  *kept*: `(P4)` against `(P3)` is the entire difference.
+- **`appliedAt` comes from Notion's Application Date, never `now`.** It is one
+  of the timestamps the EI week builds candidates from, so stamping today on
+  fourteen historical applications would propose fourteen entries he never
+  made, in a document that has already been through an audit. Verified after
+  the first run: 0 rows added to the current EI week.
+
+First run linked 6 (2 by URL, 4 by title), taking applied from 14 to 20. The
+re-run proposes nothing, which is the property that lets it sit on a schedule.
+
+**Why so few link by URL:** the posting carries the LinkedIn URL it was found
+at and Notion carries the employer's own URL he applied through — different
+URLs, different ids. That gap is the same one the direct-to-employer resolver
+is meant to close; until it exists, the title match is carrying the drift.
+
 ## KV quota: listings come from an index, never a scan (2026-09-16)
 
 He started getting "close to 100% of your daily quota" alerts. The cause was
