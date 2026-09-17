@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
-import { postingChannel } from '#shared/postings'
+import { postingChannel, localityOf, LOCALITY_LABEL } from '#shared/postings'
 import type { PostingApplyResult, PostingMeta, PostingsResponse } from '../../../shared/types'
 
 useHead({ title: 'Postings' })
@@ -41,10 +41,20 @@ const VIEWS: { key: string; label: string; dot: string; match: (p: PostingMeta) 
   { key: 'all', label: 'All', dot: 'var(--stone)', match: () => true },
   { key: 'new', label: 'New', dot: 'var(--amber)', match: (p) => p.state === 'new' },
   { key: 'ready', label: 'Ready to send', dot: 'var(--green)', match: (p) => p.pack === 'done' && p.state !== 'applied' },
+  // Edmonton and Alberta, in-office or hybrid — not remote roles that merely
+  // list an office here. The deepest process in the funnel has this shape and
+  // the scoring has never valued it, so it gets a view of its own.
+  { key: 'local', label: 'Local', dot: 'var(--teal)', match: (p) => ['edmonton', 'alberta'].includes(localityOf(p.location, p.geo)) },
   { key: 'evaluated', label: 'Evaluated', dot: 'var(--blue)', match: (p) => p.hasAnalysis },
   { key: 'applied', label: 'Applied', dot: 'var(--teal)', match: (p) => p.state === 'applied' },
   { key: 'dismissed', label: 'Dismissed', dot: 'var(--rust)', match: (p) => p.state === 'dismissed' },
 ]
+
+/** Shown only when it is the converting shape; remote rows stay unlabelled. */
+const localLabel = (p: PostingMeta) => {
+  const k = localityOf(p.location, p.geo)
+  return k === 'edmonton' || k === 'alberta' ? LOCALITY_LABEL[k] : ''
+}
 
 const STORE_KEY = 'postings.view'
 const SORT_KEY = 'postings.sort'
@@ -506,7 +516,10 @@ function resetFilters() {
                     </span>
                   </td>
                   <td class="mono clip">{{ p.comp || '—' }}</td>
-                  <td class="muted clip">{{ p.geo || p.location || '—' }}</td>
+                  <td class="muted clip">
+                    <span v-if="localLabel(p)" class="loc-chip">{{ localLabel(p) }}</span>
+                    {{ p.geo || p.location || '—' }}
+                  </td>
                   <td class="muted clip src" :title="p.source || ''">{{ channel(p) }}</td>
                   <td class="right">
                     <ClientOnly>

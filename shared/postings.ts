@@ -126,3 +126,64 @@ function channelForHost(url: string | null): string | null {
 export function postingChannel(url: string | null): string {
   return channelForHost(url) ?? 'Company site'
 }
+
+/**
+ * Whether a posting is local, and how local.
+ *
+ * Geography is a *gate* in career-ops (`queue-from-digests.mjs` rejects a
+ * Canadian office role unless it is remote or Edmonton-area) and nothing
+ * downstream ever ranked by it. But the deepest process in the funnel —
+ * Stantec, the only one to reach a third round from an employer's own site —
+ * is Edmonton and in-office, and the pipeline weighted that profile at zero.
+ *
+ * Derived from the strings the producer already sends rather than stored, so
+ * there is no field to migrate and no second source of truth. It reads both
+ * `location` and `geo` because producers fill one or the other depending on
+ * which scan found the posting.
+ */
+export type Locality = 'edmonton' | 'alberta' | 'remote-canada' | 'canada' | 'elsewhere' | 'unknown'
+
+export function localityOf(location?: string | null, geo?: string | null): Locality {
+  const s = `${location ?? ''} ${geo ?? ''}`.toLowerCase()
+  if (!s.trim()) return 'unknown'
+
+  const edmonton = /\bedmonton\b|\byeg\b|\bst\.?\s*albert\b|\bsherwood park\b|\bleduc\b/.test(s)
+  const alberta = /\balberta\b|\bcalgary\b|\bab\b(?![a-z])/.test(s)
+  const canadian =
+    /\bcanada\b|\bcanadian\b|\bontario\b|\bquebec\b|\bbritish columbia\b|\bvancouver\b|\btoronto\b|\bmontreal\b|\bottawa\b/.test(s) ||
+    edmonton ||
+    alberta
+
+  // Remote wins over the city name, because plenty of remote-Canada postings
+  // merely *list* an office — "Canada Remote (listed Calgary AB)". Reading
+  // those as local would defeat the point: the profile that converted furthest
+  // is Edmonton **in-office**, and a remote role based nowhere near him is not
+  // that. Hybrid and on-site override it back, since those put him in a room.
+  const remote = /\bremote\b|\banywhere\b|\bdistributed\b|\bwork from home\b/.test(s)
+  const inRoom = /\bhybrid\b|\bon-?site\b|\bin-?office\b|\bin person\b/.test(s)
+
+  if (edmonton && (inRoom || !remote)) return 'edmonton'
+  if (alberta && (inRoom || !remote)) return 'alberta'
+  if (remote) return canadian ? 'remote-canada' : 'elsewhere'
+  if (canadian) return 'canada'
+  return 'elsewhere'
+}
+
+export const LOCALITY_LABEL: Record<Locality, string> = {
+  edmonton: 'Edmonton',
+  alberta: 'Alberta',
+  'remote-canada': 'Remote (CA)',
+  canada: 'Canada',
+  elsewhere: '',
+  unknown: '',
+}
+
+/** Edmonton and Alberta first — the profile that has converted furthest. */
+export const LOCALITY_RANK: Record<Locality, number> = {
+  edmonton: 0,
+  alberta: 1,
+  'remote-canada': 2,
+  canada: 3,
+  unknown: 4,
+  elsewhere: 5,
+}

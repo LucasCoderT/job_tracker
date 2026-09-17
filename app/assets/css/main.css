@@ -1136,3 +1136,17 @@ a.rail-primary.as-link:hover { background: #d9bd71; border-color: #d9bd71; color
   padding: 9px 16px; border-radius: 999px; font-size: 14px; z-index: 40;
   max-width: calc(100vw - 32px);
 }
+/* Local roles: Edmonton/Alberta and actually in a room. The deepest process in
+   the funnel has this shape and the ranking never valued it. */
+.loc-chip {
+  display: inline-block;
+  font-size: 10.5px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--teal, #4f9e88);
+  border: 1px solid color-mix(in srgb, var(--teal, #4f9e88) 45%, transparent);
+  border-radius: 3px;
+  padding: 0 5px;
+  margin-right: 6px;
+  vertical-align: 1px;
+}
