@@ -322,6 +322,14 @@ export interface PostingMeta {
   packError: string | null
   packRequestedAt: string | null
   packBuiltAt: string | null
+  /**
+   * The employer's own posting for this job, when the one it was found at is an
+   * aggregator. Applications sent on the employer's page reach a screen at
+   * 15.4% against 4.9% through LinkedIn and Indeed, so when this is set it is
+   * the link to apply through — `url` stays as the place it was discovered.
+   * Resolved on the Mac by career-ops's resolve-employer-req.mjs.
+   */
+  employerUrl: string | null
   notionPageId: string | null // set once applied; what an interview pack keys on
   appliedAt: string | null
   /**

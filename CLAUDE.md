@@ -782,6 +782,24 @@ knows when the button was pressed, not when the interview happened, and the EI
 log records the latter. And career-ops's `data/applications.md` is not updated;
 it was already drifting from Notion (70 of 177 applications are not in it).
 
+## Apply where the job lives (2026-09-17)
+
+`PostingMeta.employerUrl` is the employer's own req for a job discovered on an
+aggregator. When it is set the brief leads with it (`.link-card--primary`) and
+demotes the original to "Where it was found", because that is the link that
+converts: applications sent on the employer's page reach a screen at **15.4%**
+against **4.9%** through LinkedIn and Indeed, and both processes that ever
+reached a third round came in that way. Reply rate says the opposite — a named
+ATS answers 38% of the time and has produced no interviews at all — which is
+why the funnel is measured by `stages`, not by replies.
+
+It is a producer-supplied field (`mergePosting` `pick` semantics, not one of
+the never-touched ones), resolved on the Mac by career-ops's
+`resolve-employer-req.mjs` at 07:20 and pushed through the ordinary
+`PUT /api/postings/:id`. The resolver matches a title exactly or reports
+candidates; it never guesses, because a wrong req would send an application for
+a job he never read.
+
 ## The site did not know what it had applied to (2026-09-17)
 
 `state: applied` was only ever set by pressing **Mark applied**, and that is not

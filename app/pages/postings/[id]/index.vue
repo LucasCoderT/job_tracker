@@ -446,6 +446,17 @@ const notionHref = computed(() =>
   meta.value?.notionPageId ? `https://notion.so/${meta.value.notionPageId.replace(/-/g, '')}` : '',
 )
 
+/** Just the host, so the link says where it goes without wrapping a long req URL. */
+const employerHost = computed(() => {
+  const raw = meta.value?.employerUrl
+  if (!raw) return ''
+  try {
+    return new URL(raw).hostname.replace(/^www\./, '')
+  } catch {
+    return raw.slice(0, 40)
+  }
+})
+
 function onPrimary() {
   if (applied.value || inFlight.value) return
   if (packDone.value) return markApplied()
@@ -730,6 +741,29 @@ function onPrimary() {
             </template>
           </PrimeCard>
 
+          <!--
+            The employer's own req, when career-ops resolved one. It leads,
+            because that is the link to apply through: applications sent on the
+            employer's page reach a screen at 15.4% against 4.9% through the
+            aggregators, and both processes that ever reached a third round came
+            in that way. The aggregator link stays below it, labelled as where
+            it was found rather than where to apply.
+          -->
+          <a
+            v-if="meta.employerUrl"
+            class="link-card link-card--primary"
+            :href="meta.employerUrl"
+            target="_blank"
+            rel="noopener"
+            aria-label="Apply on the employer's own posting"
+          >
+            <span class="link-meta">
+              <span class="link-title">Apply on the employer's site</span>
+              <span class="link-sub mono">{{ employerHost }} · far better odds than the board</span>
+            </span>
+            <i class="pi pi-external-link go" />
+          </a>
+
           <a
             v-if="meta.url"
             class="link-card"
@@ -739,7 +773,7 @@ function onPrimary() {
             :aria-label="`Open the posting on ${meta.source || 'its site'}`"
           >
             <span class="link-meta">
-              <span class="link-title">The posting<span v-if="meta.source" class="mono muted"> · {{ meta.source }}</span></span>
+              <span class="link-title">{{ meta.employerUrl ? 'Where it was found' : 'The posting' }}<span v-if="meta.source" class="mono muted"> · {{ meta.source }}</span></span>
               <ClientOnly>
                 <span v-if="meta.postedAt || meta.location" class="link-sub mono">
                   <template v-if="meta.postedAt">posted {{ when(meta.postedAt) }}</template>
