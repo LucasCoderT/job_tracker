@@ -679,8 +679,30 @@ a.rail-primary.as-link:hover { background: #d9bd71; border-color: #d9bd71; color
 .small { font-size: 12.5px; }
 /* The JD sits under the main column on a wide screen and last of all when
    the grid collapses, so the rail's actions stay above it on a phone. */
-.brief-jd { grid-column: 1; }
-@media (max-width: 880px) { .brief-jd { grid-column: auto; } }
+/*
+ * The JD sits under the decision, not under the rail.
+ *
+ * These are three grid siblings — main, rail, then the JD — so the JD landed in
+ * an implicit second row. With `align-items: start` that row cannot begin until
+ * the tallest cell of row 1 ends, which is the rail. On a posting with a full
+ * evaluation the left column is taller and nobody notices; on a new posting
+ * with only comp/geo/stack filled in, the JD was pushed hundreds of pixels down
+ * the page with nothing in the gap.
+ *
+ * Spanning the rail across both rows lets the JD start immediately under the
+ * left column, whatever either side's height. The stacked layout resets all of
+ * it so the source order still wins: decision, then actions, then the JD — the
+ * deliberate ordering that keeps the buttons above two hundred lines of job
+ * description on a phone.
+ */
+.brief-main { grid-column: 1; grid-row: 1; }
+.brief-rail { grid-column: 2; grid-row: 1 / span 2; }
+.brief-jd { grid-column: 1; grid-row: 2; }
+@media (max-width: 880px) {
+  .brief-main,
+  .brief-rail,
+  .brief-jd { grid-column: auto; grid-row: auto; }
+}
 
 /* ---- Add a posting by URL ---- */
 .add-posting { display: flex; flex-direction: column; gap: 12px; }

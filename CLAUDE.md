@@ -797,6 +797,27 @@ knows when the button was pressed, not when the interview happened, and the EI
 log records the latter. And career-ops's `data/applications.md` is not updated;
 it was already drifting from Notion (70 of 177 applications are not in it).
 
+## The brief's whitespace gap on a thin posting (2026-09-18)
+
+The posting brief is three grid siblings — `.brief-main`, `.brief-rail`, then
+`.brief-jd` — in a two-column grid, with the JD deliberately a separate child so
+that the stacked layout puts it *after* the rail rather than burying the actions
+under two hundred lines of job description.
+
+That put the JD in an implicit **second row**, and with `align-items: start` a
+second row cannot begin until the tallest cell of the first ends — which is the
+rail. On a posting with a full evaluation the left column is the taller of the
+two and nobody notices. On a new posting carrying only comp, geo and stack, the
+rail was 321px taller than the decision column, so the JD was pushed that far
+down with nothing in the gap.
+
+Fixed by spanning the rail across both rows (`grid-row: 1 / span 2`) and pinning
+the JD to row 2, so the JD starts directly under the left column at whatever
+height it ends. Measured on a real thin posting: the gap went from 335px to
+14px, which is the grid gap itself. The stacked layout resets all three to
+`auto` so source order still wins — decision, actions, then the JD — and phone
+width stays free of horizontal overflow.
+
 ## Closed listings leave the queue (2026-09-17)
 
 93 postings sat untouched and some were already dead — one scoring 4.2 whose own
