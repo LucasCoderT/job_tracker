@@ -384,6 +384,16 @@ const findSummary = computed(() => {
 // Build and delete are dialogs now. Not browser dialogs — an in-page modal,
 // which is what the no-`confirm()` rule was actually about: it says what will
 // be removed instead of relying on him remembering what "Really delete?" meant.
+/**
+ * What the evaluation recorded as a hard stop: US-only work authorization, a
+ * closed listing, a mandatory relocation. A pack costs a median of 41 minutes
+ * of machine time and a slot in his attention, and these have been sitting in
+ * the analysis unread while the build button behaved identically either way.
+ * The build is not blocked — an evaluation can be wrong, and the call is his —
+ * but it stops being the default.
+ */
+const hardStops = computed<string[]>(() => analysis.value?.hardStops ?? [])
+
 const buildOpen = ref(false)
 const deleteOpen = ref(false)
 
@@ -873,6 +883,16 @@ function onPrimary() {
         :style="{ width: 'min(520px, calc(100vw - 32px))' }"
       >
         <div class="build-dialog">
+          <div v-if="hardStops.length" class="build-stops">
+            <p class="build-stops-head">
+              <i class="pi pi-exclamation-triangle" />
+              {{ hardStops.length === 1 ? 'The evaluation recorded a hard stop' : `The evaluation recorded ${hardStops.length} hard stops` }}
+            </p>
+            <ul>
+              <li v-for="(stop, i) in hardStops" :key="i">{{ stop }}</li>
+            </ul>
+            <p class="build-stops-foot">Build it anyway if that is wrong or you want the pack regardless.</p>
+          </div>
           <p class="muted small">
             The Mac tailors a CV and cover letter to this JD and uploads them here — usually 15–20 minutes.
             A note steers the emphasis and tone.
@@ -891,9 +911,10 @@ function onPrimary() {
         <template #footer>
           <PrimeButton label="Cancel" severity="secondary" text size="small" @click="buildOpen = false" />
           <PrimeButton
-            :label="meta.pack === 'none' ? 'Build pack' : 'Rebuild'"
+            :label="hardStops.length ? 'Build it anyway' : meta.pack === 'none' ? 'Build pack' : 'Rebuild'"
             icon="pi pi-refresh"
             size="small"
+            :severity="hardStops.length ? 'warning' : undefined"
             :loading="busy === 'pack'"
             @click="buildPack"
           />

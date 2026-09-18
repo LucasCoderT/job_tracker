@@ -797,6 +797,28 @@ knows when the button was pressed, not when the interview happened, and the EI
 log records the latter. And career-ops's `data/applications.md` is not updated;
 it was already drifting from Notion (70 of 177 applications are not in it).
 
+## Hard stops reach the Build button (2026-09-17)
+
+An evaluation records hard stops — "US work authorization is the only
+work-eligibility statement in the posting", "this listing is closed: the
+LinkedIn guest page reads No longer accepting applications", a mandatory
+relocation — and the build flow read none of them. 4 of the first 20 unapplied
+evaluated postings carry one, including a closed listing still sitting in the
+queue at score 4.2.
+
+The Build dialog now leads with them and the confirm button reads **Build it
+anyway**. It does not block: an evaluation can be wrong and the call is his. It
+stops being the *default*, which is the point — a pack costs a median of 41
+minutes of machine time and a slot in his attention.
+
+**A trap this change walked into.** The computed first read `posting.value`,
+which does not exist in that file (the fetch binds to `data`). `npm run build`
+reported no error, because **typescript and vue-tsc are not installed**, so
+`nuxt typecheck` cannot run and the esbuild pipeline never type-checks `.vue`
+scripts. Worse, the dialog body only evaluates when opened, so the page rendered
+fine and would have thrown on the click. If you add one dev dependency to this
+repo, make it vue-tsc.
+
 ## Screen prep — the stage that was losing (2026-09-17)
 
 Of the ten applications that have ever reached an interview, **seven stopped at
