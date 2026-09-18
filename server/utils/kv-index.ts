@@ -61,9 +61,13 @@ export function createKvIndex<T>(options: KvIndexOptions<T>): KvIndex<T> {
   const graceMs = options.graceMs ?? 5 * 60 * 1000
 
   const read = async (kv: KVNamespace): Promise<IndexDoc<T> | null> => {
-    const doc = (await kv.get(key, 'json')) as IndexDoc<T> | null
-    if (!doc || doc.version !== version || !Array.isArray(doc.items)) return null
-    return doc
+    try {
+      const doc = (await kv.get(key, 'json')) as IndexDoc<T> | null
+      if (!doc || doc.version !== version || !Array.isArray(doc.items)) return null
+      return doc
+    } catch {
+      return null // a missing index means rebuild, never a failed listing
+    }
   }
 
   const write = (kv: KVNamespace, items: T[], builtAt: string): Promise<void> =>
@@ -82,6 +86,16 @@ export function createKvIndex<T>(options: KvIndexOptions<T>): KvIndex<T> {
     return items
   }
 
+  /**
+   * Rebuilding persists the result, but the listing must never *depend* on that
+   * write succeeding.
+   *
+   * On 2026-09-18 the free plan's 1,000 writes/day ran out and every listing
+   * endpoint started returning 500 — a GET failing on a write limit, because
+   * the rebuild awaited its own `put` before returning rows it already had in
+   * hand. The cache write is an optimisation for the next caller; the current
+   * caller is owed the data either way.
+   */
   const rebuild = async (kv: KVNamespace): Promise<T[]> => {
     const [scanned, previous] = await Promise.all([scan(kv), read(kv)])
     const byId = new Map(scanned.map((item) => [idOf(item), item]))
@@ -92,7 +106,11 @@ export function createKvIndex<T>(options: KvIndexOptions<T>): KvIndex<T> {
       if (Date.now() - Date.parse(updatedAtOf(item)) < graceMs) byId.set(idOf(item), item)
     }
     const items = sort([...byId.values()])
-    await write(kv, items, new Date().toISOString())
+    try {
+      await write(kv, items, new Date().toISOString())
+    } catch {
+      /* out of writes, or KV refused — serve the scan anyway */
+    }
     return items
   }
 
