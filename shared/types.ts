@@ -330,6 +330,17 @@ export interface PostingMeta {
    * Resolved on the Mac by career-ops's resolve-employer-req.mjs.
    */
   employerUrl: string | null
+  /**
+   * When a liveness check found the posting gone, and what it saw. Only ever
+   * set on a *definitive* answer — a 404 from an ATS API, or a board that no
+   * longer lists the req. An ambiguous result (redirect, 429, timeout, unknown
+   * host) leaves this null, because a false "closed" costs him a real job and
+   * the status quo only costs him a row in a list.
+   */
+  closedAt: string | null
+  closedReason: string | null
+  /** When liveness was last checked at all, so a run does not re-check the world. */
+  liveCheckedAt: string | null
   notionPageId: string | null // set once applied; what an interview pack keys on
   appliedAt: string | null
   /**

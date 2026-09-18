@@ -1171,3 +1171,17 @@ a.rail-primary.as-link:hover { background: #d9bd71; border-color: #d9bd71; color
 .build-stops ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
 .build-stops li { font-size: 14px; line-height: 1.5; color: var(--text); }
 .build-stops-foot { margin: 10px 0 0; font-size: 12.5px; color: var(--muted); }
+/* A listing the liveness check found gone. Muted rather than alarming: it is
+   not a problem to fix, it is a row to stop reading. */
+.closed-chip {
+  display: inline-block;
+  font-size: 10.5px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 0 5px;
+  margin-right: 6px;
+  vertical-align: 1px;
+}

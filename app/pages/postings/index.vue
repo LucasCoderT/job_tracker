@@ -39,7 +39,10 @@ const footer = computed(() => {
  */
 const VIEWS: { key: string; label: string; dot: string; match: (p: PostingMeta) => boolean }[] = [
   { key: 'all', label: 'All', dot: 'var(--stone)', match: () => true },
-  { key: 'new', label: 'New', dot: 'var(--amber)', match: (p) => p.state === 'new' },
+  // Closed listings leave New rather than being deleted: the record is still
+  // worth keeping (it was evaluated, it may be reposted), it just is not
+  // something he can act on this morning.
+  { key: 'new', label: 'New', dot: 'var(--amber)', match: (p) => p.state === 'new' && !p.closedAt },
   { key: 'ready', label: 'Ready to send', dot: 'var(--green)', match: (p) => p.pack === 'done' && p.state !== 'applied' },
   // Edmonton and Alberta, in-office or hybrid — not remote roles that merely
   // list an office here. The deepest process in the funnel has this shape and
@@ -47,6 +50,7 @@ const VIEWS: { key: string; label: string; dot: string; match: (p: PostingMeta) 
   { key: 'local', label: 'Local', dot: 'var(--teal)', match: (p) => ['edmonton', 'alberta'].includes(localityOf(p.location, p.geo)) },
   { key: 'evaluated', label: 'Evaluated', dot: 'var(--blue)', match: (p) => p.hasAnalysis },
   { key: 'applied', label: 'Applied', dot: 'var(--teal)', match: (p) => p.state === 'applied' },
+  { key: 'closed', label: 'Listing closed', dot: 'var(--stone)', match: (p) => Boolean(p.closedAt) },
   { key: 'dismissed', label: 'Dismissed', dot: 'var(--rust)', match: (p) => p.state === 'dismissed' },
 ]
 
@@ -517,6 +521,7 @@ function resetFilters() {
                   </td>
                   <td class="mono clip">{{ p.comp || '—' }}</td>
                   <td class="muted clip">
+                    <span v-if="p.closedAt" class="closed-chip" :title="p.closedReason || 'The listing is gone'">closed</span>
                     <span v-if="localLabel(p)" class="loc-chip">{{ localLabel(p) }}</span>
                     {{ p.geo || p.location || '—' }}
                   </td>

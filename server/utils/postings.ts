@@ -333,6 +333,9 @@ export function mergePosting(id: string, existing: PostingMeta | null, body: any
     firstSeen: has('firstSeen') ? str(body.firstSeen, 40) || null : (existing?.firstSeen ?? null),
     reportNum: has('reportNum') ? str(body.reportNum, 12) || null : (existing?.reportNum ?? null),
     employerUrl: has('employerUrl') ? str(body.employerUrl, 2000) || null : (existing?.employerUrl ?? null),
+    closedAt: has('closedAt') ? str(body.closedAt, 40) || null : (existing?.closedAt ?? null),
+    closedReason: has('closedReason') ? str(body.closedReason, 300) || null : (existing?.closedReason ?? null),
+    liveCheckedAt: has('liveCheckedAt') ? str(body.liveCheckedAt, 40) || null : (existing?.liveCheckedAt ?? null),
 
     // His decision and the Mac's progress are never set by a push.
     state: existing?.state ?? 'new',

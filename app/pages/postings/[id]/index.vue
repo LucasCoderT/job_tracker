@@ -392,7 +392,13 @@ const findSummary = computed(() => {
  * The build is not blocked — an evaluation can be wrong, and the call is his —
  * but it stops being the default.
  */
-const hardStops = computed<string[]>(() => analysis.value?.hardStops ?? [])
+const hardStops = computed<string[]>(() => {
+  const stops = [...(analysis.value?.hardStops ?? [])]
+  // A dead listing is the most definitive hard stop there is, and unlike the
+  // others it was verified rather than judged.
+  if (meta.value?.closedAt) stops.unshift(meta.value.closedReason || 'The listing is no longer accepting applications.')
+  return stops
+})
 
 const buildOpen = ref(false)
 const deleteOpen = ref(false)

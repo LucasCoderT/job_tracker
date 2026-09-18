@@ -797,6 +797,33 @@ knows when the button was pressed, not when the interview happened, and the EI
 log records the latter. And career-ops's `data/applications.md` is not updated;
 it was already drifting from Notion (70 of 177 applications are not in it).
 
+## Closed listings leave the queue (2026-09-17)
+
+93 postings sat untouched and some were already dead — one scoring 4.2 whose own
+evaluation read "This listing is closed: the LinkedIn guest page reads No longer
+accepting applications", still ranked above everything he could actually apply
+to. A queue that cannot tell a live job from a filled one spends the scarcest
+thing in the system, which is his attention on a given morning.
+
+career-ops's `liveness-api.mjs` had done the hard part for months and nothing
+scheduled it. `check-posting-liveness.mjs --site --write` runs at 07:40 (plist
+in career-ops), after `resolve-req` at 07:20 — an ATS link has a public API to
+ask and a LinkedIn link mostly does not, so resolving a posting is also what
+makes it checkable.
+
+- **Only a definitive answer counts.** A 404 from an ATS API, or a board that no
+  longer lists the req, sets `closedAt` + `closedReason`. A redirect, a 429, a
+  timeout or an unknown host sets nothing and is not stamped, so the next run
+  asks again rather than recording a non-answer as an answer. The asymmetry is
+  the point: a false "closed" costs him a real job, a stale row costs him a line.
+- **It never touches `state`.** Dismissing is his decision and always has been.
+  A closed posting drops out of the **New** view and gets its own **Listing
+  closed** view and a muted chip — the record stays, because it was evaluated
+  and may be reposted.
+- **On the brief it reads as a hard stop**, first in the list, and unlike the
+  others it was verified rather than judged.
+- `liveCheckedAt` keeps a live posting from being re-asked daily (`--recheck 3`).
+
 ## Hard stops reach the Build button (2026-09-17)
 
 An evaluation records hard stops — "US work authorization is the only
