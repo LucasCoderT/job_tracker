@@ -109,9 +109,53 @@ export async function getMeta(kv: KVNamespace, id: string): Promise<PostingMeta 
   return ((await kv.get(metaKey(id), 'json')) as PostingMeta | null) ?? null
 }
 
-export async function putMeta(kv: KVNamespace, meta: PostingMeta): Promise<void> {
+/**
+ * Fields a listing *consumer* acts on, as opposed to merely displays.
+ *
+ * The queues, the notifier and the saved views branch on these, so a change to
+ * one has to reach the index immediately. Everything else — score, company,
+ * role, the JD provenance — only changes what a row looks like, and a row that
+ * looks an hour out of date is not worth a KV write on a plan that allows a
+ * thousand a day.
+ */
+const INDEX_SIGNIFICANT = [
+  'state',
+  'pack',
+  'packBuiltAt',
+  'packError',
+  'answerStatus',
+  'answered',
+  'questions',
+  'closedAt',
+  'notionPageId',
+] as const satisfies readonly (keyof PostingMeta)[]
+
+const needsIndexPatch = (previous: PostingMeta, next: PostingMeta) =>
+  INDEX_SIGNIFICANT.some((k) => previous[k] !== next[k])
+
+/**
+ * Store a meta, and keep the listing index in step.
+ *
+ * Pass `previous` to opt into skipping the index write when nothing a consumer
+ * branches on has changed. That halves the cost of a producer push, which is
+ * the bulk of the traffic: the evaluation worker alone pushes 72 times a day
+ * and never changes a significant field, because `mergePosting` refuses to let
+ * a producer touch state, pack or artifacts in the first place.
+ *
+ * Omit it and the index is always patched — the safe default, and what every
+ * site-initiated mutation does. A brand-new record (`previous` null) always
+ * patches too, or the morning's postings would not appear until the hourly
+ * rebuild.
+ */
+export async function putMeta(
+  kv: KVNamespace,
+  meta: PostingMeta,
+  previous?: PostingMeta | null,
+): Promise<void> {
   await kv.put(metaKey(meta.id), JSON.stringify(meta))
-  await postingIndex.upsert(kv, meta)
+  if (previous === undefined || previous === null || needsIndexPatch(previous, meta)) {
+    await postingIndex.upsert(kv, meta)
+  }
 }
 
 export async function getJD(kv: KVNamespace, id: string): Promise<string | null> {

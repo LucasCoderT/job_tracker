@@ -31,7 +31,9 @@ async function writeJdFields(kv: KVNamespace, id: string, fields: Partial<Postin
   const fresh = await getMeta(kv, id)
   if (!fresh) return null // deleted while we were fetching
   const next = { ...fresh, ...fields }
-  await putMeta(kv, next)
+  // JD provenance is display-only — nothing branches on it — so this skips the
+  // index write unless the merge happened to move something that does.
+  await putMeta(kv, next, fresh)
   return next
 }
 

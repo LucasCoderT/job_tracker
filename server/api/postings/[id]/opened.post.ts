@@ -15,6 +15,8 @@ export default defineEventHandler(async (event): Promise<PostingMeta> => {
   const meta = await requirePosting(ctx)
   if (meta.openedAt) return meta
   const next: PostingMeta = { ...meta, openedAt: now() }
-  await putMeta(ctx.kv, next)
+  // Passing the previous meta skips the index write: openedAt changes what the
+  // dashboard's unread marker looks like, not what any queue does.
+  await putMeta(ctx.kv, next, meta)
   return next
 })

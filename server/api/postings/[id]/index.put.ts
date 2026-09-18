@@ -40,8 +40,14 @@ export default defineEventHandler(async (event): Promise<PostingDetail> => {
   const stamp = now()
   const meta = mergePosting(ctx.id, existing, body, stamp)
 
+  // A producer re-pushes the same JD and the same analysis every time it
+  // re-scans its reports, and writing bytes identical to the stored ones is
+  // pure cost. Reads are abundant here and writes are the scarce meter — the
+  // free plan allows 100,000 of one and 1,000 of the other — so comparing
+  // first is the right trade by two orders of magnitude.
   if (typeof body.jd === 'string' && body.jd.trim()) {
-    await putJD(ctx.kv, ctx.id, body.jd.slice(0, MAX_JD))
+    const next = body.jd.slice(0, MAX_JD)
+    if ((await getJD(ctx.kv, ctx.id)) !== next) await putJD(ctx.kv, ctx.id, next)
     meta.hasJD = true
     // The archived JD from an evaluation is the best copy there is.
     meta.jdSource = 'career-ops'
@@ -52,13 +58,18 @@ export default defineEventHandler(async (event): Promise<PostingDetail> => {
   }
 
   if (body.analysis && typeof body.analysis === 'object') {
-    await putAnalysis(ctx.kv, ctx.id, cleanAnalysis(body.analysis))
+    const next = cleanAnalysis(body.analysis)
+    const stored = await getAnalysis(ctx.kv, ctx.id)
+    if (JSON.stringify(stored) !== JSON.stringify(next)) await putAnalysis(ctx.kv, ctx.id, next)
     meta.hasAnalysis = true
   } else {
     meta.hasAnalysis = existing?.hasAnalysis ?? false
   }
 
-  await putMeta(ctx.kv, meta)
+  // `existing` opts this path into skipping the index write when nothing a
+  // queue or the notifier branches on has changed — which is every push, since
+  // mergePosting will not let a producer touch state, pack or artifacts.
+  await putMeta(ctx.kv, meta, existing)
   // No JD yet: fetch it from the posting after the response has gone, rather
   // than waiting for an evaluation that may never be run for this one.
   if (wantsCapture(meta)) inBackground(event, captureForPosting(ctx.env, ctx.kv, meta))
