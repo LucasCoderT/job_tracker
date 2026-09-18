@@ -341,6 +341,14 @@ export interface PostingMeta {
   closedReason: string | null
   /** When liveness was last checked at all, so a run does not re-check the world. */
   liveCheckedAt: string | null
+  /**
+   * 64-bit SimHash of the JD body, 16 hex chars, computed on the Mac by
+   * career-ops's fingerprint-core.mjs. Near-duplicate texts stay within a few
+   * bits of each other, which is what catches the same req posted by five
+   * agencies under five company names — URL and company+role dedup both miss
+   * that, because every field they compare genuinely differs.
+   */
+  jdFingerprint: string | null
   notionPageId: string | null // set once applied; what an interview pack keys on
   appliedAt: string | null
   /**

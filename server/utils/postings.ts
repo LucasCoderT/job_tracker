@@ -336,6 +336,7 @@ export function mergePosting(id: string, existing: PostingMeta | null, body: any
     closedAt: has('closedAt') ? str(body.closedAt, 40) || null : (existing?.closedAt ?? null),
     closedReason: has('closedReason') ? str(body.closedReason, 300) || null : (existing?.closedReason ?? null),
     liveCheckedAt: has('liveCheckedAt') ? str(body.liveCheckedAt, 40) || null : (existing?.liveCheckedAt ?? null),
+    jdFingerprint: has('jdFingerprint') ? str(body.jdFingerprint, 32) || null : (existing?.jdFingerprint ?? null),
 
     // His decision and the Mac's progress are never set by a push.
     state: existing?.state ?? 'new',
