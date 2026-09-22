@@ -23,10 +23,11 @@
  */
 import type { PostingMeta, PostingAnalysis, PostingQuestions, PostingArtifact } from '../../shared/types'
 import type { AppEnv, KVNamespace } from './notion'
-import { getJD, getAnalysis, getQuestions } from './postings'
+import { getJD, getAnalysis, getQuestions, getArtifact } from './postings'
 import { channelOf } from '../../shared/postings'
 import { localDate } from './ei-week'
 import { markdownToBlocks, appendBlocks, createSubpage, listChildren, type Block } from './notion-blocks'
+import { uploadFile, attachFiles, attachedFilenames, type UploadedFile } from './notion-files'
 
 const SITE = 'https://jobs.codertheory.dev'
 
@@ -41,6 +42,8 @@ export interface SyncResult {
   ok: boolean
   created: string[]
   wroteSummary: boolean
+  /** Files now stored inside Notion rather than only linked back to the site. */
+  attached: string[]
   error?: string
 }
 
@@ -101,7 +104,7 @@ function packMarkdown(meta: PostingMeta, questions: PostingQuestions | null): st
     for (const q of answered) lines.push(`### ${esc(q.question)}`, q.answer.trim())
   }
   if (meta.packNote) lines.push('## Notes', `- ${esc(meta.packNote)}`)
-  lines.push('---', `*Files are kept on jobs.codertheory.dev; the links open there. [The posting on the site](${SITE}/postings/${meta.id}).*`)
+  lines.push('---', `*The files are attached to this page and kept here permanently; the links above open the same files on the site. [The posting](${SITE}/postings/${meta.id}).*`)
   return lines.join('\n\n')
 }
 
@@ -152,10 +155,43 @@ function summaryMarkdown(meta: PostingMeta, present: PageKey[]): string {
   return lines.join('\n\n')
 }
 
+/**
+ * Upload the posting's artifacts into the Apply Pack page.
+ *
+ * Skips anything already there — the filename is read back from the caption —
+ * so syncing a page twice does not leave two copies of a CV. Falls back to the
+ * application page itself when there is no Apply Pack sub-page, which happens
+ * when a posting was applied to before it had any files.
+ */
+async function attachPackFiles(
+  env: AppEnv,
+  kv: KVNamespace,
+  meta: PostingMeta,
+  token: string,
+  applicationPageId: string,
+  packPageId: string | null,
+): Promise<string[]> {
+  if (!meta.artifacts.length) return []
+  const target = packPageId ?? applicationPageId
+  const already = attachedFilenames(await listChildren(token, target))
+  const wanted = meta.artifacts.filter((a) => !already.has(a.name))
+  if (!wanted.length) return []
+
+  const uploaded: UploadedFile[] = []
+  for (const a of wanted) {
+    const file = await getArtifact(kv, meta.id, a.name)
+    if (!file) continue // deleted from the site since the meta was written
+    uploaded.push(await uploadFile(env, { name: a.name, contentType: file.contentType, bytes: file.body }))
+  }
+  if (!uploaded.length) return []
+  await attachFiles(env, target, uploaded)
+  return uploaded.map((u) => u.name)
+}
+
 export async function syncApplicationPage(env: AppEnv, kv: KVNamespace, meta: PostingMeta): Promise<SyncResult> {
   const token = env.NOTION_TOKEN
   const pageId = meta.notionPageId
-  if (!token || !pageId) return { ok: false, created: [], wroteSummary: false, error: 'No Notion page for this posting yet.' }
+  if (!token || !pageId) return { ok: false, created: [], wroteSummary: false, attached: [], error: 'No Notion page for this posting yet.' }
 
   try {
     const [children, jd, analysis, questions] = await Promise.all([
@@ -182,12 +218,24 @@ export async function syncApplicationPage(env: AppEnv, kv: KVNamespace, meta: Po
     if (wroteSummary) await appendBlocks(token, pageId, markdownToBlocks(summaryMarkdown(meta, present)))
 
     const created: string[] = []
+    let packPageId = children.find((b) => b.type === 'child_page' && titleOf(b).includes(PAGES.pack.match))?.id ?? null
     for (const k of toCreate) {
-      await createSubpage(token, pageId, PAGES[k].title, PAGES[k].emoji, markdownToBlocks(bodies[k]!))
+      const id = await createSubpage(token, pageId, PAGES[k].title, PAGES[k].emoji, markdownToBlocks(bodies[k]!))
+      if (k === 'pack') packPageId = id
       created.push(PAGES[k].title)
     }
-    return { ok: true, created, wroteSummary }
+    // The built files themselves, into the Apply Pack page. Links back to the
+    // site are fine until the site is not there; Notion keeps an attached file
+    // as a permanent part of the workspace, which is the point of doing this at
+    // all. Best-effort: a failed upload must not undo the pages just written.
+    let attached: string[] = []
+    try {
+      attached = await attachPackFiles(env, kv, meta, token, pageId, packPageId)
+    } catch (err) {
+      return { ok: true, created, wroteSummary, attached: [], error: `Pages written, files not attached: ${String((err as Error)?.message ?? err).slice(0, 200)}` }
+    }
+    return { ok: true, created, wroteSummary, attached }
   } catch (err) {
-    return { ok: false, created: [], wroteSummary: false, error: String((err as Error)?.message ?? err).slice(0, 300) }
+    return { ok: false, created: [], wroteSummary: false, attached: [], error: String((err as Error)?.message ?? err).slice(0, 300) }
   }
 }

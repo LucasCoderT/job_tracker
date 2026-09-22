@@ -797,6 +797,40 @@ knows when the button was pressed, not when the interview happened, and the EI
 log records the latter. And career-ops's `data/applications.md` is not updated;
 it was already drifting from Notion (70 of 177 applications are not in it).
 
+## The built files live in Notion now (2026-09-22)
+
+The Apply Pack sub-page listed the CV and cover letter as links back to
+jobs.codertheory.dev — fine while the site exists and worth nothing the day it
+does not. `server/utils/notion-files.ts` uploads the artifacts into Notion
+itself, where, in Notion's words, an attached file "becomes a permanent part of
+your workspace".
+
+Notion's file-upload API is three calls: `POST /v1/file_uploads` for an id and
+an upload URL, `POST /v1/file_uploads/:id/send` with the bytes as multipart
+under the field name `file`, then a `file` block referencing the upload id via
+`PATCH /v1/blocks/:page/children`. Single-part tops out at 20MB (a tailored CV
+is ~110KB) and an id must be attached within an hour, which is moot when both
+happen in one request.
+
+- **These three calls use `Notion-Version: 2026-03-11`; everything else stays on
+  `2022-06-28`.** The file endpoints did not exist on the old version, and
+  moving the whole app forward would cross 2025-09-03, which changed how
+  databases and page parents are shaped — precisely what
+  `applications-notion.ts` and `aggregate.ts` read. Two versions is cheaper than
+  re-testing every property reader.
+- **Idempotent by filename.** The name is written into the file block's caption
+  and read back from `attachedFilenames()`, so syncing twice does not leave two
+  copies of a CV. Verified: a second sync attaches nothing.
+- **Best-effort.** An upload that fails returns `ok: true` with an error note —
+  the sub-pages that were just written must not be undone because Notion
+  refused a PDF.
+- Attachment happens wherever `syncApplicationPage` already runs: "Mark
+  applied", and the brief's "Update Notion page".
+
+Pack pages created before this keep their old footer line about files living on
+the site; the sync only ever *adds*, and rewriting his page content to correct a
+sentence is not worth breaking that rule for.
+
 ## The brief's whitespace gap on a thin posting (2026-09-18)
 
 The posting brief is three grid siblings — `.brief-main`, `.brief-rail`, then
