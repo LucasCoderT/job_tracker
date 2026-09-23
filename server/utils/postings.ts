@@ -110,29 +110,42 @@ export async function getMeta(kv: KVNamespace, id: string): Promise<PostingMeta 
 }
 
 /**
- * Fields a listing *consumer* acts on, as opposed to merely displays.
+ * The only change worth skipping an index write for: nothing changed at all.
  *
- * The queues, the notifier and the saved views branch on these, so a change to
- * one has to reach the index immediately. Everything else — score, company,
- * role, the JD provenance — only changes what a row looks like, and a row that
- * looks an hour out of date is not worth a KV write on a plan that allows a
- * thousand a day.
+ * This was a list of fields a consumer "acts on" — state, pack, the queues —
+ * on the reasoning that score, company, role and `employerUrl` merely change
+ * what a row *looks* like, and a row an hour stale is not worth a KV write.
+ *
+ * That reasoning had the consumers wrong. The listing is not a view, it is the
+ * API every desktop worker reads: the evaluation worker builds its prompt from
+ * `company` and `role`, liveness and JD capture both fetch `employerUrl`, and
+ * the JD capture skips on `hasJD`. On 2026-09-23 a posting was corrected from
+ * `indeed.com / ?` to Northbeam / Software Engineer, Python, and twenty minutes
+ * later the evaluation worker still logged `indeed.com — ?` and went to fetch
+ * the Indeed URL, because none of those fields reached the index. It also means
+ * a correction he makes on his phone leaves the row looking untouched for an
+ * hour, which is the same "it didn't work" the blocked-source fix was about.
+ *
+ * So the rule is inverted: patch unless the record is byte-identical apart from
+ * `updatedAt`. That keeps the saving where it was actually earned — the eval
+ * worker's ~72 no-op pushes a day, which `mergePosting` already refuses to let
+ * change anything — and never serves a stale row after a real edit.
  */
-const INDEX_SIGNIFICANT = [
-  'state',
-  'pack',
-  'packBuiltAt',
-  'packError',
-  'answerStatus',
-  'parseStatus',
-  'answered',
-  'questions',
-  'closedAt',
-  'notionPageId',
-] as const satisfies readonly (keyof PostingMeta)[]
+const INDEX_IGNORED = new Set<string>(['updatedAt'])
 
-const needsIndexPatch = (previous: PostingMeta, next: PostingMeta) =>
-  INDEX_SIGNIFICANT.some((k) => previous[k] !== next[k])
+const needsIndexPatch = (previous: PostingMeta, next: PostingMeta) => {
+  for (const k of new Set([...Object.keys(previous), ...Object.keys(next)])) {
+    if (INDEX_IGNORED.has(k)) continue
+    const a = (previous as Record<string, unknown>)[k]
+    const b = (next as Record<string, unknown>)[k]
+    if (a === b) continue
+    // Compared as JSON so arrays and nested objects (artifacts, questions) are
+    // judged by value: `mergePosting` rebuilds them, so identity would report
+    // a change on every push and cost the saving this exists for.
+    if (JSON.stringify(a ?? null) !== JSON.stringify(b ?? null)) return true
+  }
+  return false
+}
 
 /**
  * Store a meta, and keep the listing index in step.
