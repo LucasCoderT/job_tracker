@@ -27,9 +27,11 @@ export default defineEventHandler(async (event): Promise<PostingQuestions> => {
   const incoming = Array.isArray(body.questions)
     ? body.questions.map((q: any) => ({
         question: String(q?.question ?? ''),
+        ...(q?.body !== undefined ? { body: String(q.body) } : {}),
+        ...(Array.isArray(q?.options) ? { options: q.options.map((o: any) => String(o)) } : {}),
         ...(q?.answer !== undefined ? { answer: String(q.answer), source: 'drafted' as const } : {}),
       }))
-    : parseQuestions(String(body.text ?? '')).map((question) => ({ question }))
+    : parseQuestions(String(body.text ?? ''))
 
   if (!incoming.length && !String(body.text ?? '').trim()) {
     throw createError({ statusCode: 400, statusMessage: 'Paste at least one question.' })

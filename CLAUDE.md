@@ -797,6 +797,48 @@ knows when the button was pressed, not when the interview happened, and the EI
 log records the latter. And career-ops's `data/applications.md` is not updated;
 it was already drifting from Notion (70 of 177 applications are not in it).
 
+## Application questions: context, choices, removal (2026-09-23)
+
+The paste parser was one question per line, which is right for a plain list and
+destroys anything else. A real form — two multiple-choice questions, one
+carrying a five-point spec and nine candidate JSON answers, the other a
+twenty-line Python function and thirteen complexity options, plus one free-text
+question — came out as **51 "questions"**, every option and every line of code
+its own row.
+
+`parseQuestions` now returns `{question, body, options}`:
+
+- **The required-field asterisk delimits questions.** It is the only reliable
+  "a new question starts here" signal in a paste; blank lines and numbering both
+  appear *inside* a question carrying a spec or a code block. With no asterisk
+  anywhere, the old one-per-line rule still applies — that is what a plain list
+  looks like.
+- **Choices are the trailing run of single-line, blank-separated paragraphs**,
+  minimum three. Context is contiguous, so it collapses into one multi-line
+  paragraph and stays out of the run. Fewer than three trailing lines is prose,
+  not a choice list.
+- **The parse is shown before it is saved.** `POST /questions/preview` parses
+  and stores nothing; the editor renders it and saving is a separate press. The
+  difference between one question with thirteen options and fourteen questions
+  is invisible until it is on screen, and every heuristic here is a guess.
+
+`body` is rendered as preformatted text and `options` as pick-one buttons that
+write the chosen text straight into the answer — a choice question is answered
+by choosing, not by writing about choosing. The free-text box stays underneath
+for forms that want reasoning too.
+
+`DELETE /questions/:qid` removes one, armed-then-confirm. Re-pasting the whole
+form was previously the only way, which meant reproducing the paste exactly or
+losing the answers already drafted for the questions being kept.
+
+`mergeQuestions` preserves stored `body`/`options` when an incoming item omits
+them — the Mac posts answers back with neither, and without that a draft would
+erase the question's own context.
+
+career-ops's `answerPrompt` renders the body and the options into the prompt and
+requires a choice answer to be one of the options copied verbatim. Sending only
+the prompt line would ask the model to judge a function it was never shown.
+
 ## The built files live in Notion now (2026-09-22)
 
 The Apply Pack sub-page listed the CV and cover letter as links back to

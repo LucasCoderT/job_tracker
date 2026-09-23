@@ -1207,3 +1207,45 @@ a.rail-primary.as-link:hover { background: #d9bd71; border-color: #d9bd71; color
   margin-right: 6px;
   vertical-align: 1px;
 }
+
+/* ---- Application questions: context, choices, removal (2026-09-23) --------
+   A pasted form is not a list of one-line prompts. A question can carry a spec
+   or a function it is asking about, and a fixed set of answers to pick from. */
+.q-body {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 12.5px;
+  line-height: 1.5;
+  white-space: pre;
+  overflow-x: auto;
+  max-height: 340px;
+  overflow-y: auto;
+  color: var(--dim);
+}
+.q-opts { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.q-opt {
+  display: flex; gap: 9px; align-items: flex-start; width: 100%;
+  text-align: left; background: var(--panel); color: var(--text);
+  border: 1px solid var(--line); border-radius: 6px;
+  padding: 8px 11px; font: inherit; font-size: 13.5px; line-height: 1.45;
+  cursor: pointer; font-family: var(--mono, ui-monospace, monospace);
+}
+.q-opt:hover:not(:disabled) { border-color: var(--amber); }
+.q-opt.chosen { border-color: var(--amber); background: color-mix(in srgb, var(--amber) 10%, transparent); }
+.q-opt i { color: var(--muted); font-size: 13px; translate: 0 2px; flex: none; }
+.q-opt.chosen i { color: var(--amber); }
+.q-remove { color: var(--muted); }
+.q-remove.armed { color: var(--rust); font-weight: 500; }
+
+.q-preview { border: 1px solid var(--line); border-radius: 8px; padding: 14px; margin: 12px 0; background: var(--card); }
+.q-preview-head { font-size: 12px; color: var(--amber); margin: 0 0 12px; letter-spacing: .04em; }
+.q-preview-item { padding-bottom: 12px; margin-bottom: 12px; border-bottom: 1px solid var(--line); }
+.q-preview-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+.q-preview-q { margin: 0 0 8px; font-size: 14.5px; line-height: 1.45; }
+.q-preview-opts { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.q-preview-opts li { font-family: var(--mono, ui-monospace, monospace); font-size: 12.5px; color: var(--dim); }
+.q-preview-kind { font-size: 11.5px; color: var(--muted); margin: 0; }

@@ -272,27 +272,82 @@ export async function putQuestions(kv: KVNamespace, id: string, q: PostingQuesti
  * uses to mark a field required are all noise he should not have to strip by
  * hand before pasting.
  */
-export function parseQuestions(text: string): string[] {
-  return String(text ?? '')
-    .split('\n')
-    .map((line) =>
-      line
-        .replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '')
-        .replace(/\s*\*\s*$/, '')
-        .trim(),
-    )
-    .filter((line) => line.length > 1)
-    .slice(0, MAX_QUESTIONS)
+/**
+ * Turn a pasted form into questions.
+ *
+ * The old rule was one question per line, which is right for a plain list and
+ * catastrophic for anything else: a paste with two multiple-choice questions —
+ * one carrying a five-point spec and nine JSON candidate answers, the other a
+ * twenty-line Python function and thirteen complexity options — came out as 51
+ * "questions", every option and every line of code its own row.
+ *
+ * The signal that actually delimits questions is the required-field asterisk a
+ * form puts at the end of each prompt. Blank lines and numbering do not work,
+ * because both appear *inside* a question that carries a spec or a code block.
+ * With no asterisk anywhere the old one-per-line rule is still the best guess.
+ */
+const MIN_OPTIONS = 3
+
+const stripMarker = (s: string) =>
+  String(s ?? '').replace(/^\s*(?:[-*•]|\d+[.)])\s+/, '').replace(/\s*\*\s*$/, '').trim()
+
+export interface ParsedQuestion {
+  question: string
+  body: string
+  options: string[]
+}
+
+export function parseQuestions(text: string): ParsedQuestion[] {
+  const lines = String(text ?? '').replace(/\r\n?/g, '\n').split('\n')
+  const starts = lines.map((l, i) => (/\S\s*\*\s*$/.test(l) ? i : -1)).filter((i) => i >= 0)
+
+  if (!starts.length) {
+    return lines
+      .map(stripMarker)
+      .filter((l) => l.length > 1)
+      .slice(0, MAX_QUESTIONS)
+      .map((question) => ({ question, body: '', options: [] }))
+  }
+
+  const out: ParsedQuestion[] = []
+  for (const [n, start] of starts.entries()) {
+    const question = stripMarker(lines[start]!)
+    if (!question) continue
+    const rest = lines.slice(start + 1, starts[n + 1] ?? lines.length)
+    out.push({ question, ...splitBodyAndOptions(rest) })
+  }
+  return out.slice(0, MAX_QUESTIONS)
 }
 
 /**
- * Merge a new question list over the stored one, carrying answers across by
- * id. Re-pasting a form with one question added must not discard the seven
- * answers already drafted.
+ * Context or choices. The choices are the run of single-line, blank-separated
+ * paragraphs at the END of a block, which is the shape a form produces. Context
+ * — a spec, a function — is contiguous, so it collapses into one multi-line
+ * paragraph and stays out of the run. Fewer than three and it is treated as
+ * prose: two short trailing lines are far more often a sentence than a choice.
  */
+function splitBodyAndOptions(rest: string[]): { body: string; options: string[] } {
+  const paras = rest
+    .join('\n')
+    .split(/\n\s*\n/)
+    .map((p) => p.replace(/\s+$/, ''))
+    .filter((p) => p.trim())
+  let i = paras.length
+  while (i > 0 && !paras[i - 1]!.includes('\n') && paras[i - 1]!.trim().length <= 200) i--
+  const options = paras.slice(i).map((p) => p.trim())
+  if (options.length < MIN_OPTIONS) return { body: paras.join('\n\n').trim(), options: [] }
+  return { body: paras.slice(0, i).join('\n\n').trim(), options }
+}
+
 export function mergeQuestions(
   existing: PostingQuestion[],
-  incoming: { question: string; answer?: string; source?: PostingQuestion['source'] }[],
+  incoming: {
+    question: string
+    body?: string
+    options?: string[]
+    answer?: string
+    source?: PostingQuestion['source']
+  }[],
   stamp: string,
 ): PostingQuestion[] {
   const byId = new Map(existing.map((q) => [q.id, q]))
@@ -304,9 +359,15 @@ export function mergeQuestions(
     const prev = byId.get(id)
     const answer = item.answer !== undefined ? str(item.answer, 20000) : (prev?.answer ?? '')
     const source = item.answer !== undefined ? (item.source ?? 'drafted') : (prev?.source ?? 'pasted')
+    // A worker posting answers back sends no body or options; keeping the
+    // stored ones is what stops a draft erasing the question's own context.
+    const body = item.body !== undefined ? str(item.body, 20000) : (prev?.body ?? '')
+    const options = (item.options ?? prev?.options ?? []).map((o) => str(o, 500)).filter(Boolean).slice(0, 30)
     out.push({
       id,
       question,
+      ...(body ? { body } : {}),
+      ...(options.length ? { options } : {}),
       answer,
       source,
       updatedAt: prev && prev.answer === answer && prev.question === question ? prev.updatedAt : stamp,

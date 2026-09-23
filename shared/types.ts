@@ -458,6 +458,18 @@ export interface ScreenStanding {
 export interface PostingQuestion {
   id: string // stable hash of the question text, so a re-paste keeps answers
   question: string
+  /**
+   * Whatever sits under the question on the form: a spec to follow, a code
+   * block to reason about, the data to transform. Kept verbatim, because a
+   * question like "what is the runtime complexity of this function" means
+   * nothing without the function.
+   */
+  body?: string
+  /**
+   * The choices the form offered. Empty for a free-text question. An answer to
+   * one of these should be one of these — not prose about them.
+   */
+  options?: string[]
   answer: string // '' until drafted
   /** Where the current answer text came from. */
   source: 'pasted' | 'drafted' | 'edited'

@@ -2,6 +2,8 @@
 import { computed, ref, watch } from 'vue'
 import type { PostingDetail, PostingQuestion, PostingQuestions } from '../../../../shared/types'
 
+interface ParsedQuestion { question: string; body: string; options: string[] }
+
 const route = useRoute()
 const id = computed(() => String(route.params.id))
 
@@ -58,12 +60,37 @@ function openEditor() {
   editing.value = true
 }
 
+/**
+ * Splitting a form into questions is a guess, however good the signal, and the
+ * difference between one question with thirteen options and fourteen questions
+ * is invisible until it is on screen. So the parse is shown first and saving is
+ * a separate press.
+ */
+const preview = ref<ParsedQuestion[] | null>(null)
+
+async function previewPaste() {
+  busy.value = 'preview'
+  try {
+    const r = await $fetch<{ questions: ParsedQuestion[] }>(`/api/postings/${id.value}/questions/preview`, {
+      method: 'POST',
+      body: { text: paste.value },
+    })
+    preview.value = r.questions
+    if (!r.questions.length) say('That did not parse into any questions.')
+  } catch (err: any) {
+    say(err?.data?.statusMessage || err?.message || "Couldn't read that")
+  } finally {
+    busy.value = ''
+  }
+}
+
 async function savePaste() {
   busy.value = 'paste'
   try {
     await $fetch(`/api/postings/${id.value}/questions`, { method: 'PUT', body: { text: paste.value } })
     await refresh()
     editing.value = false
+    preview.value = null
     say('Questions saved. Answers you already had are kept.')
   } catch (err: any) {
     say(err?.data?.statusMessage || err?.message || "Couldn't save the questions")
@@ -104,6 +131,35 @@ watch(
 )
 
 const dirty = (q: PostingQuestion) => (drafts.value[q.id] ?? '') !== q.answer
+
+/** A choice question is answered by choosing, not by writing about choosing. */
+async function chooseOption(q: PostingQuestion, option: string) {
+  drafts.value[q.id] = option
+  await saveAnswer(q)
+}
+
+const armedDelete = ref<string | null>(null)
+let disarm: ReturnType<typeof setTimeout> | undefined
+async function removeQuestion(q: PostingQuestion) {
+  if (armedDelete.value !== q.id) {
+    armedDelete.value = q.id
+    clearTimeout(disarm)
+    disarm = setTimeout(() => (armedDelete.value = null), 4000)
+    return
+  }
+  armedDelete.value = null
+  busy.value = q.id
+  try {
+    await $fetch(`/api/postings/${id.value}/questions/${q.id}`, { method: 'DELETE' })
+    delete drafts.value[q.id]
+    await refresh()
+    say('Question removed.')
+  } catch (err: any) {
+    say(err?.data?.statusMessage || err?.message || "Couldn't remove that question")
+  } finally {
+    busy.value = ''
+  }
+}
 
 async function saveAnswer(q: PostingQuestion) {
   busy.value = q.id
@@ -197,8 +253,9 @@ const words = (s: string) => (s.trim() ? s.trim().split(/\s+/).length : 0)
         <template #content>
           <h2>{{ questions.length ? 'Edit the questions' : 'Paste the questions' }}</h2>
           <p class="muted small paste-hint">
-            One per line, straight off the application form. Numbering, bullets and the asterisk marking a
-            required field are stripped for you.
+            Paste the form as it reads. A question that carries a spec, a code block or a list of choices
+            keeps them — the asterisk a form puts on a required field is what marks where each question
+            starts, so paste it with those intact.
           </p>
           <PrimeTextarea
             v-model="paste"
@@ -206,8 +263,32 @@ const words = (s: string) => (s.trim() ? s.trim().split(/\s+/).length : 0)
             placeholder="Why do you want to work here?&#10;Describe a system you owned end to end.&#10;What are your salary expectations?"
             autocomplete="off"
           />
+          <div v-if="preview" class="q-preview">
+            <p class="q-preview-head mono">
+              {{ preview.length }} question{{ preview.length === 1 ? '' : 's' }} — check this is how the form reads
+            </p>
+            <div v-for="(pq, n) in preview" :key="n" class="q-preview-item">
+              <p class="q-preview-q">{{ n + 1 }}. {{ pq.question }}</p>
+              <pre v-if="pq.body" class="q-body">{{ pq.body }}</pre>
+              <ul v-if="pq.options.length" class="q-preview-opts">
+                <li v-for="(o, oi) in pq.options" :key="oi">{{ o }}</li>
+              </ul>
+              <p v-else-if="!pq.body" class="q-preview-kind mono">free text</p>
+            </div>
+          </div>
+
           <div class="paste-actions">
-            <PrimeButton v-if="questions.length" label="Cancel" severity="secondary" text size="small" @click="editing = false" />
+            <PrimeButton v-if="questions.length" label="Cancel" severity="secondary" text size="small" @click="editing = false; preview = null" />
+            <PrimeButton
+              label="Check"
+              icon="pi pi-eye"
+              size="small"
+              severity="secondary"
+              outlined
+              :loading="busy === 'preview'"
+              :disabled="!paste.trim()"
+              @click="previewPaste"
+            />
             <PrimeButton
               :label="questions.length ? 'Save questions' : 'Add questions'"
               icon="pi pi-check"
@@ -246,10 +327,34 @@ const words = (s: string) => (s.trim() ? s.trim().split(/\s+/).length : 0)
                 <span class="qa-n mono">{{ i + 1 }}</span>
                 <h3>{{ q.question }}</h3>
               </div>
+
+              <!-- The spec, the data, the function: a question like "what is the
+                   runtime complexity of this" means nothing without it. -->
+              <pre v-if="q.body" class="q-body">{{ q.body }}</pre>
+
+              <!-- A choice question is answered by choosing. The box stays
+                   underneath for the reasoning, which some forms also ask for. -->
+              <div v-if="q.options?.length" class="q-opts">
+                <button
+                  v-for="(o, oi) in q.options"
+                  :key="oi"
+                  type="button"
+                  class="q-opt"
+                  :class="{ chosen: (drafts[q.id] ?? '') === o }"
+                  :disabled="busy === q.id"
+                  @click="chooseOption(q, o)"
+                >
+                  <i :class="(drafts[q.id] ?? '') === o ? 'pi pi-check-circle' : 'pi pi-circle'" />
+                  <span>{{ o }}</span>
+                </button>
+              </div>
+
               <PrimeTextarea
                 v-model="drafts[q.id]"
-                rows="5"
-                :placeholder="inFlight ? 'Being drafted…' : 'Not drafted yet — write it here, or press Draft answers.'"
+                :rows="q.options?.length ? 3 : 5"
+                :placeholder="q.options?.length
+                  ? 'Chosen answer appears here — or type your own.'
+                  : inFlight ? 'Being drafted…' : 'Not drafted yet — write it here, or press Draft answers.'"
                 autocomplete="off"
               />
               <div class="qa-foot">
@@ -259,6 +364,15 @@ const words = (s: string) => (s.trim() ? s.trim().split(/\s+/).length : 0)
                   <template v-else-if="q.source === 'drafted'"> · drafted</template>
                 </span>
                 <span class="qa-acts">
+                  <button
+                    type="button"
+                    class="linkish q-remove"
+                    :class="{ armed: armedDelete === q.id }"
+                    :disabled="busy === q.id"
+                    @click="removeQuestion(q)"
+                  >
+                    {{ armedDelete === q.id ? 'really remove?' : 'remove' }}
+                  </button>
                   <template v-if="dirty(q)">
                     <button type="button" class="linkish" @click="revert(q)">revert</button>
                     <PrimeButton label="Save" icon="pi pi-check" size="small" :loading="busy === q.id" @click="saveAnswer(q)" />
