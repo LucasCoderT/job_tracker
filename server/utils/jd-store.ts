@@ -52,7 +52,12 @@ export async function captureForPosting(
 ): Promise<StoredJD> {
   const stamp = new Date().toISOString()
   try {
-    const { text, source } = await captureJD(meta.url)
+    // The employer's own req when the resolver found one. This is the whole
+    // reason an Indeed link is usable at all: Indeed cannot be read by anything
+    // — HTTP fetch, headless Playwright and a direct fetch are all bounced to
+    // bot detection — but the posting it points at can be, and resolve-employer-req
+    // finds that from the company and role rather than from the page.
+    const { text, source } = await captureJD(meta.employerUrl || meta.url)
     const already = await getJD(kv, meta.id)
     if (already) {
       const next = await writeJdFields(kv, meta.id, { hasJD: true, jdError: null, jdAttemptedAt: stamp })

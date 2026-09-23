@@ -822,9 +822,27 @@ everywhere except the sources that refuse to be read.
   with no score sorts last, so it was on no page he would look at. The view is
   the door; the chip explains it once he is there.
 
-There is no automatic recovery. Indeed refused a direct read too (401), so the
-only fix for an existing stub is pasting the description onto the brief, after
-which the evaluation runs normally.
+**Indeed cannot be read by anything, and does not need to be.** Three paths were
+tried and all three are bounced: an HTTP fetch (`jdError`), a direct request
+(401), and headless Playwright via `browser-extract.mjs`, which is redirected to
+`secure.indeed.com/auth?…&from=bot-detection-anonymous`. Driving his real
+logged-in browser through the Chrome MCP would likely work, but it cannot be the
+mechanism: that runs inside an interactive Claude session, and the 07:20 worker
+has no way to invoke one.
+
+So the link is treated as a **pointer rather than a document**. `resolve-employer-req`
+already classes Indeed as an aggregator and resolves from *company and role*,
+not from the page — which is why the add dialog now insists on those two fields
+for a blocked source. From there the employer's own req is readable, and the
+pieces already existed; what was missing was that **both capture paths read
+`meta.url`**, so the JD was still being fetched from Indeed, and
+`scripts/capture-jds.mjs` skipped Indeed URLs outright. Both now prefer
+`employerUrl`, and a newly resolved `employerUrl` clears `jdAttemptedAt` and
+`jdError` so the once-a-day retry guard does not hold back a capture against a
+page that, unlike the last one, can actually be read.
+
+End to end on an Indeed link given a company and role: employer req resolved, JD
+captured from Greenhouse, 9,402 characters, `jdSource: greenhouse`.
 
 **Left alone deliberately:** `url-key.mjs` does not strip `from=`, so the same
 Indeed job shared from the app and from the web are two ids. Stripping generic

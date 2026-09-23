@@ -460,6 +460,8 @@ export function mergePosting(id: string, existing: PostingMeta | null, body: any
   const pick = (k: string, fallback: string, max = 500) =>
     has(k) ? str(body[k], max) : fallback
 
+  const newlyResolved = has('employerUrl') && Boolean(str(body.employerUrl, 2000)) && !existing?.employerUrl
+
   return {
     id,
     url: pick('url', existing?.url ?? '', 2000),
@@ -495,8 +497,12 @@ export function mergePosting(id: string, existing: PostingMeta | null, body: any
     dismissedAt: existing?.dismissedAt ?? null,
     jdSource: existing?.jdSource ?? null,
     jdCapturedAt: existing?.jdCapturedAt ?? null,
-    jdError: existing?.jdError ?? null,
-    jdAttemptedAt: existing?.jdAttemptedAt ?? null,
+    jdError: newlyResolved ? null : (existing?.jdError ?? null),
+    // A newly resolved employer URL is a new thing to read, so the once-a-day
+    // retry guard must not hold the capture back: the previous attempt failed
+    // against a page nothing can read, and this one is against a page that can
+    // be. Clearing the stamp is what lets wantsCapture try again immediately.
+    jdAttemptedAt: newlyResolved ? null : (existing?.jdAttemptedAt ?? null),
 
     questions: existing?.questions ?? 0,
     answered: existing?.answered ?? 0,

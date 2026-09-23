@@ -77,7 +77,12 @@ const { postings = [] } = await site('/api/postings')
 // Everything without a JD except what nobody can fetch — Indeed blocks this
 // address as well, and asking again every half hour only earns a block.
 const todo = postings
-  .filter((p) => !p.hasJD && !/indeed\./i.test(p.url))
+  // Read the employer's own req when the resolver found one. An Indeed link is
+  // unreadable by anything — fetch, headless Playwright and a direct request are
+  // all bounced to bot detection — but the posting it points at is not, and that
+  // is what makes an Indeed link usable at all. Only skip when the URL we would
+  // actually read is still the unreadable one.
+  .filter((p) => !p.hasJD && !/indeed\./i.test(p.employerUrl || p.url))
   .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
 if (!todo.length) {
   log('every posting has a JD')
@@ -91,7 +96,7 @@ for (const [i, p] of todo.slice(0, LIMIT).entries()) {
   if (i) await sleep(PAUSE_MS)
   const who = `${p.company} — ${p.role || '?'}`
   try {
-    const { text, source } = await captureJD(p.url)
+    const { text, source } = await captureJD(p.employerUrl || p.url)
     if (DRY) {
       log(`  ✓ ${who}: ${source}, ${text.length} chars (not sent)`)
       continue
