@@ -614,6 +614,43 @@ self-hosting would fix it. If either ever happens, move the send into the
 `status` routes and delete the launchd agent — the Worker knows the moment work
 lands, with no polling and no dependency on the Mac being awake.
 
+### The pages watch too (2026-09-23)
+
+A notification that work is ready, on a page that still had to be reloaded to
+show it, is only half the job. The realtime spine (PipelineHub, `/api/ws`,
+`useRealtime`) had been deployed and carrying events for days with **no
+component subscribed to it**. `useLiveRefresh` is the consumer.
+
+- **Two mechanisms, on purpose.** The socket is the fast path — a matching event
+  refreshes in about a second. Polling is the honest path: `announce` is
+  best-effort by design, and a socket can be closed, asleep, or half-dead behind
+  a phone's NAT, so "eventually correct" never depends on a courtesy.
+- **Poll only while something is waiting, only while the tab is visible, and
+  never more than 30 minutes at a stretch.** A settled page does not poll at
+  all; a hidden tab does not poll at all and fetches once on becoming visible,
+  which is the only moment the answer matters. This is the rule that keeps a
+  page left open overnight from re-creating the 2026-09-16 quota outage.
+- **The 30-minute cap exists because some waits never end.** A posting under the
+  eval worker's score gate is never picked up, so "waiting to be evaluated"
+  would tick forever; the brief also bounds that claim by the posting's age
+  rather than showing a badge that can never clear.
+- **`LiveWaiting` renders nothing when nothing is pending.** A permanent "live"
+  chip would claim freshness on a page that has deliberately stopped polling.
+  It names what is outstanding ("building your pack", "drafting answers")
+  because the count means different things per page — on a listing it is how
+  many jobs are busy, on one posting it is how many *kinds* of work are out.
+- **`posting.evaluated` is guarded.** The eval worker re-pushes the whole corpus
+  after a run (173 records last time); announcing each would be a broadcast
+  storm that says nothing, so `PUT /:id` announces only when a push actually
+  brought an analysis or moved the score.
+
+The four routes that never announced and now do are the ones he waits on most:
+`questions/request`, `questions/status`, `questions/reparse`,
+`questions/parse-status`. The first and third also `commandWorkers`, so a draft
+starts in about a second rather than on the worker's next tick;
+career-ops's `site-realtime-worker.mjs` maps both to
+`site-apply-worker.mjs --answers-only`.
+
 **Deliberately not watched:** posting evaluations. The eval worker grinds
 through the whole backlog three at a time, so notifying on those would be a
 stream of alerts for work he never asked for. The rule is *things he requested*.
