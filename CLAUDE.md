@@ -815,8 +815,20 @@ its own row.
   looks like.
 - **Choices are the trailing run of single-line, blank-separated paragraphs**,
   minimum three. Context is contiguous, so it collapses into one multi-line
-  paragraph and stays out of the run. Fewer than three trailing lines is prose,
-  not a choice list.
+  paragraph and stays out of the run.
+- **A pair is accepted only on vocabulary.** Yes/No is the most common thing a
+  form asks, but two trailing short lines are just as often prose ("Please be
+  specific." / "Thanks!"), so three is the threshold on shape alone and a pair
+  has to be recognisably answer words — `CHOICE_WORD`: yes, no, true, false,
+  agree, disagree, accept, decline, n/a, prefer not to say, none, other, maybe,
+  unsure. The same vocabulary is the *only* thing that will split a contiguous
+  run into options, because the contiguous thing under a question is otherwise a
+  spec or a function, and splitting that is the damage this parser exists to
+  stop. It covers a form pasted without blank lines between Yes and No.
+- **Paragraphs are trimmed before anything inspects them.** A block starting
+  with a blank line otherwise yields `"\nYes"`, which contains a newline and
+  fails every single-line test for a reason unrelated to its content — that bug
+  made the first version of the binary rule look like it did not work at all.
 - **The parse is shown before it is saved.** `POST /questions/preview` parses
   and stores nothing; the editor renders it and saving is a separate press. The
   difference between one question with thirteen options and fourteen questions

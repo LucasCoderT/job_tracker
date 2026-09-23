@@ -288,6 +288,19 @@ export async function putQuestions(kv: KVNamespace, id: string, q: PostingQuesti
  */
 const MIN_OPTIONS = 3
 
+/**
+ * The closed vocabulary of an answer that is a choice rather than a sentence.
+ *
+ * Three trailing lines are safe to read as options on shape alone; two are not,
+ * because plenty of question bodies end with two short lines of prose ("Please
+ * be specific." / "Thanks!"). But Yes/No is the single most common thing a form
+ * asks, and refusing to see it would be the wrong trade. So a pair is accepted
+ * only when both sides are recognisably answer words — which "Please be
+ * specific." is not.
+ */
+const CHOICE_WORD =
+  /^(yes|no|true|false|agree|disagree|accept|decline|declined|accepted|i\s+(do\s+not\s+|don'?t\s+)?agree|n\/?a|not applicable|prefer not to say|none|other|maybe|unsure)\b/i
+
 const stripMarker = (s: string) =>
   String(s ?? '').replace(/^\s*(?:[-*•]|\d+[.)])\s+/, '').replace(/\s*\*\s*$/, '').trim()
 
@@ -327,16 +340,40 @@ export function parseQuestions(text: string): ParsedQuestion[] {
  * prose: two short trailing lines are far more often a sentence than a choice.
  */
 function splitBodyAndOptions(rest: string[]): { body: string; options: string[] } {
+  // Trim each paragraph before anything looks at it: a block that starts with a
+  // blank line otherwise yields "\nYes", which contains a newline and so fails
+  // every single-line test below for a reason that has nothing to do with the
+  // content.
   const paras = rest
     .join('\n')
     .split(/\n\s*\n/)
-    .map((p) => p.replace(/\s+$/, ''))
-    .filter((p) => p.trim())
+    .map((p) => p.trim())
+    .filter(Boolean)
+
   let i = paras.length
-  while (i > 0 && !paras[i - 1]!.includes('\n') && paras[i - 1]!.trim().length <= 200) i--
-  const options = paras.slice(i).map((p) => p.trim())
-  if (options.length < MIN_OPTIONS) return { body: paras.join('\n\n').trim(), options: [] }
-  return { body: paras.slice(0, i).join('\n\n').trim(), options }
+  while (i > 0 && !paras[i - 1]!.includes('\n') && paras[i - 1]!.length <= 200) i--
+  let options = paras.slice(i)
+  let body = paras.slice(0, i)
+
+  // A form pasted without blank lines between its choices puts them on
+  // consecutive lines, so the whole run arrives as one paragraph. Split it only
+  // when every line is an answer word — the same closed vocabulary — because
+  // the contiguous thing under a question is otherwise a spec or a function,
+  // and splitting that into "options" is exactly the damage this parser exists
+  // to stop.
+  if (!options.length && paras.length) {
+    const lines = paras[paras.length - 1]!.split('\n').map((l) => l.trim()).filter(Boolean)
+    if (lines.length >= 2 && lines.every((l) => l.length <= 60 && CHOICE_WORD.test(l))) {
+      options = lines
+      body = paras.slice(0, -1)
+    }
+  }
+
+  const isBinary = options.length === 2 && options.every((o) => CHOICE_WORD.test(o))
+  if (options.length < MIN_OPTIONS && !isBinary) {
+    return { body: [...body, ...options].join('\n\n').trim(), options: [] }
+  }
+  return { body: body.join('\n\n').trim(), options }
 }
 
 export function mergeQuestions(
