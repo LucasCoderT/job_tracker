@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, nextTick } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 import type { PostingCreateResult } from '../../shared/types'
+import { blockedSource } from '#shared/postings'
 
 /**
  * Add a posting by URL — the ones a friend sends, which the morning scan will
@@ -10,6 +11,12 @@ import type { PostingCreateResult } from '../../shared/types'
  * evaluation worker fills them in from the JD within the half hour: a posting
  * with no valid evaluation is exactly what it drains, so pasting a link is
  * the whole job.
+ *
+ * Except where the source refuses to be read. An Indeed link pasted on its own
+ * became a row reading "indeed.com" with an empty role and no score — saved,
+ * but unrecognisable among a hundred and fifty others, which is how "add
+ * posting doesn't work" looks from the outside. Those sources ask for the
+ * company and role up front, because nothing downstream can supply them.
  */
 const open = ref(false)
 const url = ref('')
@@ -18,6 +25,8 @@ const role = ref('')
 const busy = ref(false)
 const error = ref('')
 const urlField = ref<{ $el?: HTMLElement } | null>(null)
+const blocked = computed(() => blockedSource(url.value.trim()))
+const needsDetails = computed(() => Boolean(blocked.value) && !company.value.trim())
 
 async function show() {
   open.value = true
@@ -87,18 +96,27 @@ async function submit() {
           autofocus
         />
       </label>
+      <PrimeMessage v-if="blocked" severity="warn" :closable="false" class="add-blocked">
+        {{ blocked }} blocks automated reading, so nothing can fill these in for you. Add the company and
+        role now or this will be saved as a row you cannot recognise later.
+      </PrimeMessage>
+
       <div class="two">
         <label>
-          <span>Company <small>optional</small></span>
-          <PrimeInputText v-model="company" autocomplete="off" />
+          <span>Company <small>{{ blocked ? 'needed here' : 'optional' }}</small></span>
+          <PrimeInputText v-model="company" autocomplete="off" :invalid="needsDetails" />
         </label>
         <label>
-          <span>Role <small>optional</small></span>
+          <span>Role <small>{{ blocked ? 'needed here' : 'optional' }}</small></span>
           <PrimeInputText v-model="role" autocomplete="off" />
         </label>
       </div>
-      <p class="add-hint">
+      <p v-if="!blocked" class="add-hint">
         The Mac evaluates it within the half hour and fills in the rest — score, requirements, gaps.
+      </p>
+      <p v-else class="add-hint">
+        The evaluation needs a job description and this source will not give one up. Paste the description
+        on the posting afterwards and the evaluation runs as normal.
       </p>
       <PrimeMessage v-if="error" severity="error" :closable="false">{{ error }}</PrimeMessage>
       <div class="add-actions">

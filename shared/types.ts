@@ -400,7 +400,16 @@ export interface PostingDetail { meta: PostingMeta; jd: string | null; analysis:
 export interface PostingApplyResult { meta: PostingMeta; notion: NotionWriteResult }
 
 /** POST /api/postings — `created: false` means this URL was already here. */
-export interface PostingCreateResult { meta: PostingMeta; created: boolean }
+export interface PostingCreateResult {
+  meta: PostingMeta
+  created: boolean
+  /**
+   * Set when the source cannot be read automatically, so nothing will fill in a
+   * company or role left blank. Without it the posting is saved and silently
+   * unfindable.
+   */
+  warning?: string
+}
 
 // ---- Application questions (/api/postings/:id/questions) ----
 //

@@ -187,3 +187,29 @@ export const LOCALITY_RANK: Record<Locality, number> = {
   unknown: 4,
   elsewhere: 5,
 }
+
+/**
+ * Sources that refuse to be read automatically.
+ *
+ * The add-a-posting form tells the user company and role are optional, because
+ * the evaluation worker fills them in from the job description. That is true
+ * everywhere except here: Indeed blocks both the Worker and the Mac, so there
+ * is no JD, so there is no evaluation, so nothing ever fills them in. A link
+ * pasted on its own became a row reading "indeed.com" with an empty role —
+ * present, but impossible to recognise in a list of a hundred and fifty.
+ *
+ * Naming the source rather than returning a boolean so the message can say
+ * which one and why.
+ */
+export function blockedSource(url: string): string | null {
+  let host = ''
+  try {
+    host = new URL(String(url || '').trim()).hostname.toLowerCase()
+  } catch {
+    return null
+  }
+  if (/(^|\.)indeed\.(com|ca|co\.uk)$|(^|\.)to\.indeed\.com$/.test(host)) return 'Indeed'
+  if (/(^|\.)glassdoor\./.test(host)) return 'Glassdoor'
+  if (/(^|\.)ziprecruiter\./.test(host)) return 'ZipRecruiter'
+  return null
+}

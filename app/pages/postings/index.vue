@@ -50,6 +50,10 @@ const VIEWS: { key: string; label: string; dot: string; match: (p: PostingMeta) 
   { key: 'local', label: 'Local', dot: 'var(--teal)', match: (p) => ['edmonton', 'alberta'].includes(localityOf(p.location, p.geo)) },
   { key: 'evaluated', label: 'Evaluated', dot: 'var(--blue)', match: (p) => p.hasAnalysis },
   { key: 'applied', label: 'Applied', dot: 'var(--teal)', match: (p) => p.state === 'applied' },
+  // A source that refuses to be read leaves no role and no score, so the row
+  // sorts to the bottom of a hundred and fifty and is effectively lost. It
+  // needs a door of its own: the only fix is him pasting the description.
+  { key: 'needs', label: 'Needs details', dot: 'var(--amber)', match: (p) => !p.role && !p.hasJD && p.state === 'new' },
   { key: 'closed', label: 'Listing closed', dot: 'var(--stone)', match: (p) => Boolean(p.closedAt) },
   { key: 'dismissed', label: 'Dismissed', dot: 'var(--rust)', match: (p) => p.state === 'dismissed' },
 ]
@@ -521,6 +525,7 @@ function resetFilters() {
                   </td>
                   <td class="mono clip">{{ p.comp || '—' }}</td>
                   <td class="muted clip">
+                    <span v-if="!p.role && !p.hasJD" class="needs-chip" title="No description could be read, so this has no role, no score and no evaluation. Open it and paste the description.">needs details</span>
                     <span v-if="p.closedAt" class="closed-chip" :title="p.closedReason || 'The listing is gone'">closed</span>
                     <span v-if="localLabel(p)" class="loc-chip">{{ localLabel(p) }}</span>
                     {{ p.geo || p.location || '—' }}

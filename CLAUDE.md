@@ -797,6 +797,41 @@ knows when the button was pressed, not when the interview happened, and the EI
 log records the latter. And career-ops's `data/applications.md` is not updated;
 it was already drifting from Notion (70 of 177 applications are not in it).
 
+## A source that will not be read (2026-09-23)
+
+"Add posting doesn't work" for an Indeed link. It did work — the posting was
+saved. It was saved as company `indeed.com`, role `""`, score `null`, and with
+114 live postings sorted by score it went to the bottom of the list, which from
+the outside is indistinguishable from nothing happening.
+
+The chain: Indeed blocks automated fetches, so `captureForPosting` failed
+(`jdError: "Indeed blocks automated fetches"`), so there is no JD, so the
+evaluation worker — which drains postings *without a valid evaluation* and needs
+a JD to write one — can never fill in the company and role. The add form's hint
+that both are optional "because the evaluation worker fills them in" is true
+everywhere except the sources that refuse to be read.
+
+- `blockedSource(url)` in `shared/postings.ts` names the source rather than
+  returning a boolean, so the message can say which and why. Indeed, Glassdoor,
+  ZipRecruiter.
+- The add dialog warns as soon as such a URL is typed and labels company and
+  role **needed here** instead of optional; `POST /api/postings` returns a
+  `warning` on the result for the same case, so a client that skips the dialog
+  still hears it.
+- A **Needs details** saved view, because the chip alone was not enough: a row
+  with no score sorts last, so it was on no page he would look at. The view is
+  the door; the chip explains it once he is there.
+
+There is no automatic recovery. Indeed refused a direct read too (401), so the
+only fix for an existing stub is pasting the description onto the brief, after
+which the evaluation runs normally.
+
+**Left alone deliberately:** `url-key.mjs` does not strip `from=`, so the same
+Indeed job shared from the app and from the web are two ids. Stripping generic
+param names globally is what that file explicitly refuses to do — they are
+functional on some boards, and merging two distinct postings is worse than
+holding two rows for one job.
+
 ## Application questions: context, choices, removal (2026-09-23)
 
 The paste parser was one question per line, which is right for a plain list and

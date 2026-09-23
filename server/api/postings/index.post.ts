@@ -15,6 +15,7 @@
 import type { PostingCreateResult } from '../../../shared/types'
 import { getCloudflareEnv, sourceDomain, channelOf } from '../../utils/notion'
 import { postingsKV, getMeta, putMeta, postingIdFor, mergePosting } from '../../utils/postings'
+import { blockedSource } from '../../../shared/postings'
 import { now } from '../../utils/posting-route'
 import { captureForPosting, inBackground } from '../../utils/jd-store'
 
@@ -50,5 +51,15 @@ export default defineEventHandler(async (event): Promise<PostingCreateResult> =>
   await putMeta(kv, meta)
   // A friend's link is exactly the posting no evaluation will ever reach.
   inBackground(event, captureForPosting(getCloudflareEnv(event), kv, meta))
-  return { meta, created: true }
+  // Everywhere else a blank company and role are filled in from the job
+  // description within the half hour. Not here: no read means no JD, no JD
+  // means no evaluation, and the row stays "indeed.com" with an empty role
+  // forever. Say so rather than letting him find out by not finding it.
+  const blocked = blockedSource(url)
+  const warning =
+    blocked && !String(body.company ?? '').trim()
+      ? `${blocked} blocks automated reading, so the company and role will not fill themselves in — add them here, or paste the job description on the posting.`
+      : undefined
+
+  return { meta, created: true, ...(warning ? { warning } : {}) }
 })
