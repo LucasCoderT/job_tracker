@@ -381,6 +381,12 @@ export interface PostingMeta {
   questions: number
   answered: number
   answerStatus: AnswerStatus
+  /**
+   * Whether a re-parse of the pasted form is queued. Denormalised like
+   * `answerStatus` so the parse queue is one listing read rather than one read
+   * per posting that has ever had questions.
+   */
+  parseStatus?: AnswerStatus
   artifacts: PostingArtifact[]
   createdAt: string
   updatedAt: string
@@ -478,6 +484,19 @@ export interface PostingQuestion {
 
 export interface PostingQuestions {
   questions: PostingQuestion[]
+  /**
+   * The paste exactly as it was given, kept so Claude can re-read it when the
+   * heuristic parse comes out wrong. Without this there is nothing to re-read:
+   * only the parsed result was ever stored.
+   */
+  rawText?: string
+  /**
+   * A re-parse handed to the Mac. Separate from `status`, which is about
+   * drafting answers — a form can be mid-parse and already have answers, or
+   * the other way round.
+   */
+  parseStatus?: AnswerStatus
+  parseError?: string | null
   status: AnswerStatus
   /** Steer the whole draft — tone, what to emphasise, anything to avoid. */
   note: string

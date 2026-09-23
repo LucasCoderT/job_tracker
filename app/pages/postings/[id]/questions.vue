@@ -68,6 +68,28 @@ function openEditor() {
  */
 const preview = ref<ParsedQuestion[] | null>(null)
 
+/**
+ * The escape hatch. The parser here is instant and works when Claude does not,
+ * which is why it runs first — but a form is arbitrarily shaped, and when the
+ * split is wrong something that can read the paste should get a turn.
+ */
+const reparsing = computed(() => data.value?.parseStatus === 'requested' || data.value?.parseStatus === 'building')
+
+async function reparse() {
+  busy.value = 'reparse'
+  try {
+    await $fetch(`/api/postings/${id.value}/questions/reparse`, { method: 'POST' })
+    await refresh()
+    editing.value = false
+    preview.value = null
+    say('Queued. The Mac re-reads the form, usually within a few minutes.')
+  } catch (err: any) {
+    say(err?.data?.statusMessage || err?.message || "Couldn't queue that")
+  } finally {
+    busy.value = ''
+  }
+}
+
 async function previewPaste() {
   busy.value = 'preview'
   try {
@@ -267,6 +289,10 @@ const words = (s: string) => (s.trim() ? s.trim().split(/\s+/).length : 0)
             <p class="q-preview-head mono">
               {{ preview.length }} question{{ preview.length === 1 ? '' : 's' }} — check this is how the form reads
             </p>
+            <p class="q-preview-hint">
+              Not right? Save it anyway and press <strong>Have Claude re-read it</strong> — the paste is kept, and
+              the Mac can split a form this one cannot.
+            </p>
             <div v-for="(pq, n) in preview" :key="n" class="q-preview-item">
               <p class="q-preview-q">{{ n + 1 }}. {{ pq.question }}</p>
               <pre v-if="pq.body" class="q-body">{{ pq.body }}</pre>
@@ -313,8 +339,26 @@ const words = (s: string) => (s.trim() ? s.trim().split(/\s+/).length : 0)
           />
           <PrimeButton label="Copy all" icon="pi pi-copy" size="small" severity="secondary" outlined :disabled="!answered" @click="copyAll" />
           <PrimeButton label="Edit questions" icon="pi pi-pencil" size="small" severity="secondary" text @click="openEditor" />
+          <PrimeButton
+            v-if="data.rawText"
+            :label="reparsing ? 'Re-reading…' : 'Have Claude re-read it'"
+            :icon="reparsing ? 'pi pi-spin pi-spinner' : 'pi pi-sparkles'"
+            size="small"
+            severity="secondary"
+            outlined
+            :disabled="reparsing"
+            :loading="busy === 'reparse'"
+            @click="reparse"
+          />
           <span v-if="data.note" class="q-note mono">“{{ data.note }}”</span>
         </div>
+
+        <PrimeMessage v-if="reparsing" severity="info" :closable="false">
+          The Mac is re-reading the form you pasted. The questions below are replaced when it finishes.
+        </PrimeMessage>
+        <PrimeMessage v-if="data.parseError" severity="warn" :closable="false">
+          Re-reading it failed: {{ data.parseError }}
+        </PrimeMessage>
 
         <PrimeMessage v-if="inFlight" severity="info" :closable="false">
           The Mac is drafting these from your CV and the job description. They land here when it is done.

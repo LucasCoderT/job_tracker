@@ -851,6 +851,27 @@ career-ops's `answerPrompt` renders the body and the options into the prompt and
 requires a choice answer to be one of the options copied verbatim. Sending only
 the prompt line would ask the model to judge a function it was never shown.
 
+**And when the heuristic gets it wrong, Claude re-reads the paste.** Forms are
+arbitrarily shaped and this parser has already needed patching twice; a rule set
+will keep losing to them. So `rawText` is stored — the paste as given, which was
+previously discarded — and **Have Claude re-read it** queues it to the Mac,
+which returns `{question, body, options}` and replaces the stored questions.
+
+The heuristic stays the default rather than being replaced, for one reason that
+is not about quality: **there have been over a thousand usage-limited ticks this
+month**, including a three-day stretch, and a paste that cannot be entered
+during a limit fails at exactly the moment he is sitting in front of a form. The
+heuristic is instant, free and offline; Claude is the escape hatch. Cost was
+never the argument either way — questions have been pasted on 7 postings ever.
+
+`parseStatus` is denormalised onto the meta beside `answerStatus`, so the parse
+queue is one listing read rather than one read per posting that has ever had
+questions, and it is in `INDEX_SIGNIFICANT` because a worker acts on it.
+
+Answers survive a re-parse only where the question text is unchanged — they are
+keyed by a hash of it. That is the honest behaviour: if the split was wrong, the
+questions those answers were written against were wrong too.
+
 ## The built files live in Notion now (2026-09-22)
 
 The Apply Pack sub-page listed the CV and cover letter as links back to

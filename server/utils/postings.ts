@@ -124,6 +124,7 @@ const INDEX_SIGNIFICANT = [
   'packBuiltAt',
   'packError',
   'answerStatus',
+  'parseStatus',
   'answered',
   'questions',
   'closedAt',
@@ -420,6 +421,7 @@ export function withQuestionCounts(meta: PostingMeta, q: PostingQuestions | null
     questions: q?.questions.length ?? 0,
     answered: q?.questions.filter((x) => x.answer.trim()).length ?? 0,
     answerStatus: q?.status ?? 'none',
+    parseStatus: q?.parseStatus ?? 'none',
   }
 }
 
@@ -499,6 +501,7 @@ export function mergePosting(id: string, existing: PostingMeta | null, body: any
     questions: existing?.questions ?? 0,
     answered: existing?.answered ?? 0,
     answerStatus: existing?.answerStatus ?? 'none',
+    parseStatus: existing?.parseStatus ?? 'none',
 
     hasJD: has('jd') ? Boolean(str(body.jd, 200_000)) : (existing?.hasJD ?? false),
     hasAnalysis: has('analysis') ? Boolean(body.analysis) : (existing?.hasAnalysis ?? false),

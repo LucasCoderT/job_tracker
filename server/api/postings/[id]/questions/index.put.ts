@@ -41,8 +41,14 @@ export default defineEventHandler(async (event): Promise<PostingQuestions> => {
   }
 
   const done = getQuery(event).status === 'done'
+  // Keep the paste itself. A re-parse has nothing to work from otherwise, and
+  // the parsed result is lossy by construction — it is a guess about where one
+  // question ends and the next begins.
+  const rawText = typeof body.text === 'string' && body.text.trim() ? String(body.text).slice(0, 100000) : existing.rawText
+
   const next: PostingQuestions = {
     ...existing,
+    rawText,
     questions: mergeQuestions(existing.questions, incoming, stamp),
     note: body.note !== undefined ? String(body.note).trim().slice(0, 2000) : existing.note,
     error: body.error ? String(body.error).slice(0, 2000) : done ? null : existing.error,
