@@ -52,6 +52,18 @@ export type PipelineEventName =
   | 'posting.state'
   | 'posting.applied'
   | 'posting.deleted'
+  // Application questions. These are the longest waits he actually sits
+  // through — a draft rides the apply worker's tick — and they were the one
+  // agent hand-off with no event at all, so the questions page could only
+  // learn that answers had landed by being reloaded.
+  | 'answers.requested'
+  | 'answers.building'
+  | 'answers.done'
+  | 'answers.failed'
+  // Re-parsing a pasted form through Claude. Same shape, different worker.
+  | 'parse.requested'
+  | 'parse.done'
+  | 'parse.failed'
 
 export interface PipelineEvent {
   event: PipelineEventName

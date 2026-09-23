@@ -8,6 +8,7 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    PrimeBreadcrumb: typeof import('primevue/breadcrumb')['default']
     PrimeButton: typeof import('primevue/button')['default']
     PrimeCard: typeof import('primevue/card')['default']
     PrimeColumn: typeof import('primevue/column')['default']
@@ -17,12 +18,13 @@ declare module 'vue' {
     PrimeInputIcon: typeof import('primevue/inputicon')['default']
     PrimeInputNumber: typeof import('primevue/inputnumber')['default']
     PrimeInputText: typeof import('primevue/inputtext')['default']
+    PrimeMenu: typeof import('primevue/menu')['default']
     PrimeMessage: typeof import('primevue/message')['default']
     PrimeProgressSpinner: typeof import('primevue/progressspinner')['default']
     PrimeSelect: typeof import('primevue/select')['default']
     PrimeSelectButton: typeof import('primevue/selectbutton')['default']
-    PrimeTag: typeof import('primevue/tag')['default']
     PrimeTextarea: typeof import('primevue/textarea')['default']
+    PrimeToast: typeof import('primevue/toast')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
   }

@@ -8,6 +8,7 @@
 import type { PostingMeta } from '../../../../../shared/types'
 import { postingContext, requirePosting, now } from '../../../../utils/posting-route'
 import { putMeta } from '../../../../utils/postings'
+import { announce } from '../../../../utils/realtime'
 
 const REPORTABLE = ['building', 'done', 'failed'] as const
 
@@ -31,5 +32,10 @@ export default defineEventHandler(async (event): Promise<PostingMeta> => {
     updatedAt: stamp,
   }
   await putMeta(ctx.kv, next)
+  // `pack.done` here is the moment the phone is waiting for.
+  announce(event, `pack.${status}` as 'pack.building' | 'pack.done' | 'pack.failed', ctx.id, {
+    kind: 'apply', company: next.company, role: next.role, status: next.pack,
+    error: next.packError, artifacts: next.artifacts.length,
+  })
   return next
 })

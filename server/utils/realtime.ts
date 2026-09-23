@@ -72,7 +72,13 @@ export function announce(
  */
 export function commandWorkers(
   event: H3Event,
-  command: 'build-pack' | 'evaluate' | 'refresh',
+  command:
+    | 'build-pack'
+    | 'build-interview-pack'
+    | 'draft-answers'
+    | 'reparse-questions'
+    | 'evaluate'
+    | 'refresh',
   ids: { jobId?: string; id?: string } = {},
 ): void {
   const stub = hub(event)

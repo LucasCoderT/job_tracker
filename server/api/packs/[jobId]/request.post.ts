@@ -37,7 +37,7 @@ export default defineEventHandler(async (event): Promise<PackMeta> => {
   await putMeta(ctx.kv, counted)
   // Tell the UI immediately, and wake the Mac worker rather than making it
   // wait up to 20 minutes for its next poll.
-  announce(event, 'pack.requested', ctx.jobId, { company, position, status: 'requested' })
-  commandWorkers(event, 'build-pack', { jobId: ctx.jobId })
+  announce(event, 'pack.requested', ctx.jobId, { kind: 'interview', company, position, status: 'requested' })
+  commandWorkers(event, 'build-interview-pack', { jobId: ctx.jobId })
   return counted
 })

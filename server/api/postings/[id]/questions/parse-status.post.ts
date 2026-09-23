@@ -6,6 +6,7 @@
 import type { PostingQuestions, AnswerStatus } from '../../../../../shared/types'
 import { postingContext, requirePosting, now } from '../../../../utils/posting-route'
 import { getQuestions, putQuestions, putMeta, withQuestionCounts, ANSWER_STATUSES } from '../../../../utils/postings'
+import { announce, commandWorkers } from '../../../../utils/realtime'
 
 export default defineEventHandler(async (event): Promise<PostingQuestions> => {
   const ctx = postingContext(event)
@@ -27,5 +28,12 @@ export default defineEventHandler(async (event): Promise<PostingQuestions> => {
   }
   await putQuestions(ctx.kv, ctx.id, next)
   await putMeta(ctx.kv, withQuestionCounts({ ...meta, updatedAt: stamp }, next))
+  if (status === 'done' || status === 'failed') {
+    announce(event, `parse.${status}` as 'parse.done' | 'parse.failed', ctx.id, {
+      company: meta.company,
+      role: meta.role,
+      questions: next.questions.length,
+    })
+  }
   return next
 })

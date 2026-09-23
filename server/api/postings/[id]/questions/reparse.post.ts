@@ -13,6 +13,7 @@
 import type { PostingQuestions } from '../../../../../shared/types'
 import { postingContext, requirePosting, now } from '../../../../utils/posting-route'
 import { getQuestions, putQuestions, putMeta, withQuestionCounts } from '../../../../utils/postings'
+import { announce, commandWorkers } from '../../../../utils/realtime'
 
 export default defineEventHandler(async (event): Promise<PostingQuestions> => {
   const ctx = postingContext(event)
@@ -29,5 +30,7 @@ export default defineEventHandler(async (event): Promise<PostingQuestions> => {
   const next: PostingQuestions = { ...existing, parseStatus: 'requested', parseError: null, updatedAt: stamp }
   await putQuestions(ctx.kv, ctx.id, next)
   await putMeta(ctx.kv, withQuestionCounts({ ...meta, updatedAt: stamp }, next))
+  announce(event, 'parse.requested', ctx.id, { company: meta.company, role: meta.role })
+  commandWorkers(event, 'reparse-questions', { id: ctx.id })
   return next
 })

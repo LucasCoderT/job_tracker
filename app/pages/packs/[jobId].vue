@@ -26,6 +26,15 @@ const { data: stats } = await useStats()
 const { data: postingsData } = await useFetch<PostingsResponse>('/api/postings', { key: 'postings' })
 
 const meta = computed(() => data.value?.meta)
+
+/** A pack page open during its own build is the commonest case there is. */
+const packWaiting = computed(() => (isWaitingStatus(meta.value?.status) ? 1 : 0))
+const { refreshing: liveRefreshing } = useLiveRefresh({
+  refresh: () => Promise.all([refresh(), refreshIndex()]),
+  waiting: () => packWaiting.value > 0,
+  events: ['pack.requested', 'pack.building', 'pack.done', 'pack.failed'],
+  id: () => jobId.value,
+})
 const bank = computed(() => data.value?.bank ?? null)
 const lintIssues = computed(() => data.value?.lint ?? [])
 const { crumbs } = useTrail(() => [{ label: meta.value?.company || 'Pack' }], '/packs')
@@ -330,6 +339,7 @@ async function saveDetails() {
         <AppCrumbs :crumbs="crumbs" />
         <h1 v-if="meta">{{ meta.company }}<span v-if="meta.position" class="pos"> · {{ meta.position }}</span></h1>
         <h1 v-else>Pack</h1>
+        <LiveWaiting :count="packWaiting" :refreshing="liveRefreshing" :label="meta?.status === 'building' ? 'building' : 'queued to build'" />
       </div>
       <div v-if="meta" class="header-tools">
         <PrimeButton

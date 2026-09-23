@@ -9,6 +9,7 @@
 import type { PostingQuestions } from '../../../../../shared/types'
 import { postingContext, requirePosting, now } from '../../../../utils/posting-route'
 import { getQuestions, putQuestions, putMeta, withQuestionCounts } from '../../../../utils/postings'
+import { announce, commandWorkers } from '../../../../utils/realtime'
 
 const REPORTABLE = ['building', 'done', 'failed'] as const
 
@@ -36,5 +37,12 @@ export default defineEventHandler(async (event): Promise<PostingQuestions> => {
   }
   await putQuestions(ctx.kv, ctx.id, next)
   await putMeta(ctx.kv, withQuestionCounts({ ...meta, updatedAt: stamp }, next))
+  announce(event, `answers.${status}` as 'answers.building' | 'answers.done' | 'answers.failed', ctx.id, {
+    company: meta.company,
+    role: meta.role,
+    status,
+    answered: next.questions.filter((q) => q.answer.trim()).length,
+    questions: next.questions.length,
+  })
   return next
 })

@@ -13,6 +13,40 @@ const { refresh: refreshIndex } = usePostings()
 
 const meta = computed(() => data.value?.meta)
 
+/**
+ * The brief waits on more than a pack: a new posting has no evaluation yet, and
+ * that arrives from the eval worker rather than from anything he pressed. Both
+ * count as waiting, so the page fills itself in as each piece lands.
+ */
+const waitingHere = computed(() => {
+  const m = meta.value
+  if (!m) return 0
+  let n = 0
+  if (isWaitingStatus(m.pack)) n++
+  if (isWaitingStatus(m.answerStatus)) n++
+  if (isWaitingStatus(m.parseStatus)) n++
+  // An evaluation is only *pending* for a posting young enough to still be in
+  // the worker's sights. It runs hourly and skips anything under its score
+  // gate, so on an older posting "waiting to be evaluated" would be a badge
+  // that never clears — the Northbeam posting needed --id by hand today for
+  // exactly that reason.
+  if (!m.hasAnalysis && m.state === 'new' && Date.now() - Date.parse(m.createdAt) < 2 * 3600_000) n++
+  return n
+})
+const waitingLabel = computed(() => {
+  const m = meta.value
+  if (!m) return ''
+  if (isWaitingStatus(m.pack)) return m.pack === 'building' ? 'building your pack' : 'pack queued'
+  if (isWaitingStatus(m.answerStatus)) return 'drafting answers'
+  if (isWaitingStatus(m.parseStatus)) return 'Claude is re-reading the form'
+  return 'waiting to be evaluated'
+})
+const { refreshing: liveRefreshing, status: liveStatus } = useLiveRefresh({
+  refresh: () => Promise.all([refresh(), refreshIndex()]),
+  waiting: () => waitingHere.value > 0,
+  id: () => id.value,
+})
+
 // Back goes where he came from — the dashboard's "Worth a look", the postings
 // list, or a pack — rather than always to /postings. See useTrail.
 const { crumbs, parent } = useTrail(() => [{ label: meta.value?.company || 'Posting' }], '/postings')
@@ -486,6 +520,7 @@ function onPrimary() {
       <div class="brief-head">
         <AppCrumbs :crumbs="crumbs" />
         <h1 v-if="meta">{{ meta.company }}<span v-if="meta.role" class="pos"> · {{ meta.role }}</span></h1>
+        <LiveWaiting :count="waitingHere" :refreshing="liveRefreshing" :status="liveStatus" :label="waitingLabel" />
       </div>
       <div v-if="meta" class="brief-meta mono">
         <span v-if="meta.state !== 'new'" class="state-pill" :class="meta.state">

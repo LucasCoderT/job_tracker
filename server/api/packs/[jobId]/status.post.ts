@@ -36,7 +36,7 @@ export default defineEventHandler(async (event): Promise<PackMeta> => {
   // This is the one Lucas actually watches for: the pack finishing while the
   // phone is open.
   announce(event, `pack.${status}` as 'pack.building' | 'pack.done' | 'pack.failed', ctx.jobId, {
-    company: next.company, position: next.position, status: next.status, error: next.error,
+    kind: 'interview', company: next.company, position: next.position, status: next.status, error: next.error,
   })
   return next
 })

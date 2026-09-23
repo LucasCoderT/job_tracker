@@ -9,6 +9,7 @@
 import type { PostingMeta } from '../../../../../shared/types'
 import { postingContext, requirePosting, now } from '../../../../utils/posting-route'
 import { putMeta } from '../../../../utils/postings'
+import { announce, commandWorkers } from '../../../../utils/realtime'
 
 export default defineEventHandler(async (event): Promise<PostingMeta> => {
   const ctx = postingContext(event)
@@ -24,5 +25,9 @@ export default defineEventHandler(async (event): Promise<PostingMeta> => {
     updatedAt: stamp,
   }
   await putMeta(ctx.kv, next)
+  // This is the route the detail page's "Build pack" hits. Tell the UI, and
+  // wake the Mac so it starts now instead of on its next 20-minute poll.
+  announce(event, 'pack.requested', ctx.id, { kind: 'apply', company: next.company, role: next.role, status: 'requested' })
+  commandWorkers(event, 'build-pack', { id: ctx.id })
   return next
 })

@@ -17,6 +17,7 @@ import {
   mergePosting, cleanAnalysis, postingIdFor,
 } from '../../../utils/postings'
 import { MAX_JD, wantsCapture, captureForPosting, inBackground } from '../../../utils/jd-store'
+import { announce } from '../../../utils/realtime'
 
 export default defineEventHandler(async (event): Promise<PostingDetail> => {
   const ctx = postingContext(event)
@@ -66,10 +67,31 @@ export default defineEventHandler(async (event): Promise<PostingDetail> => {
     meta.hasAnalysis = existing?.hasAnalysis ?? false
   }
 
-  // `existing` opts this path into skipping the index write when nothing a
-  // queue or the notifier branches on has changed — which is every push, since
+  // `existing` opts this path into skipping the index write when the record is
+  // unchanged apart from its timestamp — which is most pushes, since
   // mergePosting will not let a producer touch state, pack or artifacts.
   await putMeta(ctx.kv, meta, existing)
+
+  // Tell the open pages, but only when this push actually brought something.
+  // The eval worker re-pushes the whole corpus after every run (173 records
+  // last time), and announcing each one would be a broadcast storm that says
+  // nothing — the page would refetch 173 times to render identical rows.
+  const gainedAnalysis = meta.hasAnalysis && !existing?.hasAnalysis
+  const gainedJD = meta.hasJD && !existing?.hasJD
+  const scoreMoved = existing != null && meta.score !== existing.score
+  if (gainedAnalysis || scoreMoved) {
+    announce(event, 'posting.evaluated', ctx.id, {
+      company: meta.company,
+      role: meta.role,
+      score: meta.score,
+    })
+  } else if (gainedJD || !existing) {
+    announce(event, existing ? 'posting.updated' : 'posting.created', ctx.id, {
+      company: meta.company,
+      role: meta.role,
+      score: meta.score,
+    })
+  }
   // No JD yet: fetch it from the posting after the response has gone, rather
   // than waiting for an evaluation that may never be run for this one.
   if (wantsCapture(meta)) inBackground(event, captureForPosting(ctx.env, ctx.kv, meta))

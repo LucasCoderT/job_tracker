@@ -23,6 +23,8 @@ export type PipelineEventName =
   | 'pack.requested' | 'pack.building' | 'pack.done' | 'pack.failed'
   | 'posting.created' | 'posting.updated' | 'posting.evaluated'
   | 'posting.state' | 'posting.applied' | 'posting.deleted'
+  | 'answers.requested' | 'answers.building' | 'answers.done' | 'answers.failed'
+  | 'parse.requested' | 'parse.done' | 'parse.failed'
   | 'hello' | 'pong'
 
 export interface PipelineEvent {

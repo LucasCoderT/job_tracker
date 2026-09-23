@@ -17,6 +17,26 @@ const { data, pending, error, refresh } = await useFetch<PostingQuestions>(
 
 const meta = computed(() => posting.value?.meta)
 
+/** Drafting and re-parsing are both agent round trips; watch for either. */
+const waitingHere = computed(() => {
+  const q = data.value
+  return (isWaitingStatus(q?.status) ? 1 : 0) + (isWaitingStatus(q?.parseStatus) ? 1 : 0)
+})
+/** Two different round trips can be outstanding, so say which. */
+const waitingLabel = computed(() => {
+  const drafting = isWaitingStatus(data.value?.status)
+  const reparsing = isWaitingStatus(data.value?.parseStatus)
+  if (drafting && reparsing) return 'drafting and re-reading'
+  return reparsing ? 'Claude is re-reading it' : 'drafting answers'
+})
+const { refreshing: liveRefreshing } = useLiveRefresh({
+  refresh,
+  waiting: () => waitingHere.value > 0,
+  events: ['answers.requested', 'answers.building', 'answers.done', 'answers.failed',
+           'parse.requested', 'parse.done', 'parse.failed'],
+  id: () => id.value,
+})
+
 const { crumbs } = useTrail(
   () => [{ label: meta.value?.company || 'Posting', to: `/postings/${id.value}` }, { label: 'Questions' }],
   '/postings',
@@ -247,6 +267,7 @@ const words = (s: string) => (s.trim() ? s.trim().split(/\s+/).length : 0)
         <h1 v-if="meta">
           Application questions<span class="pos"> · {{ meta.company }}</span>
         </h1>
+        <LiveWaiting :count="waitingHere" :refreshing="liveRefreshing" :label="waitingLabel" />
       </div>
       <div v-if="data" class="brief-meta mono">
         <span class="status-pill" :class="data.status">

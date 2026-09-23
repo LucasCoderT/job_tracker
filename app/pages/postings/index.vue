@@ -12,6 +12,19 @@ useHead({ title: 'Postings' })
 const { data, pending, error, refresh } = await useFetch<PostingsResponse>('/api/postings', { key: 'postings' })
 const postings = computed(() => data.value?.postings ?? [])
 
+/**
+ * Keep the list current while the Mac is working on anything in it, so a
+ * finished pack or a drafted set of answers appears without a reload. Polling
+ * runs only while at least one row is actually waiting — a list of settled
+ * postings costs nothing.
+ */
+const waitingCount = computed(() => postings.value.filter(postingIsWaiting).length)
+const { refreshing: liveRefreshing } = useLiveRefresh({
+  refresh,
+  waiting: () => waitingCount.value > 0,
+  id: () => undefined, // a listing wants every record's events, not one
+})
+
 const config = useRuntimeConfig()
 const notionUrl = computed(() => config.public.notionViewUrl)
 
@@ -385,6 +398,7 @@ function resetFilters() {
       <div>
         <NuxtLink to="/" class="crumb"><i class="pi pi-arrow-left" /> Pipeline</NuxtLink>
         <h1>Postings<span class="count mono">{{ postings.length }}</span></h1>
+        <LiveWaiting :count="waitingCount" :refreshing="liveRefreshing" />
       </div>
       <div class="header-tools">
         <PrimeButton

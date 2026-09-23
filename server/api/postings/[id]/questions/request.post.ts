@@ -10,6 +10,7 @@
 import type { PostingQuestions } from '../../../../../shared/types'
 import { postingContext, requirePosting, now } from '../../../../utils/posting-route'
 import { getQuestions, putQuestions, putMeta, withQuestionCounts } from '../../../../utils/postings'
+import { announce, commandWorkers } from '../../../../utils/realtime'
 
 export default defineEventHandler(async (event): Promise<PostingQuestions> => {
   const ctx = postingContext(event)
@@ -31,5 +32,14 @@ export default defineEventHandler(async (event): Promise<PostingQuestions> => {
   }
   await putQuestions(ctx.kv, ctx.id, next)
   await putMeta(ctx.kv, withQuestionCounts({ ...meta, updatedAt: stamp }, next))
+  announce(event, 'answers.requested', ctx.id, {
+    company: meta.company,
+    role: meta.role,
+    status: 'requested',
+    questions: next.questions.length,
+  })
+  // Same trade as Build pack: the socket makes it about a second instead of
+  // up to the worker's tick, and polling stays the fallback.
+  commandWorkers(event, 'draft-answers', { id: ctx.id })
   return next
 })

@@ -9,6 +9,17 @@ useHead({ title: 'Interview packs' })
 // `then` resolves to its own object, so the destructured helpers come back
 // undefined. Same trap as pages/postings/index.vue.
 const { data, pending, error, refresh } = await useFetch<PacksResponse>('/api/packs', { key: 'packs' })
+const packsWaiting = computed(() =>
+  (data.value?.packs ?? []).filter((p) => isWaitingStatus(p.status)).length,
+)
+const packsWaitingLabel = computed(() =>
+  packsWaiting.value === 1 ? '1 building' : `${packsWaiting.value} building`,
+)
+const { refreshing: liveRefreshing } = useLiveRefresh({
+  refresh,
+  waiting: () => packsWaiting.value > 0,
+  events: ['pack.requested', 'pack.building', 'pack.done', 'pack.failed'],
+})
 const packs = computed(() => data.value?.packs ?? [])
 
 // The gap list needs the tracker: which conversations are live right now.
@@ -212,6 +223,7 @@ const lede = computed(() => {
       <div>
         <NuxtLink to="/" class="crumb"><i class="pi pi-arrow-left" /> Pipeline</NuxtLink>
         <h1>Interview packs<span class="count mono">{{ packs.length }}</span></h1>
+        <LiveWaiting :count="packsWaiting" :refreshing="liveRefreshing" :label="packsWaitingLabel" />
       </div>
       <PrimeButton label="Build a pack" icon="pi pi-plus" size="small" @click="startNew" />
     </header>
