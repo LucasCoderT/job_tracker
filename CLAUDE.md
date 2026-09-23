@@ -844,6 +844,27 @@ page that, unlike the last one, can actually be read.
 End to end on an Indeed link given a company and role: employer req resolved, JD
 captured from Greenhouse, 9,402 characters, `jdSource: greenhouse`.
 
+**Two things the first real posting through this broke** (his Indeed link, which
+turned out to be Northbeam — Software Engineer, Python):
+
+- **The evaluation worker's JD ladder skipped the site.** It ran live URL →
+  local archive → report prose → Notion, and the JD the site already holds was
+  on no rung. So a posting carrying 4,543 pasted characters sent an agent to
+  fetch the one source that cannot be read. He pastes a JD *precisely* when the
+  source refuses to be read, which makes the stored copy the only copy in
+  exactly the case the ladder handled worst. It is rung zero now, passed inline
+  in the prompt — no tool call, and it cannot 403. The worker reads it from
+  `GET /api/postings/:id` rather than trusting the listing's `hasJD`, which lags
+  a JD that arrived in the last hour.
+- **career-ops read a tool's 429 as Claude's usage limit.** `LIMIT_RE` matched a
+  bare "rate limit" / "too many requests" against Claude's whole stdout, most of
+  which is the agent's own prose. An evaluation narrating an MCP connector
+  refusing it declared a global limit: every background job paused and his phone
+  got a push saying Claude was out, twice in one day. Phrasing cannot separate
+  the two — the agent quotes the same words — but position can: a real limit
+  ends the run, so the notice is the tail of the output. See `looksLimited` in
+  career-ops's `claude-limits.mjs`.
+
 **Left alone deliberately:** `url-key.mjs` does not strip `from=`, so the same
 Indeed job shared from the app and from the web are two ids. Stripping generic
 param names globally is what that file explicitly refuses to do — they are
@@ -1186,6 +1207,26 @@ traffic: ~1,800 reads/day and almost no list requests. The listing also got
 Verified on production against real data: `/api/postings` and `/api/packs`
 match `?fresh=1` byte-for-byte, and create/update/delete all reach the index
 immediately.
+
+**The index once dropped the fields its consumers read (2026-09-23).** Skipping
+the index write when nothing "significant" changed halved the cost of a producer
+push, and the significant list was `state`, `pack`, the queue fields and
+`notionPageId` — on the reasoning that company, role, score and `employerUrl`
+only change what a row looks like.
+
+The listing is not a view. It is the API every desktop worker reads: the
+evaluation worker builds its prompt from `company` and `role`, liveness and JD
+capture fetch `employerUrl`, and capture skips on `hasJD`. All four were in the
+"merely displays" half. A posting corrected from `indeed.com / ?` to Northbeam /
+Software Engineer, Python was still `indeed.com — ?` to the eval worker twenty
+minutes later, which sent it to fetch the Indeed URL it had just been told to
+stop using — and a correction made on a phone looked like it had not registered.
+
+Inverted: **patch unless the record is identical apart from `updatedAt`.** The
+saving stays where it was actually earned, the eval worker's ~72 no-op pushes a
+day, which `mergePosting` already refuses to let change anything. Values are
+compared as JSON, not by identity, or `mergePosting` rebuilding `artifacts`
+would report a change on every push and cost the saving entirely.
 
 **A KV trap this re-confirmed:** a `get` by exact key is read-your-own-writes
 in the same colo but is edge-cached ~60s elsewhere, so a record read back
