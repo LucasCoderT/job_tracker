@@ -1,6 +1,6 @@
 # Job Pipeline
 
-A private, single-page dashboard for Lucas's Notion job-tracker database ("DB Applications"): Sankey pipeline view, response rate, interview rate, and offer rate. Notion remains the source of truth; this Worker only reads and aggregates.
+A private, single-page dashboard for Lucas's Notion job-tracker database ("DB Applications"): a conversion strip that names where the process leaks, response/interview/offer rates, weekly velocity, and reply rate by source. Notion remains the source of truth, and the app is read-mostly on top of it.
 
 Auth is handled by Cloudflare Access (Zero Trust) in front of the Worker, so nothing here is publicly reachable and the Worker itself contains no auth code.
 
@@ -23,7 +23,7 @@ The Worker is adapted to the current schema — no changes required:
 ### How the funnel is derived
 
 - **Progressing** is the interviewing stage (node label matches your term).
-- **Applied** rows older than `STALE_DAYS` (default 30) count as **No Answer**; fresher ones are **Awaiting Reply**. With your current data: 70 stale / 33 awaiting.
+- **Applied** rows older than `STALE_DAYS` (default 30) count as **No Answer**; fresher ones are **Awaiting Reply**.
 - **Response rate** = any human reply (Rejected + Progressing + offers) / total.
 - **Interview rate** = Progressing + offers (+ post-interview rejections) / total.
 - **Offer rate** = offers / total.
@@ -42,8 +42,8 @@ The Worker is adapted to the current schema — no changes required:
 ## 3. Deploy the Worker
 
 ```bash
-cd job-pipeline
-npm install -g wrangler   # if you don't have it
+cd job_tracker
+npm install
 wrangler login
 
 # Set your custom domain in wrangler.toml first (routes → pattern),
@@ -51,8 +51,13 @@ wrangler login
 
 wrangler secret put NOTION_TOKEN         # paste the integration secret
 wrangler secret put NOTION_DATABASE_ID   # paste the database ID
-wrangler deploy
+
+npm run deploy   # nuxt build (cloudflare_module preset) && wrangler deploy
 ```
+
+`npm run deploy` is the one to use. `wrangler deploy` on its own ships whatever
+is already in `.output/`, so without a build first it will happily redeploy the
+last one.
 
 Optionally set `NOTION_VIEW_URL` in `wrangler.toml` to your Job Application Tracker page URL to get an "Open board in Notion" link in the header. `STALE_DAYS` (default 30) controls when an unanswered application counts as "No Answer".
 
@@ -82,15 +87,92 @@ Access injects a signed JWT (`Cf-Access-Jwt-Assertion`) on every request. Since 
 - Zero Trust free plan: 50 users; you need 1.
 
 
-## v2 features
+## What's on the dashboard
 
-- **Needs attention** — a strip at the top surfacing rows with `Next Action = Follow up` plus Awaiting rows aged 10+ days (the "old enough to nudge, not yet ghosted" window). Follow-ups first, then oldest first. Cards link to the Notion page.
-- **Velocity** — applications per week (from Application Date) with the eventually-got-a-reply portion overlaid. Hover any week for numbers.
-- **Reply rate by source** — Reference Link domains bucketed (ca.indeed.com → indeed.com), top 6 by volume plus "other", each showing reply rate. This is the resume-hours-allocation chart.
-- **Kanban search** — filters cards by company/position; column badges show matched/total while filtering.
-- **Daily snapshots (optional)** — a cron trigger writes daily counts+metrics to KV so trends (response rate over time, pipeline composition) can be charted later; Notion alone can't reconstruct history because statuses mutate in place. Setup: `wrangler kv namespace create SNAPSHOTS`, paste the id into the commented block in `wrangler.toml`, redeploy. `/api/history` returns the accumulated series. Without the binding, everything else works and snapshots are skipped.
+- **Conversion strip** — the step rate between stages, which names the bottleneck
+  outright, over a bar showing where applications are sitting right now. This
+  replaced the Sankey: the Sankey showed where everything went but never
+  answered where the process leaks, and at 360px wide its labels rendered at
+  about 5px.
+- **Needs attention** — rows with `Next Action = Follow up`, plus Awaiting rows
+  aged 10+ days, which is the old-enough-to-nudge-but-not-yet-ghosted window.
+  Follow-ups first, then oldest first.
+- **Velocity** — applications per week from Application Date, with the
+  eventually-got-a-reply portion overlaid.
+- **Reply rate by source** — Reference Link domains bucketed (ca.indeed.com
+  becomes indeed.com), top few by volume plus "other". This is the
+  where-do-the-hours-go chart.
+- **Roles and salary context** — what the applications actually were, and what
+  they were paying.
+- **Board and table** — two views of the same rows with one search box driving
+  both, and column badges showing matched/total while a filter is active.
+- **Daily snapshots** — a cron writes the day's counts and metrics to KV, which
+  is the only reason any trend line exists. Notion mutates statuses in place, so
+  once a row flips the earlier state is gone and history cannot be
+  reconstructed from it. `/api/history` returns the accumulated series.
 
-## Files
+## Architecture
 
-- `src/index.js` — the whole app: Notion query, aggregation, dashboard HTML
-- `wrangler.toml` — Worker config (set your custom domain here)
+**Nuxt 4 + Nitro, built with the `cloudflare_module` preset into a single ESM
+Worker.** Aggregation happens server-side; the client is sent only the shapes it
+needs and never a raw Notion payload.
+
+```
+Browser ─► Cloudflare Access ─► Worker (Nitro) ─► Notion API
+                                   │
+                                   ├─ GET /              SSR dashboard
+                                   ├─ GET /api/stats     aggregated JSON, edge-cached
+                                   ├─ GET /api/history   daily snapshots from KV
+                                   ├─ /api/packs/**      interview packs (PACKS KV)
+                                   ├─ /api/postings/**   job postings (POSTINGS KV)
+                                   └─ scheduledTask      daily cron snapshot → KV
+```
+
+A single `PipelineHub` Durable Object is the realtime spine. Workers are
+stateless and cannot hold a WebSocket open, and a DO is the only primitive on
+the platform that can, so anything the page needs pushed to it goes through
+there.
+
+## Layout
+
+```
+nuxt.config.ts     cloudflare_module preset, scheduledTasks (cron), security headers
+wrangler.toml      custom domain, workers_dev=false, KV, cron, vars, Durable Object
+theme/             PrimeVue preset, so the component library matches the bespoke dataviz
+shared/            types, bank helpers, pipeline ladder — imported by both server and app
+server/
+  utils/aggregate.ts   the core fold behind /api/stats
+  utils/notion.ts      property readers, pagination, env access
+  utils/mock.ts        fake Notion pages, so the whole path runs with no token
+  durable/             PipelineHub
+  api/                 stats, history, snapshot, packs, postings, jobs, ei
+app/
+  pages/               dashboard, packs, postings
+  components/          ConversionStrip, StatCard, VelocityChart, SourcesBreakdown,
+                       RolesBreakdown, SalaryContext, TrackerSection, PostingsPreview
+  composables/         useStats, useTooltip, usePacks
+scripts/               JD capture and reconcile, plus the launchd plists that run them
+src/index.js           the v1/v2 Worker, kept for reference. Not part of the build.
+```
+
+`src/index.js` used to be the entire app: Worker logic plus the whole frontend
+in a `PAGE_HTML` template string, no build step. v3 moved to Nuxt 4 and
+TypeScript and kept the same Cloudflare and Access deploy model. It is still in
+the repo because the imperative version is occasionally worth looking at, but
+nothing imports it.
+
+## Local development
+
+```bash
+npm install
+npm run dev
+```
+
+With no `NOTION_TOKEN` in the environment, `server/utils/mock.ts` supplies fake
+Notion pages shaped exactly like the real query results, so the whole
+aggregate → `/api/stats` → dashboard path runs offline. Dates are computed
+relative to now, so the Awaiting-vs-No-Answer cutoff and the weekly series
+populate realistically.
+
+Note that a `.env` with a real `NOTION_TOKEN` will be picked up and you will be
+looking at live data instead.
