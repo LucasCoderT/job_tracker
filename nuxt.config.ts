@@ -43,8 +43,16 @@ export default defineNuxtConfig({
       meta: [
         { charset: 'utf-8' },
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+        // The app is dark-only (htmlAttrs class: 'dark'), so one value is right.
+        { name: 'theme-color', content: '#141416' },
       ],
       link: [
+        // SVG first so browsers that support it skip the raster fallbacks.
+        { rel: 'icon', href: '/icons/favicon.svg', type: 'image/svg+xml' },
+        { rel: 'icon', href: '/icons/favicon-32.png', sizes: '32x32', type: 'image/png' },
+        { rel: 'icon', href: '/icons/favicon-16.png', sizes: '16x16', type: 'image/png' },
+        { rel: 'apple-touch-icon', href: '/icons/apple-touch-icon.png' },
+        { rel: 'manifest', href: '/icons/site.webmanifest' },
         { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
         { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' },
         {
