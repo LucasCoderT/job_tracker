@@ -473,6 +473,7 @@ and take the CV builds down with it.
 Routes (`server/api/postings/`): `GET /` list · `GET /queue`
 requested+building, FIFO · `GET|PUT|DELETE /:id` · `POST /:id/state` ·
 `POST /:id/pack` · `POST /:id/pack/status` · `POST /:id/applied` ·
+`POST /:id/evaluate` · `POST /:id/evaluate/status` ·
 `GET|PUT|DELETE /:id/artifacts/:name` · `GET|PUT /:id/questions` ·
 `POST /:id/questions/request` · `POST /:id/questions/status` ·
 `PUT /:id/questions/:qid` · `GET /questions/queue`.
@@ -613,6 +614,42 @@ permanently spent. Only a paid plan (account-based on the hosted service) or
 self-hosting would fix it. If either ever happens, move the send into the
 `status` routes and delete the launchd agent — the Worker knows the moment work
 lands, with no polling and no dependency on the Mac being awake.
+
+### Re-evaluate, from the brief (2026-09-26)
+
+The eval worker drains postings *without a valid evaluation*, so a posting that
+has one is invisible to it and could never be re-read — wrong whenever the inputs
+changed underneath it. Two cases in one week: an evaluation written from no JD at
+all, and one that scored a stub before the company and role were known. Both
+needed `--id` typed on the Mac.
+
+`POST /:id/evaluate` (request) · `POST /:id/evaluate/status` (the Mac reporting).
+`evalStatus` on the meta does three jobs, which is why it is a field and not an
+inference from `hasAnalysis`:
+
+- **It is the signal the worker cannot derive.** "Has a valid evaluation" is the
+  very condition that blocked re-evaluating, so the request must say so outright.
+- **It is the queue.** `commandWorkers` is the fast path; the field is what makes
+  a request survive the Mac being asleep, read from the listing the worker
+  already fetches. A requested posting bypasses the settled-state filter and the
+  score floor and is queued even when its report validates — every one of those
+  gates exists to stop the worker spending runs on things nobody asked about, and
+  none of that reasoning survives him asking. It also sorts to the head of the
+  tick, which is only three long.
+- **It is what keeps the notifier's rule intact.** Background evaluations stay
+  unannounced; `evalStatus` only leaves `none` when a button was pressed, so the
+  new watcher needs no special case.
+
+Refusals worth keeping: a second tap is 409 rather than a bumped timestamp that
+looks like a fresh start, and `done` is refused unless an analysis is stored —
+which forces the worker to report `done` *after* `push-postings`, since the report
+exists on disk before anything uploads it. A usage limit leaves the request
+`building` on purpose so it is retried when the limit lifts.
+
+**It never deletes the existing evaluation.** The worker replaces the report in
+place and the brief goes on showing what he has, so a failed run costs nothing.
+The dialog says so, and warns when no JD is stored, because a re-evaluation
+without one is weaker than the pass it would replace.
 
 ### The pages watch too (2026-09-23)
 
