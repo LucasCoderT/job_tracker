@@ -25,6 +25,7 @@ const waitingHere = computed(() => {
   if (isWaitingStatus(m.pack)) n++
   if (isWaitingStatus(m.answerStatus)) n++
   if (isWaitingStatus(m.parseStatus)) n++
+  if (isWaitingStatus(m.evalStatus)) n++
   // An evaluation is only *pending* for a posting young enough to still be in
   // the worker's sights. It runs hourly and skips anything under its score
   // gate, so on an older posting "waiting to be evaluated" would be a badge
@@ -36,6 +37,7 @@ const waitingHere = computed(() => {
 const waitingLabel = computed(() => {
   const m = meta.value
   if (!m) return ''
+  if (isWaitingStatus(m.evalStatus)) return m.evalStatus === 'building' ? 're-evaluating' : 're-evaluation queued'
   if (isWaitingStatus(m.pack)) return m.pack === 'building' ? 'building your pack' : 'pack queued'
   if (isWaitingStatus(m.answerStatus)) return 'drafting answers'
   if (isWaitingStatus(m.parseStatus)) return 'Claude is re-reading the form'
@@ -91,6 +93,36 @@ async function act(key: string, run: () => Promise<unknown>, after?: () => void)
   } finally {
     busy.value = ''
   }
+}
+
+/**
+ * Ask for a fresh evaluation.
+ *
+ * Needed because the worker only drains postings *without a valid evaluation*,
+ * so a posting that already has one can never be re-read on its own — which is
+ * wrong whenever the inputs changed underneath it. Both cases happened this
+ * week: an evaluation written from no JD at all, and one that scored a stub
+ * before the company and role were known.
+ */
+const reEvalOpen = ref(false)
+const reEvalNote = ref('')
+/** Queued or running, so the button disables itself rather than double-queueing. */
+const evalWaiting = computed(() => isWaitingStatus(meta.value?.evalStatus))
+/** A re-evaluation with no JD stored is much weaker; the dialog says so. */
+const hasJD = computed(() => Boolean(jd.value))
+const reEvaluate = () => {
+  reEvalOpen.value = false
+  return act(
+    'eval',
+    () => $fetch(`/api/postings/${id.value}/evaluate`, { method: 'POST', body: { note: reEvalNote.value } }),
+    () => {
+      reEvalNote.value = ''
+      notice.value = {
+        text: 'Queued. The Mac re-reads the JD and replaces the evaluation here when it is done.',
+        severity: 'success',
+      }
+    },
+  )
 }
 
 const buildPack = () => {
@@ -873,6 +905,22 @@ function onPrimary() {
           <button v-if="notionHref" type="button" class="linkish notion-sync" :disabled="busy === 'notion'" @click="syncNotion">
             <i :class="busy === 'notion' ? 'pi pi-spin pi-spinner' : 'pi pi-sync'" /> Update Notion page
           </button>
+
+          <!-- Re-evaluate. Secondary on purpose: it spends a Claude run and the
+               brief already shows an evaluation, so it is the thing you reach
+               for when the inputs changed, not the default action. -->
+          <button
+            type="button"
+            class="linkish notion-sync"
+            :disabled="busy === 'eval' || evalWaiting"
+            @click="reEvalOpen = true"
+          >
+            <i :class="busy === 'eval' || evalWaiting ? 'pi pi-spin pi-spinner' : 'pi pi-sparkles'" />
+            {{ evalWaiting ? (meta.evalStatus === 'building' ? 'Re-evaluating…' : 'Re-evaluation queued') : meta.hasAnalysis ? 'Re-evaluate' : 'Evaluate now' }}
+          </button>
+          <p v-if="meta.evalError" class="faint small eval-error">
+            Last re-evaluation failed: {{ meta.evalError }}
+          </p>
         </aside>
 
         <!-- The posting itself. Its own grid child rather than part of the
@@ -958,6 +1006,49 @@ function onPrimary() {
             :severity="hardStops.length ? 'warning' : undefined"
             :loading="busy === 'pack'"
             @click="buildPack"
+          />
+        </template>
+      </PrimeDialog>
+
+      <PrimeDialog
+        v-model:visible="reEvalOpen"
+        modal
+        :header="meta.hasAnalysis ? 'Re-evaluate this posting' : 'Evaluate this posting'"
+        :style="{ width: 'min(520px, calc(100vw - 32px))' }"
+      >
+        <div class="build-dialog">
+          <p class="muted small">
+            The Mac re-reads the job description and writes a fresh A–G report, replacing the
+            existing one in place. Usually a few minutes, and you get a notification.
+          </p>
+          <p v-if="meta.hasAnalysis" class="muted small">
+            The evaluation below stays exactly as it is until the new one lands, so nothing is
+            lost if the run fails.
+          </p>
+          <p v-if="!hasJD" class="build-stops">
+            <span class="build-stops-head"><i class="pi pi-exclamation-triangle" /> There is no job description stored</span>
+            <br>
+            Without one the evaluation is written from the report and the Notion row, which is
+            weaker than the first pass had. Paste the JD first if you have it.
+          </p>
+          <label>
+            <span>What changed? <small>optional</small></span>
+            <PrimeTextarea
+              v-model="reEvalNote"
+              rows="4"
+              placeholder="e.g. the JD was pasted after the first pass, or the comp changed…"
+              autocomplete="off"
+            />
+          </label>
+        </div>
+        <template #footer>
+          <PrimeButton label="Cancel" severity="secondary" text size="small" @click="reEvalOpen = false" />
+          <PrimeButton
+            :label="meta.hasAnalysis ? 'Re-evaluate' : 'Evaluate'"
+            icon="pi pi-sparkles"
+            size="small"
+            :loading="busy === 'eval'"
+            @click="reEvaluate"
           />
         </template>
       </PrimeDialog>

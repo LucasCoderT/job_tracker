@@ -39,8 +39,14 @@ export function postingIsWaiting(p: {
   pack?: string
   answerStatus?: string
   parseStatus?: string
+  evalStatus?: string
 }): boolean {
-  return isWaitingStatus(p.pack) || isWaitingStatus(p.answerStatus) || isWaitingStatus(p.parseStatus)
+  return (
+    isWaitingStatus(p.pack) ||
+    isWaitingStatus(p.answerStatus) ||
+    isWaitingStatus(p.parseStatus) ||
+    isWaitingStatus(p.evalStatus)
+  )
 }
 
 export interface LiveRefreshOptions {

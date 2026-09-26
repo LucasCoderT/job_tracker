@@ -387,6 +387,28 @@ export interface PostingMeta {
    * per posting that has ever had questions.
    */
   parseStatus?: AnswerStatus
+
+  /**
+   * A re-evaluation he asked for, as opposed to one the worker got to on its
+   * own. The distinction is the whole reason this field exists rather than
+   * being inferred from `hasAnalysis`:
+   *
+   * - The worker evaluates anything lacking a *valid* evaluation, so a posting
+   *   that already has one is invisible to it. Re-evaluating therefore needs an
+   *   explicit signal, or the request is silently dropped.
+   * - It is also what makes the request survive the Mac being asleep. The
+   *   WebSocket command is the fast path; this field is the queue, read from
+   *   the listing the worker already fetches.
+   * - And it is what makes notifying correct. Background evaluations are
+   *   deliberately not announced (the worker grinds the whole backlog three at
+   *   a time, which would be a stream of alerts for work he never asked for).
+   *   One he pressed a button for is exactly the thing worth telling him about.
+   */
+  evalStatus?: AnswerStatus
+  evalRequestedAt?: string | null
+  evalError?: string | null
+  /** Optional steer for the re-evaluation, e.g. "the comp changed". */
+  evalNote?: string
   artifacts: PostingArtifact[]
   createdAt: string
   updatedAt: string

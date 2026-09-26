@@ -521,6 +521,14 @@ export function mergePosting(id: string, existing: PostingMeta | null, body: any
     answered: existing?.answered ?? 0,
     answerStatus: existing?.answerStatus ?? 'none',
     parseStatus: existing?.parseStatus ?? 'none',
+    // A re-evaluation he asked for is progress, not producer data. The eval
+    // worker clears it through the dedicated status route once it has finished,
+    // never by pushing the report — otherwise the push that carries the new
+    // analysis would also erase the record of having been asked.
+    evalStatus: existing?.evalStatus ?? 'none',
+    evalRequestedAt: existing?.evalRequestedAt ?? null,
+    evalError: existing?.evalError ?? null,
+    evalNote: existing?.evalNote ?? '',
 
     hasJD: has('jd') ? Boolean(str(body.jd, 200_000)) : (existing?.hasJD ?? false),
     hasAnalysis: has('analysis') ? Boolean(body.analysis) : (existing?.hasAnalysis ?? false),

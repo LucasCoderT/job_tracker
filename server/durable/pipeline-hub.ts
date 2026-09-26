@@ -64,6 +64,11 @@ export type PipelineEventName =
   | 'parse.requested'
   | 'parse.done'
   | 'parse.failed'
+  // A re-evaluation he asked for. Background evaluations stay unannounced.
+  | 'eval.requested'
+  | 'eval.building'
+  | 'eval.done'
+  | 'eval.failed'
 
 export interface PipelineEvent {
   event: PipelineEventName

@@ -184,6 +184,40 @@ const WATCHERS = [
     }),
   },
   {
+    /**
+     * Re-evaluations he asked for — and only those.
+     *
+     * Background evaluations stay unwatched deliberately: the worker grinds the
+     * whole backlog three at a time, so announcing them would be a stream of
+     * alerts for work he never asked for. `evalStatus` only leaves 'none' when
+     * a button was pressed, which is what makes this watcher safe to add
+     * without breaking that rule.
+     */
+    ns: 'evaluations',
+    label: 're-evaluation',
+    rows: async () => (await site('/api/postings')).postings ?? [],
+    id: (p) => p.id,
+    finished: (p) => p.evalStatus === 'done' || p.evalStatus === 'failed',
+    // The score is what he is waiting to see, so a re-evaluation that lands on
+    // the same number still counts as news — the request passes through
+    // 'requested', which drops the key out of the watched set and makes its
+    // return new regardless.
+    stamp: (p) => `${p.evalStatus}@${p.evalRequestedAt || ''}`,
+    ok: (p) => p.evalStatus === 'done',
+    note: (p) => ({
+      title: `Re-evaluated: ${p.company}`,
+      message: `${p.company}${p.role ? ` — ${p.role}` : ''}\nNow scoring ${p.score ?? '—'}/5. Fresh evaluation ready to read.`,
+      tags: ['mag'],
+      click: `${BASE}/postings/${p.id}?from=/`,
+    }),
+    failure: (p) => ({
+      title: `Re-evaluation failed: ${p.company}`,
+      message: `${p.company}${p.role ? ` — ${p.role}` : ''}\n${p.evalError || 'The Mac could not re-evaluate it.'}`,
+      tags: ['warning'],
+      click: `${BASE}/postings/${p.id}?from=/`,
+    }),
+  },
+  {
     ns: 'interview',
     label: 'interview pack',
     rows: async () => (await site('/api/packs')).packs ?? [],

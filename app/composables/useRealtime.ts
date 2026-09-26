@@ -25,6 +25,7 @@ export type PipelineEventName =
   | 'posting.state' | 'posting.applied' | 'posting.deleted'
   | 'answers.requested' | 'answers.building' | 'answers.done' | 'answers.failed'
   | 'parse.requested' | 'parse.done' | 'parse.failed'
+  | 'eval.requested' | 'eval.building' | 'eval.done' | 'eval.failed'
   | 'hello' | 'pong'
 
 export interface PipelineEvent {

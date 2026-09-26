@@ -1281,3 +1281,6 @@ a.rail-primary.as-link:hover { background: #d9bd71; border-color: #d9bd71; color
   0%, 100% { opacity: 1; transform: scale(1); }
   50%      { opacity: .35; transform: scale(.82); }
 }
+
+/* A failed re-evaluation says why, under the button that started it. */
+.eval-error { margin: 4px 0 0; color: var(--amber); line-height: 1.35; }
