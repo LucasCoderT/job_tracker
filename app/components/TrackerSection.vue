@@ -12,6 +12,9 @@ const props = defineProps<{
 
 // Pack state per row (one shared request; see usePacks).
 const { byJob: packs } = usePacks()
+// Which application came from which posting, so a row can open its brief
+// rather than Notion. Same shared request the header badge already makes.
+const { byNotionPage: postings } = usePostings()
 
 // ---- Rejected / moved on a round ----
 //
@@ -186,6 +189,7 @@ const filters = computed(() =>
         :jobs="filtered"
         :searching="searching"
         :packs="packs"
+        :postings="postings"
         :busy-id="busyId"
         @status="openStatusMenu"
       />
@@ -193,6 +197,7 @@ const filters = computed(() =>
         v-else
         :jobs="filtered"
         :packs="packs"
+        :postings="postings"
         :buckets="buckets"
         :stale-days="staleDays"
         :busy-id="busyId"

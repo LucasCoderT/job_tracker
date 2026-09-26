@@ -1,15 +1,39 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { Bucket, Job, PackMeta } from '../../shared/types'
+import type { Bucket, Job, PackMeta, PostingMeta } from '../../shared/types'
 
 const props = defineProps<{
   jobs: Job[]
   packs: Map<string, PackMeta>
+  /** Notion page id -> the posting it came from. Partial by nature. */
+  postings: Map<string, PostingMeta>
   buckets: Bucket[]
   staleDays: number
   busyId: string | null
 }>()
 const emit = defineEmits<{ status: [event: MouseEvent, job: Job] }>()
+
+/**
+ * Where a row goes when clicked.
+ *
+ * The posting brief, when the site knows which posting this application came
+ * from — it now carries the Notion link itself, plus the evaluation, the JD,
+ * the built files and the questions, so going out to Notion first was a step
+ * backwards through the better page.
+ *
+ * Only a linked posting has a `notionPageId` (set by "Mark applied" here, or by
+ * the reconcile job's exact-match rules), so plenty of older rows have none.
+ * Those keep the Notion link exactly as before: a row that cannot reach a brief
+ * must not lose the link it had.
+ */
+function linkProps(job: Job) {
+  const posting = props.postings.get(job.id)
+  if (posting) return { to: `/postings/${posting.id}` }
+  return job.url
+    ? { to: job.url, external: true, target: '_blank', rel: 'noopener' }
+    : { to: '#' }
+}
+
 
 const BUCKET_LABEL: Record<string, string> = {
   awaiting: 'Awaiting',
@@ -74,7 +98,7 @@ const rows = computed(() =>
 
       <PrimeColumn field="company" header="Company" sortable>
         <template #body="{ data }">
-          <a v-if="data.url" class="tbl-link" :href="data.url" target="_blank" rel="noopener">{{ data.company }}</a>
+          <NuxtLink v-if="data.url || postings.get(data.id)" class="tbl-link" v-bind="linkProps(data)">{{ data.company }}</NuxtLink>
           <span v-else class="tbl-link">{{ data.company }}</span>
           <div v-if="data.position" class="tbl-sub">{{ data.position }}</div>
         </template>

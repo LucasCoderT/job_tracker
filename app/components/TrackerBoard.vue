@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import type { Bucket, Job, PackMeta } from '../../shared/types'
+import type { Bucket, Job, PackMeta, PostingMeta } from '../../shared/types'
 
 // Board view. Search, the status filter and the section header live in
 // TrackerSection, which passes an already-filtered `jobs` set.
@@ -9,8 +9,32 @@ const props = defineProps<{
   jobs: Job[]
   searching: boolean
   packs: Map<string, PackMeta>
+  /** Notion page id -> the posting it came from. Partial by nature. */
+  postings: Map<string, PostingMeta>
   busyId: string | null
 }>()
+
+/**
+ * Where a row goes when clicked.
+ *
+ * The posting brief, when the site knows which posting this application came
+ * from — it now carries the Notion link itself, plus the evaluation, the JD,
+ * the built files and the questions, so going out to Notion first was a step
+ * backwards through the better page.
+ *
+ * Only a linked posting has a `notionPageId` (set by "Mark applied" here, or by
+ * the reconcile job's exact-match rules), so plenty of older rows have none.
+ * Those keep the Notion link exactly as before: a row that cannot reach a brief
+ * must not lose the link it had.
+ */
+function linkProps(job: Job) {
+  const posting = props.postings.get(job.id)
+  if (posting) return { to: `/postings/${posting.id}` }
+  return job.url
+    ? { to: job.url, external: true, target: '_blank', rel: 'noopener' }
+    : { to: '#' }
+}
+
 // The status menu lives in TrackerSection; a card only says which job.
 const emit = defineEmits<{ status: [event: MouseEvent, job: Job] }>()
 
@@ -90,11 +114,11 @@ const columns = computed(() =>
           >
             <i :class="busyId === job.id ? 'pi pi-spin pi-spinner' : 'pi pi-ellipsis-v'" />
           </button>
-          <a class="card-main" :href="job.url || '#'" target="_blank" rel="noopener">
+          <NuxtLink class="card-main" v-bind="linkProps(job)">
             <p class="co">{{ job.company }}</p>
             <p v-if="job.position" class="role">{{ job.position }}</p>
             <p v-if="whenText(job)" class="when mono">{{ whenText(job) }}</p>
-          </a>
+          </NuxtLink>
           <PackChip :job="job" :pack="packs.get(job.id)" />
         </div>
       </div>
