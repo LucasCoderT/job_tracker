@@ -1235,6 +1235,43 @@ at and Notion carries the employer's own URL he applied through — different
 URLs, different ids. That gap is the same one the direct-to-employer resolver
 is meant to close; until it exists, the title match is carrying the drift.
 
+## A tracker row with nowhere to go (2026-09-29)
+
+The board and table link to the posting brief and fall back to Notion when the
+site has no posting for that application. The fallback was firing on **95 of 221
+applications**, and on the default "In conversation" board it was 3 of 5 cards —
+so the feature read as broken from the only view he looks at.
+
+The cause was not a strict matcher. **90 of the 95 had no posting record at
+all**, because they were applied to on the employer's own careers page, which is
+the channel that converts and the one the site never hears about. Only 5 had a
+posting sitting unlinked, and those 5 are the argument for the conservative
+rule rather than against it: four were *different roles at the same company*
+(Wealthsimple's Business Banking req against its AI Platform req; Wave HQ's Full
+Stack II against a Machine Learning req). Linking any of them would file an
+application against a job he never applied to. Exactly one — Stantec — was the
+same job, its Notion title differing only by "(Edmonton in-office)".
+
+`scripts/backfill-postings-from-notion.mjs` runs the direction reconcile cannot:
+Notion -> posting, creating the record from Company, Position and the Job
+Posting URL, then linking it so it lands as `applied`.
+
+- **Scope is narrow on purpose**: in conversation, or applied in the last 60
+  days. A posting for a job that closed in March is a dead URL with nothing to
+  say, and 90 of them would be noise in the one listing that exists to say what
+  to apply to. The rows he clicks are the live ones.
+- **No Job Posting URL, no posting** — the id is `sha256(normalizeUrl(url))`, so
+  a row without a URL has no key. Surpass is the standing example: it stays on
+  the Notion fallback until that field is filled in.
+- **A URL another application already owns is skipped, never stolen.** Two Notion
+  rows sharing one job-posting URL resolve to one id; the row that claimed it
+  first is usually the right one. Reported as a skip so a re-run does not read
+  as a failure.
+- **Not scheduled.** It creates records, and that stays a decision.
+
+Result: board cards reaching a brief went from 2 of 5 to 4 of 5, and 126 of 221
+overall to 130.
+
 ## KV quota: listings come from an index, never a scan (2026-09-16)
 
 He started getting "close to 100% of your daily quota" alerts. The cause was
