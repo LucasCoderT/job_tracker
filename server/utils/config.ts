@@ -15,7 +15,8 @@ export const CACHE_TTL_SECONDS = 300
 // v7: enriched `jobs` rows with salary/source/nextAction for the applications table.
 // v8: added `stages` (how far each interview process actually got) + per-job stage.
 // v9: `jobs[].id` (Notion page id) so a row can own an interview pack.
-export const SCHEMA_VERSION = '10'
+// v11: `jobs[].repliedAt` — the date the first human reply arrived.
+export const SCHEMA_VERSION = '11'
 
 export const DEFAULT_STALE_DAYS = 30
 export const ATTENTION_MIN_DAYS = 10
@@ -31,6 +32,12 @@ export const NEXT_ACTION_PROP = 'Next Action'
 export const SOURCE_PROP = 'Job Posting'
 export const SALARY_PROP = 'Salary' // number (annual); ~43% of rows populated
 export const INTERVIEWED_PROP = 'Interviewed' // checkbox; added to Notion 2026-08-16 and backfilled
+// The date the first human reply arrived — a rejection, an invite, an offer;
+// never an auto-ack. Added 2026-10-01 because nothing recorded it: Notion's
+// last_edited_time is spoiled by bulk edits (June rejections read as ~90 days),
+// so whether a month's applications were doing worse or were just younger
+// could not be told apart. Earliest date wins, whoever writes it.
+export const REPLIED_PROP = 'Replied'
 
 // How far a process actually got. Ordinal rather than semantic ("Hiring
 // Manager", "Technical") because round names differ per company and ordinal

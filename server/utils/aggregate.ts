@@ -31,6 +31,7 @@ import {
   SALARY_PROP,
   DATE_PROP,
   STAGE_ORDER,
+  REPLIED_PROP,
 } from './config'
 import {
   classify,
@@ -76,6 +77,7 @@ export function jobFromPage(page: NotionPage, bucket: BucketKey, now: number): J
     source: channelOf(readUrl(page, SOURCE_PROP)),
     nextAction: readSelect(page, NEXT_ACTION_PROP),
     stage: readStage(page),
+    repliedAt: page.properties?.[REPLIED_PROP]?.date?.start?.slice(0, 10) ?? null,
   }
 }
 

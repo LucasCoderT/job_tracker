@@ -30,6 +30,7 @@ import {
   STAGE_PROP,
   INTERVIEWED_PROP,
   NEXT_ACTION_PROP,
+  REPLIED_PROP,
 } from './config'
 import { readStatus, readSelect } from './notion'
 
@@ -81,7 +82,7 @@ async function statusProperty(token: string, db: string, value: string): Promise
  * EI week entirely. `en-CA` formats as YYYY-MM-DD.
  */
 const TIMEZONE = 'America/Edmonton'
-function localDate(at = new Date()): string {
+export function localDate(at = new Date()): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).format(at)
 }
 
@@ -155,7 +156,39 @@ export function snapshotOf(page: NotionPage): JobStatusSnapshot {
     stage: readSelect(page, STAGE_PROP),
     interviewed: checkbox?.type === 'checkbox' ? !!checkbox.checkbox : false,
     nextAction: readSelect(page, NEXT_ACTION_PROP),
+    replied: readReplied(page),
   }
+}
+
+/** The Replied date as YYYY-MM-DD, or null. */
+export function readReplied(page: NotionPage): string | null {
+  return page.properties?.[REPLIED_PROP]?.date?.start?.slice(0, 10) ?? null
+}
+
+/**
+ * Which of two reply dates to keep: the earlier. A rejection email dated the
+ * 12th outranks him marking it on the site on the 15th; whichever source writes
+ * first, the answer is the same.
+ */
+export function earliestReply(a: string | null | undefined, b: string | null | undefined): string | null {
+  if (!a) return b ?? null
+  if (!b) return a
+  return a < b ? a : b
+}
+
+/**
+ * Sets Replied on a row, keeping whichever date is earlier. Returns the page
+ * as Notion has it afterwards, or null when nothing needed writing (already
+ * that date or earlier) or the database has no Replied column.
+ */
+export async function recordReply(env: AppEnv, page: NotionPage, date: string): Promise<NotionPage | null> {
+  if (page.properties?.[REPLIED_PROP]?.type !== 'date') return null
+  const current = readReplied(page)
+  const keep = earliestReply(current, date)
+  if (keep === current) return null
+  return await notion(env.NOTION_TOKEN!, `/pages/${page.id}`, 'PATCH', {
+    properties: { [REPLIED_PROP]: { date: { start: keep } } },
+  })
 }
 
 /**
@@ -202,6 +235,11 @@ export async function updateJobStatus(env: AppEnv, page: NotionPage, next: JobSt
   put(STAGE_PROP, selectLike(STAGE_PROP, next.stage))
   put(NEXT_ACTION_PROP, selectLike(NEXT_ACTION_PROP, next.nextAction))
   if (props[INTERVIEWED_PROP]?.type === 'checkbox') properties[INTERVIEWED_PROP] = { checkbox: next.interviewed }
+  // `undefined` means the caller has no opinion (an Undo from a page loaded
+  // before the column existed); null clears it, which only Undo does.
+  if (props[REPLIED_PROP]?.type === 'date' && next.replied !== undefined) {
+    properties[REPLIED_PROP] = { date: next.replied ? { start: next.replied } : null }
+  }
 
   return await notion(token, `/pages/${page.id}`, 'PATCH', { properties })
 }

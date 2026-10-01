@@ -59,6 +59,7 @@ export interface Job {
   source: string | null // registrable domain, e.g. "ashbyhq.com"
   nextAction: string | null
   stage: string | null // furthest interview round reached; null = never interviewed
+  repliedAt: string | null // YYYY-MM-DD the first human reply arrived; null = none recorded
 }
 
 // One rung of the interview-depth ladder: how many processes got this far.
@@ -639,6 +640,8 @@ export interface JobStatusSnapshot {
   stage: string | null
   interviewed: boolean
   nextAction: string | null
+  /** The Replied date. Absent (not null) on a snapshot from before it existed: leave the column alone. */
+  replied?: string | null
 }
 
 /**

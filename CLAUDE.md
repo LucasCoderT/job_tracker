@@ -1272,6 +1272,48 @@ Posting URL, then linking it so it lands as `applied`.
 Result: board cards reaching a brief went from 2 of 5 to 4 of 5, and 126 of 221
 overall to 130.
 
+## When a reply arrived (2026-10-01)
+
+On 2026-10-01 the numbers said no application sent after 2026-08-17 had reached
+a screen, and September (65 sent) had 5 replies. Whether that was a real
+collapse or just young applications could not be told, because **nothing
+recorded when a reply arrived**. Notion's `last_edited_time` is spoiled by bulk
+edits (June rejections read as ~90 days) and career-ops's status log had 21
+rows.
+
+`Replied` (date) is a new column on DB Applications, surfaced as
+`jobs[].repliedAt` (**SCHEMA_VERSION 11**). It means *the earliest reply there
+is evidence of*: a rejection, an invite, an offer, never an auto-ack. **Earliest
+wins, whoever writes it**, so the two writers cannot disagree:
+
+- **The status menu.** Reject and advance stamp today (Edmonton) unless an
+  earlier date is already there, and the snapshot carries `replied` so Undo puts
+  it back. A snapshot without the key (a page loaded before this) leaves the
+  column alone; `null` clears it.
+- **The mail.** career-ops's `reply-dates.mjs` reads the "Work/job
+  applications" folder with `scan-mail-followups.mjs`'s own classifier and
+  matcher and posts to `POST /api/jobs/replies` (20 per call: two Notion calls a
+  row against a 50-subrequest budget). It runs after the follow-up scan every
+  day over 45 days; `--since=400` is the backfill, and re-sending history writes
+  nothing. The route refuses a page outside DB Applications and a reply dated
+  before the application.
+
+The matcher was made stricter than the scanner's, because a wrong date poisons
+exactly the comparison this exists for. High-confidence classifications only:
+the scanner's medium rejection is a bare "unfortunately", which WorkTango's
+receipt contains. The employer must be named in the sender or subject, since
+body-only matching let "Government of Alberta … same req at six other agencies"
+claim mail from Vantage and Life360. Several applications at one company are
+told apart by role title in the mail (Autodesk's two), or skipped (Mozilla's
+three).
+
+**Coverage is partial and says so.** The backfill dated 22 applications. About
+35 more have heard back with no date, because those replies came through
+LinkedIn messages, a different folder, or before the folder rule existed. A date
+is also only as early as the first mail filed: one application's reads weeks
+later than the first contact actually was. Treat `repliedAt` as an upper bound and compare cohorts
+on "replied within N days", where an upper bound can only undercount.
+
 ## Copy cover letter (2026-10-01)
 
 Plenty of forms ask for the cover letter in a textarea rather than as an

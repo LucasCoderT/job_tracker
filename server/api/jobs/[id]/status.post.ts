@@ -17,6 +17,9 @@
  *            · Interviewed → ✓ · Next Action → Prepare Interview, or Decide
  *   restore  exactly the snapshot given — the only way a stage goes back down
  *
+ * reject and advance both set Replied to today unless an earlier date is
+ * already there, so Undo also puts Replied back.
+ *
  * Returns the row rebuilt the way the board builds it, plus what was there
  * before, so the page can move the card at once and offer Undo without a
  * second round trip. The /api/stats edge cache is purged on success.
@@ -26,7 +29,7 @@ import { STAGE_ORDER, reachableStages, nextStage, stageRank } from '../../../../
 import { getCloudflareEnv, resolveStaleDays, classify, readTitle, readRichText } from '../../../utils/notion'
 import { POSITION_PROP } from '../../../utils/config'
 import { jobFromPage } from '../../../utils/aggregate'
-import { readApplication, snapshotOf, updateJobStatus } from '../../../utils/applications-notion'
+import { readApplication, snapshotOf, updateJobStatus, earliestReply, localDate } from '../../../utils/applications-notion'
 import { purgeStats } from '../../../utils/stats-cache'
 import { recordActivity, cancelLatestActivity } from '../../../utils/activity'
 
@@ -43,7 +46,12 @@ function restoreSnapshot(raw: any): JobStatusSnapshot {
   if (status !== null && !STATUSES.has(status)) throw bad(`Unknown status "${status}".`)
   if (stage !== null && stageRank(stage) < 0) throw bad(`Unknown stage "${stage}".`)
   if (nextAction !== null && !NEXT_ACTIONS.has(nextAction)) throw bad(`Unknown next action "${nextAction}".`)
-  return { status, stage, nextAction, interviewed: !!raw.interviewed }
+  const snap: JobStatusSnapshot = { status, stage, nextAction, interviewed: !!raw.interviewed }
+  if ('replied' in raw) {
+    if (raw.replied !== null && !/^\d{4}-\d{2}-\d{2}$/.test(String(raw.replied))) throw bad('replied must be YYYY-MM-DD or null.')
+    snap.replied = raw.replied
+  }
+  return snap
 }
 
 export default defineEventHandler(async (event): Promise<JobStatusResult> => {
@@ -67,7 +75,9 @@ export default defineEventHandler(async (event): Promise<JobStatusResult> => {
 
   let next: JobStatusSnapshot
   if (action === 'reject') {
-    next = { ...previous, status: 'Rejected', nextAction: 'Nothing' }
+    // Marking a row off Applied is the moment he saw a reply, unless an
+    // earlier date is already known (usually the email's, from the Mac).
+    next = { ...previous, status: 'Rejected', nextAction: 'Nothing', replied: earliestReply(previous.replied, localDate()) }
   } else if (action === 'advance') {
     const bucket = classify(page, { staleMs, now })
     const interviewing = bucket === 'interviewed' || bucket === 'progressing'
@@ -91,6 +101,7 @@ export default defineEventHandler(async (event): Promise<JobStatusResult> => {
       stage,
       interviewed: true,
       nextAction: offer ? 'Decide' : 'Prepare Interview',
+      replied: earliestReply(previous.replied, localDate()),
     }
   } else {
     next = restoreSnapshot(body.previous)
