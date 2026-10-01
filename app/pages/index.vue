@@ -190,6 +190,18 @@ const footer = computed(() => {
         </PrimeCard>
       </div>
 
+      <!-- Is the machinery helping? Score, channel and pack against outcomes
+           old enough to be outcomes, then the pack test. -->
+      <PrimeCard v-if="stats.calibration" class="sec" aria-label="What predicts a reply">
+        <template #content>
+          <div class="sec-head">
+            <h2>What predicts a reply</h2>
+            <span class="sec-note">is the machinery helping</span>
+          </div>
+          <CalibrationPanel :cal="stats.calibration" />
+        </template>
+      </PrimeCard>
+
       <!-- The footnotes: both say "source is the lever, this isn't", so they
            share one quiet panel rather than two cards of equal weight. -->
       <PrimeCard class="sec footnotes" aria-label="Reply rate by role type and salary context">

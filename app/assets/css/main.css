@@ -1308,3 +1308,28 @@ a.rail-primary.as-link:hover { background: #d9bd71; border-color: #d9bd71; color
 .copy-letter.compact { margin-top: 0; display: inline-flex; flex-direction: column; }
 .copy-letter.compact .p-button { width: auto; }
 .copy-letter.compact .copy-letter-sub { text-align: left; }
+
+/* ---- Calibration: what predicts a reply ---- */
+.cal-scope { margin: 0 0 4px; font-size: 12.5px; line-height: 1.5; }
+.cal-key { display: inline-flex; align-items: center; gap: 5px; margin-left: 10px; white-space: nowrap; }
+.cal-key .sw { width: 8px; height: 8px; border-radius: 2px; }
+.cal-key .sw.heard { background: var(--amber); }
+.cal-key .sw.screen { background: var(--olive); }
+.cal-groups { display: grid; gap: 14px 28px; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 10px; }
+@media (max-width: 1100px) { .cal-groups { grid-template-columns: 1fr; } }
+.cal-group h3, .cal-test h3 { margin: 0; font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.cal-row { grid-template-columns: minmax(0, 150px) 1fr 172px; }
+/* On a phone the bar would be crushed between a label and a long rate, so it
+   drops to its own line under them, the way the pipeline funnel reads. */
+@media (max-width: 600px) {
+  .cal-row { grid-template-columns: minmax(0, 1fr) auto; row-gap: 4px; }
+  .cal-row .src-bar { grid-column: 1 / -1; grid-row: 2; }
+}
+.cal-row .rate { white-space: nowrap; }
+.cal-scr { color: var(--faint); }
+.cal-screen { position: absolute; inset: 0 auto 0 0; background: var(--olive); border-radius: 6px; }
+.cal-row.thin .dom, .cal-row.thin .rate b { color: var(--muted); }
+.cal-row.thin .src-bar { opacity: .55; }
+.cal-foot { margin: 12px 0 0; font-size: 11px; line-height: 1.5; }
+.cal-test { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--panel-edge); }
+.cal-test p.small { margin: 4px 0 0; }

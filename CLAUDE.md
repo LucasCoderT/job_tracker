@@ -1272,6 +1272,32 @@ Posting URL, then linking it so it lands as `applied`.
 Result: board cards reaching a brief went from 2 of 5 to 4 of 5, and 126 of 221
 overall to 130.
 
+## What predicts a reply (2026-10-01)
+
+A dashboard panel (`CalibrationPanel`, `stats.calibration`, **SCHEMA_VERSION
+12**) that compares outcomes by evaluation score, by channel (employer's own
+site / a named ATS / LinkedIn and Indeed), and by what went with the
+application (a Mac-built pack or not). Then the pack test, once one is running.
+`calibrate()` in `server/utils/calibration.ts` is pure, and the stats route
+joins the postings index (one KV read) to call it. If KV fails the panel is
+skipped, not the dashboard.
+
+- **Only applications at least `staleDays` (30) old count.** By then waiting
+  has become an answer or silence, so groups are judged on outcomes rather than
+  on how recently they were sent. That gate is what keeps them comparable, not
+  `repliedAt`, whose coverage is partial. **It changed a conclusion the same
+  day:** across all applications, a 4.0+ score looked no better than anything
+  else. Among mature ones it is: 17/50 heard back with 6 screens, against 21/92
+  and 2 screens unscored. Unaged comparisons in this repo have produced
+  confidently wrong answers before (see the funnel-leak notes).
+- **One shared 0–100% scale** across every row; heard back is amber, screens
+  sit inside in olive (Round 1's colour). Rows under n=20 are drawn fainter,
+  career-ops's own rule for comparative claims.
+- **The pack test is judged differently**, as replied within 21 days among
+  applications at least 21 days old, by *assigned* half, with deviations
+  counted. The test is younger than the 30-day gate and would otherwise show
+  nothing for a month. Replied's undercount hits both halves alike.
+
 ## The pack test (2026-10-01)
 
 From 2026-09-16 every application went out with a Mac-built pack (tailored CV

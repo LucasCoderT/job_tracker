@@ -16,7 +16,8 @@ export const CACHE_TTL_SECONDS = 300
 // v8: added `stages` (how far each interview process actually got) + per-job stage.
 // v9: `jobs[].id` (Notion page id) so a row can own an interview pack.
 // v11: `jobs[].repliedAt` — the date the first human reply arrived.
-export const SCHEMA_VERSION = '11'
+// v12: `calibration` — outcomes by score, channel and pack, and the pack test.
+export const SCHEMA_VERSION = '12'
 
 export const DEFAULT_STALE_DAYS = 30
 export const ATTENTION_MIN_DAYS = 10

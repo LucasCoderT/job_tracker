@@ -133,6 +133,42 @@ export interface Stats {
   salary: SalaryContext
   metrics: Metrics
   stages: StageStat[]
+  /** Absent when the POSTINGS store is not bound (local mock). */
+  calibration?: Calibration
+}
+
+// ---- Calibration: what actually predicts a reply ----
+
+/** One group's outcome among applications old enough to have one. */
+export interface CalibrationRow {
+  label: string
+  n: number
+  heard: number // any human reply, rejections included (HEARD_BACK_BUCKETS)
+  screens: number // reached Round 1 or further
+}
+
+export interface CalibrationGroup {
+  key: 'score' | 'channel' | 'sent'
+  title: string
+  rows: CalibrationRow[]
+}
+
+/** The pack test, by assigned half: replies within `withinDays` among applications at least that old. */
+export interface PackTestRow {
+  arm: 'tailored' | 'base'
+  sent: number // applied since the test began
+  due: number // of those, old enough to judge
+  replied: number // of those due, replied within the window
+  deviated: number // sent with the other half's treatment
+}
+
+export interface Calibration {
+  matureDays: number // only applications at least this old are counted
+  mature: number
+  groups: CalibrationGroup[]
+  /** Median days from application to first reply, where Replied is known. */
+  replyDays: { n: number; median: number | null }
+  test: { startedAt: string; withinDays: number; rows: PackTestRow[] } | null
 }
 
 // ---- /api/history payload ----

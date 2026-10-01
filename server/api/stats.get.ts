@@ -15,6 +15,9 @@ import { aggregate } from '../utils/aggregate'
 import { mockPages } from '../utils/mock'
 import { CACHE_TTL_SECONDS } from '../utils/config'
 import { statsCacheKey } from '../utils/stats-cache'
+import { calibrate } from '../utils/calibration'
+import { listPostings } from '../utils/postings'
+import { getPackTest } from '../utils/pack-test'
 
 export default defineEventHandler(async (event): Promise<Stats | Response | { error: string }> => {
   const env = getCloudflareEnv(event)
@@ -57,6 +60,16 @@ export default defineEventHandler(async (event): Promise<Stats | Response | { er
   }
 
   const stats = aggregate(pages, { staleDays, now })
+  // The postings listing is one KV read (the index). Best effort: a missing
+  // calibration panel is better than a dashboard that fails because KV did.
+  if (env.POSTINGS) {
+    try {
+      const [postings, test] = await Promise.all([listPostings(env.POSTINGS), getPackTest(env.POSTINGS)])
+      stats.calibration = calibrate(stats.jobs, postings, test, { staleDays, now })
+    } catch (err) {
+      console.warn('calibration skipped:', (err as Error).message)
+    }
+  }
 
   if (cacheKey) {
     const res = new Response(JSON.stringify(stats), {
