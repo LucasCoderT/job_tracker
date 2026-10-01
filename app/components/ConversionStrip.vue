@@ -79,7 +79,11 @@ const outcomes = computed(() => {
     .map((o) => ({ ...o, w: (o.n / T.value) * 100 }))
 })
 
-/** The phone layout: one labelled bar per stage, centred, nothing under 11px. */
+/**
+ * The phone layout: one labelled bar per stage, nothing under 11px. A stage
+ * that has been reached keeps a visible sliver however small (a CSS min-width);
+ * zero draws no fill at all, because a sliver there would read as "a few".
+ */
 const funnel = computed(() => {
   const st = stages.value
   const rows: [string, number, string, boolean][] = [
@@ -91,7 +95,7 @@ const funnel = computed(() => {
     ['Offers', m.value.offers, 'var(--teal)', false],
   ]
   return rows.map(([label, n, color, strong]) => ({
-    label, n, color, strong, pct: pct(n, T.value), w: Math.max(1.5, (n / T.value) * 100),
+    label, n, color, strong, pct: pct(n, T.value), w: (n / T.value) * 100,
   }))
 })
 </script>
@@ -121,7 +125,7 @@ const funnel = computed(() => {
           <span :class="{ strong: f.strong }">{{ f.label }}</span>
           <span class="mono"><b>{{ f.n }}</b> · {{ f.pct }}</span>
         </div>
-        <div class="fn-track"><span class="fn-fill" :style="{ background: f.color, width: f.w + '%' }" /></div>
+        <div class="fn-track"><span v-if="f.n > 0" class="fn-fill" :style="{ background: f.color, width: f.w + '%' }" /></div>
       </div>
     </div>
 
