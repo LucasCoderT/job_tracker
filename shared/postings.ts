@@ -213,3 +213,16 @@ export function blockedSource(url: string): string | null {
   if (/(^|\.)ziprecruiter\./.test(host)) return 'ZipRecruiter'
   return null
 }
+
+/**
+ * The cover letter as plain text, when the Mac sent one beside the PDF.
+ *
+ * Plenty of forms ask for the letter in a textarea rather than as an upload,
+ * and retyping it off a PDF on a phone is not a real option. career-ops writes
+ * the body (no letterhead, date, greeting or sign-off — the form has its own)
+ * to a .txt next to the PDF, and the uploader sends both. Same name rule as
+ * every artifact: "cover" in the name, so this is the text-typed one of those.
+ */
+export function letterText<T extends { kind: string; contentType: string }>(artifacts: readonly T[]): T | null {
+  return artifacts.find((a) => a.kind === 'cover-letter' && a.contentType.startsWith('text/')) ?? null
+}

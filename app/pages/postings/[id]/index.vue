@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
-import { normalizeUrl } from '#shared/postings'
+import { letterText, normalizeUrl } from '#shared/postings'
 import type { NotionWriteResult, PostingApplyResult, PostingDetail } from '../../../../shared/types'
 
 const route = useRoute()
@@ -485,8 +485,13 @@ const extras = computed(() =>
   Object.entries(analysis.value?.extra ?? {}).map(([k, v]) => ({ k: k.replace(/_/g, ' '), v })),
 )
 
+// The letter's text is not a file to download; it is the Copy button under
+// the files. It only shows as a card when there is no PDF beside it.
+const letter = computed(() => letterText(meta.value?.artifacts ?? []))
 const files = computed(() =>
-  (meta.value?.artifacts ?? []).map((f) => ({
+  (meta.value?.artifacts ?? [])
+    .filter((f) => f !== letter.value || !meta.value?.artifacts.some((a) => a.kind === 'cover-letter' && a !== f))
+    .map((f) => ({
     ...f,
     label: KIND[f.kind] || f.name,
     icon: ICON[f.kind] ?? 'pi pi-file',
@@ -778,7 +783,8 @@ function onPrimary() {
                     </button>
                   </div>
                 </div>
-                <p v-else class="muted small">
+                <CopyCoverLetter v-if="letter" :posting-id="id" :name="letter.name" />
+                <p v-if="!files.length" class="muted small">
                   {{ inFlight ? 'The Mac is building it — it lands here when it is done.' : 'Nothing built yet.' }}
                 </p>
 

@@ -1284,3 +1284,17 @@ a.rail-primary.as-link:hover { background: #d9bd71; border-color: #d9bd71; color
 
 /* A failed re-evaluation says why, under the button that started it. */
 .eval-error { margin: 4px 0 0; color: var(--amber); line-height: 1.35; }
+
+/* Copy cover letter: the body as text, for a form with a textarea instead of
+   an upload. Sits under the files in the brief's rail and in the questions
+   toolbar. */
+.copy-letter { margin-top: 10px; }
+.copy-letter .p-button { width: 100%; justify-content: center; }
+.copy-letter-sub { margin: 6px 0 0; font-size: 11px; color: var(--faint); text-align: center; }
+.copy-letter-text {
+  width: 100%; margin-top: 8px; resize: vertical; font: inherit; font-size: 12.5px; line-height: 1.5;
+  color: var(--text); background: var(--card); border: 1px solid var(--panel-edge); border-radius: 8px; padding: 8px 10px;
+}
+.copy-letter.compact { margin-top: 0; display: inline-flex; flex-direction: column; }
+.copy-letter.compact .p-button { width: auto; }
+.copy-letter.compact .copy-letter-sub { text-align: left; }

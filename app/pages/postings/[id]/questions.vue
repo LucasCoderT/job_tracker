@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { letterText } from '#shared/postings'
 import type { PostingDetail, PostingQuestion, PostingQuestions } from '../../../../shared/types'
 
 interface ParsedQuestion { question: string; body: string; options: string[] }
@@ -16,6 +17,7 @@ const { data, pending, error, refresh } = await useFetch<PostingQuestions>(
 )
 
 const meta = computed(() => posting.value?.meta)
+const letter = computed(() => letterText(meta.value?.artifacts ?? []))
 
 /** Drafting and re-parsing are both agent round trips; watch for either. */
 const waitingHere = computed(() => {
@@ -359,6 +361,7 @@ const words = (s: string) => (s.trim() ? s.trim().split(/\s+/).length : 0)
             @click="draftOpen = true"
           />
           <PrimeButton label="Copy all" icon="pi pi-copy" size="small" severity="secondary" outlined :disabled="!answered" @click="copyAll" />
+          <CopyCoverLetter v-if="letter" compact :posting-id="id" :name="letter.name" />
           <PrimeButton label="Edit questions" icon="pi pi-pencil" size="small" severity="secondary" text @click="openEditor" />
           <PrimeButton
             v-if="data.rawText"

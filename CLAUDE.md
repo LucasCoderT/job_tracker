@@ -1272,6 +1272,37 @@ Posting URL, then linking it so it lands as `applied`.
 Result: board cards reaching a brief went from 2 of 5 to 4 of 5, and 126 of 221
 overall to 130.
 
+## Copy cover letter (2026-10-01)
+
+Plenty of forms ask for the cover letter in a textarea rather than as an
+upload, and a PDF on a phone is not something you can paste from. The brief's
+rail (under the files) and the questions toolbar now carry **Copy cover
+letter**, which puts the letter's body on the clipboard: the opening, profile,
+any achievements as `- ` bullets, the problems paragraph and the closing. No
+letterhead, role title, dateline, greeting or sign-off, because the form
+already has his name and a pasted "Hi team," reads as a paste.
+
+- **The text is written where the PDF is rendered.** career-ops's
+  `generate-cover-letter.mjs` writes `buildText(payload)` to a `.txt` beside
+  every PDF, from the same payload, so the two cannot disagree. The apply
+  worker uploads it beside the PDF on its own (`letterTexts`), rather than
+  asking the agent to list it, and refuses one older than its PDF: that means
+  the PDF was re-rendered some other way, and a Copy button that pastes a
+  different letter from the one attached is worse than none.
+- **It is an ordinary artifact.** "cover" in the name makes it kind
+  `cover-letter`; the `text/*` content type is what `letterText()` in
+  `shared/postings.ts` looks for. The brief hides its file card when a PDF
+  sits beside it. Notion's Apply Pack list labels it "as text to paste".
+- **The text is fetched on mount, not on the tap.** iOS Safari only lets a page
+  write the clipboard inside the gesture that asked, and an awaited fetch in
+  between spends it. If the write still fails the letter appears selected.
+- **Backfill:** `node site-apply-worker.mjs --letter-texts [--dry-run]` in
+  career-ops. It goes through `data/pdf-index.tsv` to find what each PDF was
+  rendered from, and only adds text when that was a `cover-payload.json` not
+  edited since, and the site's PDF is the same size as the local one. First
+  run added 37; 54 letters have no local PDF and 8 were rendered from
+  hand-written HTML, so those have no button.
+
 ## KV quota: listings come from an index, never a scan (2026-09-16)
 
 He started getting "close to 100% of your daily quota" alerts. The cause was

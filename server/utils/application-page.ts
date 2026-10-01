@@ -96,7 +96,7 @@ function packMarkdown(meta: PostingMeta, questions: PostingQuestions | null): st
     lines.push('## Files sent')
     for (const a of meta.artifacts) {
       const kb = Math.max(1, Math.round(a.bytes / 1024))
-      lines.push(`- [${a.name}](${SITE}/api/postings/${meta.id}/artifacts/${encodeURIComponent(a.name)}) — ${ARTIFACT_LABEL[a.kind]} (${kb} KB)`)
+      lines.push(`- [${a.name}](${SITE}/api/postings/${meta.id}/artifacts/${encodeURIComponent(a.name)}) — ${ARTIFACT_LABEL[a.kind]}${a.kind === 'cover-letter' && a.contentType.startsWith('text/') ? ', as text to paste' : ''} (${kb} KB)`)
     }
   }
   if (answered.length) {
