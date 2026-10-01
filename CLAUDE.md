@@ -1272,6 +1272,38 @@ Posting URL, then linking it so it lands as `applied`.
 Result: board cards reaching a brief went from 2 of 5 to 4 of 5, and 126 of 221
 overall to 130.
 
+## The pack test (2026-10-01)
+
+From 2026-09-16 every application went out with a Mac-built pack (tailored CV
+and cover letter), and over the same weeks replies fell to roughly a third of
+June's rate. Tooling and outcome moved together, so half the postings now go
+out with his **base CV and no letter** instead, and the halves are compared on
+reply rate once `repliedAt` has had time to fill in.
+
+- **Assignment is a coin he cannot steer:** `packArm(id)` is the parity of the
+  posting id's last hex digit (a sha256 prefix). The usual way a test like this
+  lies is the strongest postings quietly getting the tailored treatment.
+- **Only undecided postings are in it.** `inPackTest` is true while a base CV
+  exists, the posting is `new`, and nothing has been built or asked for. A pack
+  built before the test is sunk cost, not a data point.
+- **The base half is enforced at the route.** `POST /:id/pack` 409s for it
+  unless `leaveTest: true`, so the listing's bulk build skips those (reported as
+  "left for the base CV") instead of quietly ending the test. On the brief the
+  primary button becomes Mark applied, the base CV is offered for download, and
+  Build becomes "Build anyway" behind a dialog that says it leaves the test.
+- **What was sent is recorded**, not assumed: `sentWith` (`tailored` when a pack
+  was built, `base` otherwise) is set by Mark applied and by reconcile. Analysis
+  is by assigned arm (`packArm`), with `sentWith` showing how often he deviated.
+- **The base CV** is `PUT /api/base-cv?name=` (raw PDF, POSTINGS KV
+  `basecv:file` + `basecv:meta`). The first upload is the test's `startedAt` and
+  later uploads keep it. It is career-ops's `templates/cv-template-custom.html`
+  (his real resume) rendered as-is through `generate-cv.mjs`, minus the
+  Projects section, which held only Mangasteen, already off his CVs by his own
+  rules. Nothing in it was written by a model.
+
+Read it honestly: at his pace about 20 applications per half is 3–4 weeks, and
+career-ops's own rule is no comparative claim under n=20.
+
 ## When a reply arrived (2026-10-01)
 
 On 2026-10-01 the numbers said no application sent after 2026-08-17 had reached

@@ -273,14 +273,15 @@ const selectedPostings = computed(
 )
 
 /** One call per selected posting, reporting how many actually landed. */
-async function runBulk(key: string, label: string, call: (p: PostingMeta) => Promise<unknown>) {
+async function runBulk(key: string, label: string, call: (p: PostingMeta) => Promise<unknown>, skippedAs = '') {
   busy.value = key
   let ok = 0
+  let skipped = 0
   const failed: string[] = []
   for (const p of selectedPostings.value) {
     try {
-      await call(p)
-      ok++
+      if ((await call(p)) === SKIPPED) skipped++
+      else ok++
     } catch {
       failed.push(p.company)
     }
@@ -288,12 +289,28 @@ async function runBulk(key: string, label: string, call: (p: PostingMeta) => Pro
   selected.value = {}
   busy.value = ''
   await refresh()
+  const held = skipped ? ` ${skipped} ${skippedAs}.` : ''
   notice.value = failed.length
-    ? { text: `${label}: ${ok} done, ${failed.length} failed (${failed.slice(0, 3).join(', ')}).`, severity: 'warn' }
-    : { text: `${label}: ${ok} done.`, severity: 'success' }
+    ? { text: `${label}: ${ok} done, ${failed.length} failed (${failed.slice(0, 3).join(', ')}).${held}`, severity: 'warn' }
+    : { text: `${label}: ${ok} done.${held}`, severity: 'success' }
 }
+const SKIPPED = Symbol('skipped')
 
-const bulkBuild = () => runBulk('build', 'Queued', (p) => $fetch(`/api/postings/${p.id}/pack`, { method: 'POST', body: {} }))
+/**
+ * Bulk build leaves the pack test's base half alone: the route refuses those
+ * (409), and they are counted as left for the base CV rather than as failures.
+ * Leaving the test is a per-posting decision made on the brief, never a side
+ * effect of a selection.
+ */
+const bulkBuild = () =>
+  runBulk('build', 'Queued', async (p) => {
+    try {
+      await $fetch(`/api/postings/${p.id}/pack`, { method: 'POST', body: {} })
+    } catch (err: any) {
+      if (err?.statusCode === 409 && /pack test/.test(err?.data?.statusMessage ?? err?.statusMessage ?? '')) return SKIPPED
+      throw err
+    }
+  }, 'left for the base CV (pack test)')
 
 const bulkDismiss = () =>
   runBulk('dismiss', 'Dismissed', (p) =>

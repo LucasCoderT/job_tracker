@@ -365,6 +365,12 @@ export interface PostingMeta {
    * touched the posting, not when he decided anything.
    */
   dismissedAt: string | null
+  /**
+   * What the application went out with, set when it is marked applied or
+   * linked by reconcile: a built pack is 'tailored', anything else 'base'.
+   * Null before the pack test existed, or when it was never known.
+   */
+  sentWith?: 'tailored' | 'base' | null
   hasJD: boolean
   /**
    * Where the JD came from — "greenhouse", "lever", "ashby", "linkedin",
@@ -417,7 +423,15 @@ export interface PostingMeta {
 
 export interface PostingsResponse { enabled: boolean; postings: PostingMeta[] }
 
-export interface PostingDetail { meta: PostingMeta; jd: string | null; analysis: PostingAnalysis | null }
+export interface PostingDetail { meta: PostingMeta; jd: string | null; analysis: PostingAnalysis | null; packTest?: PackTestInfo }
+
+/** The base CV the pack test sends; `startedAt` is when it was first uploaded, which is when the test began. */
+export interface PackTestInfo {
+  startedAt: string | null
+  name: string | null
+  bytes: number
+  updatedAt: string | null
+}
 
 /** POST /:id/applied — the row went into Notion (or said why it didn't). */
 export interface PostingApplyResult { meta: PostingMeta; notion: NotionWriteResult }

@@ -1,6 +1,6 @@
 /**
  * POST /api/postings/:id/pack — "Build pack". Queues the Mac to tailor a CV
- * and cover letter for this posting. Body: { note?: string }.
+ * and cover letter for this posting. Body: { note?: string, leaveTest?: boolean }.
  *
  * A rebuild leaves the existing files downloadable until new ones replace
  * them: the phone should never lose the CV it was about to send because a
@@ -10,11 +10,20 @@ import type { PostingMeta } from '../../../../../shared/types'
 import { postingContext, requirePosting, now } from '../../../../utils/posting-route'
 import { putMeta } from '../../../../utils/postings'
 import { announce, commandWorkers } from '../../../../utils/realtime'
+import { getPackTest } from '../../../../utils/pack-test'
+import { inPackTest, packArm } from '../../../../../shared/pack-test'
 
 export default defineEventHandler(async (event): Promise<PostingMeta> => {
   const ctx = postingContext(event)
   const meta = await requirePosting(ctx)
   const body = (await readBody(event).catch(() => ({}))) ?? {}
+  // The pack test (shared/pack-test.ts). Refused here and not only in the UI,
+  // because the listing's bulk build and any future caller come through this
+  // route too. `leaveTest: true` is the explicit way out, and the posting then
+  // counts as tailored, which the analysis can see.
+  if (!body.leaveTest && packArm(meta.id) === 'base' && inPackTest(meta, await getPackTest(ctx.kv))) {
+    throw createError({ statusCode: 409, statusMessage: 'This posting is in the base-CV half of the pack test.' })
+  }
   const stamp = now()
   const next: PostingMeta = {
     ...meta,

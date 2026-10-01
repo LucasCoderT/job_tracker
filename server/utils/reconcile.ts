@@ -29,6 +29,7 @@ import type { PostingMeta } from '../../shared/types'
 import { queryAllPages, readUrl, readTitle, readRichText, readStatus, readDateMs } from './notion'
 import { SOURCE_PROP, POSITION_PROP } from './config'
 import { listPostings, postingIdFor, getMeta, putMeta } from './postings'
+import { sentWith } from '../../shared/pack-test'
 
 export interface ReconcileLink {
   postingId: string
@@ -211,6 +212,9 @@ export async function reconcile(
         state: 'applied',
         notionPageId: link.notionPageId,
         appliedAt: fresh.appliedAt ?? link.appliedAt,
+        // Sent on the employer's page, so the site never saw it go: what was
+        // built by then is the best evidence of what went with it.
+        sentWith: fresh.sentWith ?? sentWith(fresh),
         updatedAt: new Date().toISOString(),
       })
       applied++

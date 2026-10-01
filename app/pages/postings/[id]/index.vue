@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
 import { letterText, normalizeUrl } from '#shared/postings'
+import { inPackTest, packArm } from '#shared/pack-test'
 import type { NotionWriteResult, PostingApplyResult, PostingDetail } from '../../../../shared/types'
 
 const route = useRoute()
@@ -129,7 +130,7 @@ const buildPack = () => {
   buildOpen.value = false
   return act(
     'pack',
-    () => $fetch(`/api/postings/${id.value}/pack`, { method: 'POST', body: { note: note.value } }),
+    () => $fetch(`/api/postings/${id.value}/pack`, { method: 'POST', body: { note: note.value, leaveTest: testArm.value === 'base' } }),
     () => {
       notice.value = {
         text: 'Queued. The Mac tailors the CV and cover letter and uploads them here.',
@@ -503,6 +504,12 @@ const applied = computed(() => meta.value?.state === 'applied')
 const packDone = computed(() => meta.value?.pack === 'done')
 const inFlight = computed(() => meta.value?.pack === 'requested' || meta.value?.pack === 'building')
 
+// The pack test (shared/pack-test.ts): null when it does not decide this
+// posting — no test running, or something already built, asked for or sent.
+const testArm = computed(() =>
+  meta.value && inPackTest(meta.value, data.value?.packTest ?? null) ? packArm(meta.value.id) : null,
+)
+
 const primary = computed(() => {
   if (applied.value)
     return {
@@ -516,6 +523,12 @@ const primary = computed(() => {
       icon: 'pi pi-send',
       hint: 'Send it through their site, then mark it here: a row goes into Notion and the funnel picks it up within 5 minutes.',
     }
+  if (testArm.value === 'base')
+    return {
+      label: 'Mark applied',
+      icon: 'pi pi-send',
+      hint: 'Pack test: this one goes out with your base CV and no cover letter. Download it below, send it through their site, then mark it here.',
+    }
   if (inFlight.value)
     return {
       label: 'Building the pack…',
@@ -525,7 +538,9 @@ const primary = computed(() => {
   return {
     label: 'Build pack',
     icon: 'pi pi-file-pdf',
-    hint: 'Queues the Mac to tailor a CV and cover letter to this JD.',
+    hint: testArm.value === 'tailored'
+      ? 'Pack test: this one is in the tailored half. Queues the Mac to tailor a CV and cover letter to this JD.'
+      : 'Queues the Mac to tailor a CV and cover letter to this JD.',
   }
 })
 
@@ -546,7 +561,7 @@ const employerHost = computed(() => {
 
 function onPrimary() {
   if (applied.value || inFlight.value) return
-  if (packDone.value) return markApplied()
+  if (packDone.value || testArm.value === 'base') return markApplied()
   buildOpen.value = true
 }
 </script>
@@ -784,7 +799,17 @@ function onPrimary() {
                   </div>
                 </div>
                 <CopyCoverLetter v-if="letter" :posting-id="id" :name="letter.name" />
-                <p v-if="!files.length" class="muted small">
+                <div v-if="testArm === 'base'" class="rail-files">
+                  <a class="file-card" href="/api/base-cv">
+                    <i class="pi pi-file-pdf" />
+                    <span class="file-meta">
+                      <span class="file-label">Base CV · pack test</span>
+                      <span class="file-sub mono">{{ data?.packTest?.name }} · {{ kb(data?.packTest?.bytes ?? 0) }}</span>
+                    </span>
+                    <i class="pi pi-download go" />
+                  </a>
+                </div>
+                <p v-else-if="!files.length" class="muted small">
                   {{ inFlight ? 'The Mac is building it — it lands here when it is done.' : 'Nothing built yet.' }}
                 </p>
 
@@ -797,7 +822,7 @@ function onPrimary() {
 
                 <PrimeButton
                   class="rail-build"
-                  :label="meta.pack === 'none' ? 'Build' : packDone ? 'Rebuild' : 'Re-queue'"
+                  :label="testArm === 'base' ? 'Build anyway' : meta.pack === 'none' ? 'Build' : packDone ? 'Rebuild' : 'Re-queue'"
                   icon="pi pi-refresh"
                   size="small"
                   severity="secondary"
@@ -988,6 +1013,10 @@ function onPrimary() {
             </ul>
             <p class="build-stops-foot">Build it anyway if that is wrong or you want the pack regardless.</p>
           </div>
+          <p v-if="testArm === 'base'" class="build-leave-test">
+            This posting is in the base-CV half of the pack test. Building a pack takes it out of the
+            test, and the comparison is only fair if that stays rare.
+          </p>
           <p class="muted small">
             The Mac tailors a CV and cover letter to this JD and uploads them here — usually 15–20 minutes.
             A note steers the emphasis and tone.
@@ -1006,10 +1035,10 @@ function onPrimary() {
         <template #footer>
           <PrimeButton label="Cancel" severity="secondary" text size="small" @click="buildOpen = false" />
           <PrimeButton
-            :label="hardStops.length ? 'Build it anyway' : meta.pack === 'none' ? 'Build pack' : 'Rebuild'"
+            :label="testArm === 'base' ? 'Build, leaving the test' : hardStops.length ? 'Build it anyway' : meta.pack === 'none' ? 'Build pack' : 'Rebuild'"
             icon="pi pi-refresh"
             size="small"
-            :severity="hardStops.length ? 'warning' : undefined"
+            :severity="hardStops.length || testArm === 'base' ? 'warning' : undefined"
             :loading="busy === 'pack'"
             @click="buildPack"
           />

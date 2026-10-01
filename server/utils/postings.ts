@@ -508,6 +508,7 @@ export function mergePosting(id: string, existing: PostingMeta | null, body: any
     appliedAt: existing?.appliedAt ?? null,
     openedAt: existing?.openedAt ?? null,
     dismissedAt: existing?.dismissedAt ?? null,
+    sentWith: existing?.sentWith ?? null,
     jdSource: existing?.jdSource ?? null,
     jdCapturedAt: existing?.jdCapturedAt ?? null,
     jdError: newlyResolved ? null : (existing?.jdError ?? null),

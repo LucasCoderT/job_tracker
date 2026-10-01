@@ -15,6 +15,7 @@ import { putMeta } from '../../../utils/postings'
 import { createApplication } from '../../../utils/applications-notion'
 import { captureForPosting, inBackground } from '../../../utils/jd-store'
 import { syncApplicationPage } from '../../../utils/application-page'
+import { sentWith } from '../../../../shared/pack-test'
 
 export default defineEventHandler(async (event): Promise<PostingApplyResult> => {
   const ctx = postingContext(event)
@@ -30,6 +31,7 @@ export default defineEventHandler(async (event): Promise<PostingApplyResult> => 
     state: 'applied',
     appliedAt: stamp,
     notionPageId: notion.ok ? notion.pageId : null,
+    sentWith: sentWith(meta),
     updatedAt: stamp,
   }
   await putMeta(ctx.kv, next)
