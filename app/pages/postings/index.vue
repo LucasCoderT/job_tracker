@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
-import { postingChannel, localityOf, LOCALITY_LABEL } from '#shared/postings'
+import { postingChannel, localityOf, LOCALITY_LABEL, inNewQueue } from '#shared/postings'
 import type { PostingApplyResult, PostingMeta, PostingsResponse } from '../../../shared/types'
 
 useHead({ title: 'Postings' })
@@ -55,7 +55,11 @@ const VIEWS: { key: string; label: string; dot: string; match: (p: PostingMeta) 
   // Closed listings leave New rather than being deleted: the record is still
   // worth keeping (it was evaluated, it may be reposted), it just is not
   // something he can act on this morning.
-  { key: 'new', label: 'New', dot: 'var(--amber)', match: (p) => p.state === 'new' && !p.closedAt },
+  { key: 'new', label: 'New', dot: 'var(--amber)', match: (p) => inNewQueue(p) },
+  // The morning scan publishes a quick score before the full evaluation, and
+  // anything it scored under the worker's gate is only evaluated on request.
+  // Those wait here rather than in New, which holds evaluated postings only.
+  { key: 'unevaluated', label: 'Not evaluated', dot: 'var(--stone)', match: (p) => p.state === 'new' && !p.closedAt && !p.hasAnalysis },
   { key: 'ready', label: 'Ready to send', dot: 'var(--green)', match: (p) => p.pack === 'done' && p.state !== 'applied' },
   // Edmonton and Alberta, in-office or hybrid — not remote roles that merely
   // list an office here. The deepest process in the funnel has this shape and

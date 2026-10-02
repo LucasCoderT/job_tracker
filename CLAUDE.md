@@ -1272,6 +1272,27 @@ Posting URL, then linking it so it lands as `applied`.
 Result: board cards reaching a brief went from 2 of 5 to 4 of 5, and 126 of 221
 overall to 130.
 
+## New means evaluated (2026-10-02)
+
+He expected a posting on the site to have been evaluated already. It never
+had: the 07:00 scan publishes a quick score at once, and the full A–G
+evaluation follows from the eval worker, which runs `--min-score=3.3`. On the
+day this changed, 106 of 193 open postings had no evaluation, and about 98 of
+those sat under the gate or were unscored, so none was coming.
+
+- **The New view and the dashboard preview hold evaluated postings only**
+  (`inNewQueue` in `shared/postings.ts`). The rest are under a **Not
+  evaluated** view, where Evaluate now on the brief is the way in.
+- **The "waiting to be evaluated" badge only promises what is coming**
+  (`evaluationExpected`): a request is open, or the scan scored it at or over
+  `EVAL_MIN_SCORE`. Before, it showed for two hours on any new posting, including
+  ones the worker would never touch. `EVAL_MIN_SCORE` duplicates the plist's
+  flag; change both together.
+- **Adding a posting by hand requests its evaluation** (`evalStatus:
+  'requested'` plus `commandWorkers`). One added by hand has no score, so since
+  the gate went in it had never been evaluated, while the route's own comment
+  said it would be within the half hour.
+
 ## What predicts a reply (2026-10-01)
 
 A dashboard panel (`CalibrationPanel`, `stats.calibration`, **SCHEMA_VERSION

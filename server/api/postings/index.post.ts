@@ -5,10 +5,12 @@
  * client cannot compute the id (it is a hash of the normalized URL), so
  * unlike the producer's PUT this takes a bare URL and derives the id here.
  *
- * Company and role are optional: the evaluation worker fills them in from the
- * JD within the half hour, because a posting with no valid evaluation is
- * exactly what it drains. Until then the record is labelled with the URL's
- * host so it is recognisable in the list rather than blank.
+ * Company and role are optional: the evaluation fills them in from the JD.
+ * Adding a posting asks for that evaluation outright (`evalStatus:
+ * 'requested'`), because the worker only drains postings scored at or over its
+ * gate and one added by hand has no score, so until 2026-10-02 it was never
+ * evaluated at all. Until it is, the record is labelled with the URL's host so
+ * it is recognisable in the list rather than blank.
  *
  * Body: { url, company?, role?, note? }
  */
@@ -18,6 +20,7 @@ import { postingsKV, getMeta, putMeta, postingIdFor, mergePosting } from '../../
 import { blockedSource } from '../../../shared/postings'
 import { now } from '../../utils/posting-route'
 import { captureForPosting, inBackground } from '../../utils/jd-store'
+import { announce, commandWorkers } from '../../utils/realtime'
 
 export default defineEventHandler(async (event): Promise<PostingCreateResult> => {
   const kv = postingsKV(getCloudflareEnv(event))
@@ -47,8 +50,14 @@ export default defineEventHandler(async (event): Promise<PostingCreateResult> =>
     why: String(body.note ?? '').trim(),
     firstSeen: stamp.slice(0, 10),
   }, stamp)
+  // He added it, so he wants it read: the same request "Evaluate now" makes,
+  // which the worker honours regardless of score.
+  meta.evalStatus = 'requested'
+  meta.evalRequestedAt = stamp
 
   await putMeta(kv, meta)
+  announce(event, 'eval.requested', id, { company: meta.company, role: meta.role, status: 'requested' })
+  commandWorkers(event, 'evaluate', { id })
   // A friend's link is exactly the posting no evaluation will ever reach.
   inBackground(event, captureForPosting(getCloudflareEnv(event), kv, meta))
   // Everywhere else a blank company and role are filled in from the job

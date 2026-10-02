@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
-import { letterText, normalizeUrl } from '#shared/postings'
+import { letterText, normalizeUrl, evaluationExpected } from '#shared/postings'
 import { inPackTest, packArm } from '#shared/pack-test'
 import type { NotionWriteResult, PostingApplyResult, PostingDetail } from '../../../../shared/types'
 
@@ -27,12 +27,11 @@ const waitingHere = computed(() => {
   if (isWaitingStatus(m.answerStatus)) n++
   if (isWaitingStatus(m.parseStatus)) n++
   if (isWaitingStatus(m.evalStatus)) n++
-  // An evaluation is only *pending* for a posting young enough to still be in
-  // the worker's sights. It runs hourly and skips anything under its score
-  // gate, so on an older posting "waiting to be evaluated" would be a badge
-  // that never clears — the Northbeam posting needed --id by hand today for
-  // exactly that reason.
-  if (!m.hasAnalysis && m.state === 'new' && Date.now() - Date.parse(m.createdAt) < 2 * 3600_000) n++
+  // An evaluation is only *pending* when one is actually coming: the worker
+  // skips anything under its score gate (EVAL_MIN_SCORE), so for those the
+  // badge promised something that never arrived. Still bounded by age, since a
+  // worker that has not reached a posting in two hours is not about to.
+  if (m.state === 'new' && !isWaitingStatus(m.evalStatus) && evaluationExpected(m) && Date.now() - Date.parse(m.createdAt) < 2 * 3600_000) n++
   return n
 })
 const waitingLabel = computed(() => {

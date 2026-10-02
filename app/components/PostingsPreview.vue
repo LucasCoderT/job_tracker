@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { PostingMeta } from '../../shared/types'
+import { inNewQueue } from '#shared/postings'
 
 const props = defineProps<{ postings: PostingMeta[] }>()
 
@@ -16,7 +17,7 @@ const MAX = 5
  */
 const shown = computed(() =>
   props.postings
-    .filter((p) => p.state === 'new')
+    .filter(inNewQueue)
     .slice()
     .sort(
       (a, b) =>
@@ -26,7 +27,8 @@ const shown = computed(() =>
     .slice(0, MAX),
 )
 
-const total = computed(() => props.postings.filter((p) => p.state === 'new').length)
+// Evaluated only, the same rule as the listing's New view (inNewQueue).
+const total = computed(() => props.postings.filter(inNewQueue).length)
 
 /** The build's state, so a finished pack is visible without opening it. */
 const PACK_ICON: Record<string, string> = {

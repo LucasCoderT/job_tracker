@@ -226,3 +226,33 @@ export function blockedSource(url: string): string | null {
 export function letterText<T extends { kind: string; contentType: string }>(artifacts: readonly T[]): T | null {
   return artifacts.find((a) => a.kind === 'cover-letter' && a.contentType.startsWith('text/')) ?? null
 }
+
+/**
+ * The evaluation worker's score gate: career-ops runs `site-eval-worker.mjs
+ * --min-score=3.3` (dev.codertheory.careerops.site-eval.plist). Below it, or
+ * unscored, a posting is evaluated only when he asks, so nothing on the site
+ * may promise that one is coming. Change both together.
+ */
+export const EVAL_MIN_SCORE = 3.3
+
+/**
+ * Whether a full evaluation is on its way without him doing anything: he
+ * asked for one (or added the posting himself, which asks), or the morning
+ * scan scored it at or over the gate.
+ */
+export function evaluationExpected(p: { hasAnalysis: boolean; score: number | null; evalStatus?: string | null }): boolean {
+  if (p.hasAnalysis) return false
+  if (p.evalStatus === 'requested' || p.evalStatus === 'building') return true
+  return p.score != null && p.score >= EVAL_MIN_SCORE
+}
+
+/**
+ * Whether a posting belongs in the queue of things to decide on. Only
+ * evaluated postings do (2026-10-02): the morning scan publishes a quick score
+ * straight away and the full evaluation follows, and a list that mixed the two
+ * read as if the site posted jobs nobody had looked at. The rest are one view
+ * away, under "Not evaluated".
+ */
+export function inNewQueue(p: { state: string; closedAt?: string | null; hasAnalysis: boolean }): boolean {
+  return p.state === 'new' && !p.closedAt && p.hasAnalysis
+}
