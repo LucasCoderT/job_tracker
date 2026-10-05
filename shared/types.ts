@@ -564,6 +564,12 @@ export interface PostingQuestion {
   updatedAt: string
 }
 
+/** One question picked out for a (re)draft, and how he wants that answer steered. */
+export interface QuestionTarget {
+  id: string
+  note: string
+}
+
 export interface PostingQuestions {
   questions: PostingQuestion[]
   /**
@@ -582,6 +588,13 @@ export interface PostingQuestions {
   status: AnswerStatus
   /** Steer the whole draft — tone, what to emphasise, anything to avoid. */
   note: string
+  /**
+   * A draft of only these questions, each with its own note. Absent or empty
+   * means the run is the whole form. Set by a request that names questions,
+   * cleared when the run ends; while it is set, an upload can only change
+   * these answers.
+   */
+  targets?: QuestionTarget[]
   requestedAt: string | null
   builtAt: string | null
   error: string | null

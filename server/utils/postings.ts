@@ -22,6 +22,7 @@ import type {
   PostingQuestion,
   PostingQuestions,
   PostingState,
+  QuestionTarget,
 } from '../../shared/types'
 import type { AppEnv, KVNamespace } from './notion'
 import { normalizeUrl } from '../../shared/postings'
@@ -344,6 +345,49 @@ export function parseQuestions(text: string): ParsedQuestion[] {
     out.push({ question, ...splitBodyAndOptions(rest) })
   }
   return out.slice(0, MAX_QUESTIONS)
+}
+
+/**
+ * Add questions to a targeted draft. Tapping Redraft on a second question
+ * while the first is still queued joins the same run; asking again for one
+ * already queued replaces its note, since the latest note is the one he means.
+ */
+export function addTargets(current: QuestionTarget[] | undefined, ids: string[], note: string): QuestionTarget[] {
+  const out = new Map((current ?? []).map((t) => [t.id, t]))
+  for (const id of ids) out.set(id, { id, note })
+  return [...out.values()]
+}
+
+/**
+ * Apply a targeted draft's answers: only the targeted questions can change.
+ *
+ * Deliberately not mergeQuestions. That replaces the list with what was sent,
+ * which is right for a paste and wrong here: the Mac answered against a copy
+ * of the form taken when it started, so trusting its list could bring back a
+ * question he removed meanwhile, and an agent that returned every answer
+ * anyway would overwrite the ones he kept. Here the stored list is the list,
+ * and anything sent for a question that was not asked for is ignored.
+ */
+export function applyTargetAnswers(
+  existing: PostingQuestion[],
+  targets: QuestionTarget[],
+  incoming: { question: string; answer?: string }[],
+  stamp: string,
+): { questions: PostingQuestion[]; applied: number } {
+  const wanted = new Set(targets.map((t) => t.id))
+  const answers = new Map<string, string>()
+  for (const item of incoming) {
+    const answer = str(item.answer ?? '', 20000)
+    if (answer) answers.set(questionId(String(item.question ?? '')), answer)
+  }
+  let applied = 0
+  const questions = existing.map((q) => {
+    const answer = wanted.has(q.id) ? answers.get(q.id) : undefined
+    if (answer === undefined) return q
+    applied++
+    return { ...q, answer, source: 'drafted' as const, updatedAt: stamp }
+  })
+  return { questions, applied }
 }
 
 /**

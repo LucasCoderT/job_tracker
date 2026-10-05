@@ -8,12 +8,16 @@
  * Answers carry across by question id, so re-pasting a form with one question
  * added does not discard the seven answers already drafted.
  *
+ * While a targeted draft is out (`targets` set by the request route), the Mac's
+ * upload can only change the targeted answers; everything else it sends is
+ * ignored, and the stored list stays the list.
+ *
  * Body: { text?: string } | { questions: [{question, answer?}], note?, error? }
  */
 import type { PostingQuestions } from '../../../../../shared/types'
 import { postingContext, requirePosting, now } from '../../../../utils/posting-route'
 import {
-  getQuestions, putQuestions, putMeta, parseQuestions, mergeQuestions,
+  getQuestions, putQuestions, putMeta, parseQuestions, mergeQuestions, applyTargetAnswers,
   withQuestionCounts, EMPTY_QUESTIONS, MAX_QUESTIONS,
 } from '../../../../utils/postings'
 
@@ -46,10 +50,19 @@ export default defineEventHandler(async (event): Promise<PostingQuestions> => {
   // question ends and the next begins.
   const rawText = typeof body.text === 'string' && body.text.trim() ? String(body.text).slice(0, 100000) : existing.rawText
 
+  // The Mac handing back a draft of named questions: only those may change,
+  // whatever it sent (see applyTargetAnswers). A paste from him is never this.
+  const targeted = done && Array.isArray(body.questions) && existing.targets?.length
+    ? applyTargetAnswers(existing.questions, existing.targets, incoming, stamp)
+    : null
+  if (targeted && !targeted.applied) {
+    throw createError({ statusCode: 409, statusMessage: 'None of the questions asked for came back with an answer.' })
+  }
   const next: PostingQuestions = {
     ...existing,
     rawText,
-    questions: mergeQuestions(existing.questions, incoming, stamp),
+    questions: targeted ? targeted.questions : mergeQuestions(existing.questions, incoming, stamp),
+    ...(done ? { targets: [] } : {}),
     note: body.note !== undefined ? String(body.note).trim().slice(0, 2000) : existing.note,
     error: body.error ? String(body.error).slice(0, 2000) : done ? null : existing.error,
     updatedAt: stamp,

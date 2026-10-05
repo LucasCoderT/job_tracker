@@ -33,6 +33,8 @@ export default defineEventHandler(async (event): Promise<PostingQuestions> => {
     status: status as PostingQuestions['status'],
     error: status === 'failed' ? String(body.error ?? 'failed').slice(0, 2000) : null,
     builtAt: status === 'done' ? stamp : existing.builtAt,
+    // The run is over either way; a failed target is asked for again by tapping it.
+    ...(status === 'building' ? {} : { targets: [] }),
     updatedAt: stamp,
   }
   await putQuestions(ctx.kv, ctx.id, next)

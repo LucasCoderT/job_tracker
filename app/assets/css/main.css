@@ -1333,3 +1333,5 @@ a.rail-primary.as-link:hover { background: #d9bd71; border-color: #d9bd71; color
 .cal-foot { margin: 12px 0 0; font-size: 11px; line-height: 1.5; }
 .cal-test { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--panel-edge); }
 .cal-test p.small { margin: 4px 0 0; }
+/* Drafting one question: the dialog names which. */
+.one-q { margin: 0; font-size: 14px; font-weight: 600; color: var(--text); line-height: 1.45; text-wrap: pretty; }

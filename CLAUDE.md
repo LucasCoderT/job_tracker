@@ -1272,6 +1272,52 @@ Posting URL, then linking it so it lands as `applied`.
 Result: board cards reaching a brief went from 2 of 5 to 4 of 5, and 126 of 221
 overall to 130.
 
+## Redraft one answer (2026-10-05)
+
+"Draft answers" was all or nothing: the Mac answered every question and
+uploaded every answer, so a second go at one answer replaced the two he liked,
+his own edits included. Each question card now has **Redraft** (or **Draft**
+when empty), with its own note.
+
+- **`POST /:id/questions/request` takes `only: [questionId]`** and stores
+  `targets: [{id, note}]` on the questions record. The note belongs to that
+  answer; the whole-form `note` is left alone. A second question tapped while
+  the first is still `requested` joins the run. Once the Mac is `building` a
+  targeted request is 409, because it is answering from the list it was given.
+  A whole-form request clears the targets, and so does the run ending either
+  way.
+- **The guarantee is on the server, not in the prompt.** While `targets` is
+  set, the Mac's upload goes through `applyTargetAnswers`, which changes only
+  the targeted answers on the *stored* list and ignores everything else. It is
+  deliberately not `mergeQuestions`: that replaces the list with what was sent,
+  so an agent that returned every answer anyway would overwrite the ones he
+  kept, and a stale copy of the form could bring back a question he removed.
+  `done` with none of the targets answered is refused.
+- **The Mac sees what it is replacing.** career-ops's `targetedAnswerPrompt`
+  shows the whole form with the answers he is keeping (so the new one does not
+  repeat them) and the rejected draft beside its note, because "shorter" means
+  nothing without it. With no note it is told not to hand the same answer back
+  reworded. The worker also deletes the previous run's manifest before each
+  run: a run that wrote nothing would otherwise upload the old answers as new.
+- **An answer box follows the stored answer until he types in it.** The page
+  seeded each box once, so a draft landing later sat behind the old text and
+  looked like unsaved changes. Asking for a redraft discards unsaved text in
+  that box, which the dialog says first.
+
+**Two things the first production test taught, neither about the feature:**
+
+- **A request sent seconds after `wrangler deploy` can be answered by the old
+  version.** The test went out 24 seconds after the deploy finished, the old
+  route ignored `only`, and a whole-form redraft was queued instead. Probe for
+  the new behaviour with a request that is harmless under the old code before
+  sending one that is not.
+- **Never `pkill -f site-apply-worker`.** It matches every lane. Stopping the
+  mistaken draft that way also killed a pack build two minutes in, left both
+  lock files behind (`data/site-packs/.lock`, `.answers.lock`, honoured for 30
+  minutes), and spent that posting's attempts, so the next run "gave up after 2
+  attempts" without trying. Kill the one pid, and clear the lock and the
+  `ans:<id>.attempts.json` it leaves.
+
 ## New means evaluated (2026-10-02)
 
 He expected a posting on the site to have been evaluated already. It never

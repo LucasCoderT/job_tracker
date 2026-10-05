@@ -161,15 +161,62 @@ async function draft() {
   }
 }
 
+// ---- drafting one question ----
+// He liked answers 1 and 3 and wants another go at 2: a whole redraft would
+// replace all three, so one question can be sent on its own with its own note.
+const oneFor = ref<PostingQuestion | null>(null)
+const oneNote = ref('')
+const oneOpen = computed({ get: () => oneFor.value !== null, set: (v) => { if (!v) oneFor.value = null } })
+
+/** The questions a targeted run is working on; empty when the run is the whole form. */
+const targetIds = computed(() => new Set(inFlight.value ? (data.value?.targets ?? []).map((t) => t.id) : []))
+/** Whether this card is waiting on the Mac: named in a targeted run, or the whole form is out. */
+const drafting = (q: PostingQuestion) => inFlight.value && (targetIds.value.size ? targetIds.value.has(q.id) : true)
+// Once the Mac has started it is answering from the list it was given, and a
+// whole-form draft already covers every question.
+const canTarget = computed(() => data.value?.status !== 'building' && !(inFlight.value && !targetIds.value.size))
+
+function openOne(q: PostingQuestion) {
+  oneNote.value = (data.value?.targets ?? []).find((t) => t.id === q.id)?.note ?? ''
+  oneFor.value = q
+}
+
+async function draftOne() {
+  const q = oneFor.value
+  if (!q) return
+  oneFor.value = null
+  busy.value = `one:${q.id}`
+  // The dialog said unsaved changes here would be replaced; put the box back
+  // in step with the stored answer so the new draft shows when it lands.
+  drafts.value = { ...drafts.value, [q.id]: q.answer }
+  try {
+    await $fetch(`/api/postings/${id.value}/questions/request`, { method: 'POST', body: { only: [q.id], note: oneNote.value } })
+    await refresh()
+    say('Queued. Only that answer changes; the others stay as they are.')
+  } catch (err: any) {
+    say(err?.data?.statusMessage || err?.message || "Couldn't queue the draft")
+  } finally {
+    busy.value = ''
+  }
+}
+
 // ---- per-answer editing ----
 const drafts = ref<Record<string, string>>({})
 
-// Only seed a box he is not currently typing in — a refresh landing mid-edit
-// must not overwrite what he has written.
+// A box follows the stored answer until he types in it: a refresh landing
+// mid-edit must not overwrite what he has written, but a draft landing in a
+// box he has not touched has to show. Seeding only once did the first and not
+// the second, so a finished redraft sat behind the old text looking like
+// unsaved changes. `stored` is the answer each box was last in step with.
+const stored: Record<string, string> = {}
 watch(
   questions,
   (list) => {
-    for (const q of list) if (drafts.value[q.id] === undefined) drafts.value[q.id] = q.answer
+    for (const q of list) {
+      const untouched = drafts.value[q.id] === undefined || drafts.value[q.id] === stored[q.id]
+      if (untouched) drafts.value[q.id] = q.answer
+      stored[q.id] = q.answer
+    }
   },
   { immediate: true },
 )
@@ -385,7 +432,12 @@ const words = (s: string) => (s.trim() ? s.trim().split(/\s+/).length : 0)
         </PrimeMessage>
 
         <PrimeMessage v-if="inFlight" severity="info" :closable="false">
-          The Mac is drafting these from your CV and the job description. They land here when it is done.
+          <template v-if="targetIds.size">
+            The Mac is redrafting {{ targetIds.size === 1 ? 'one answer' : `${targetIds.size} answers` }}. The others stay as they are.
+          </template>
+          <template v-else>
+            The Mac is drafting these from your CV and the job description. They land here when it is done.
+          </template>
         </PrimeMessage>
 
         <div class="qa-list">
@@ -422,12 +474,13 @@ const words = (s: string) => (s.trim() ? s.trim().split(/\s+/).length : 0)
                 :rows="q.options?.length ? 3 : 5"
                 :placeholder="q.options?.length
                   ? 'Chosen answer appears here — or type your own.'
-                  : inFlight ? 'Being drafted…' : 'Not drafted yet — write it here, or press Draft answers.'"
+                  : drafting(q) ? 'Being drafted…' : 'Not drafted yet — write it here, or press Draft.'"
                 autocomplete="off"
               />
               <div class="qa-foot">
                 <span class="qa-meta mono">
                   {{ words(drafts[q.id] ?? '') }} words
+                  <template v-if="drafting(q) && targetIds.size"> · <i class="pi pi-spin pi-spinner" /> redrafting</template>
                   <template v-if="q.source === 'edited'"> · your words</template>
                   <template v-else-if="q.source === 'drafted'"> · drafted</template>
                 </span>
@@ -445,6 +498,17 @@ const words = (s: string) => (s.trim() ? s.trim().split(/\s+/).length : 0)
                     <button type="button" class="linkish" @click="revert(q)">revert</button>
                     <PrimeButton label="Save" icon="pi pi-check" size="small" :loading="busy === q.id" @click="saveAnswer(q)" />
                   </template>
+                  <PrimeButton
+                    :label="q.answer.trim() ? 'Redraft' : 'Draft'"
+                    icon="pi pi-sparkles"
+                    size="small"
+                    severity="secondary"
+                    text
+                    :disabled="!canTarget"
+                    :loading="busy === `one:${q.id}`"
+                    :title="canTarget ? 'Draft this answer only' : 'The Mac is already drafting'"
+                    @click="openOne(q)"
+                  />
                   <PrimeButton
                     label="Copy"
                     icon="pi pi-copy"
@@ -491,6 +555,33 @@ const words = (s: string) => (s.trim() ? s.trim().split(/\s+/).length : 0)
             :loading="busy === 'draft'"
             @click="draft"
           />
+        </template>
+      </PrimeDialog>
+
+      <PrimeDialog
+        v-model:visible="oneOpen"
+        modal
+        :header="oneFor?.answer.trim() ? 'Redraft this answer' : 'Draft this answer'"
+        :style="{ width: 'min(520px, calc(100vw - 32px))' }"
+      >
+        <div v-if="oneFor" class="build-dialog">
+          <p class="one-q">{{ oneFor.question }}</p>
+          <p class="muted small">
+            The Mac drafts this one answer and leaves the other {{ questions.length - 1 }} exactly as they are.
+            <template v-if="oneFor.answer.trim()">It sees the current answer, so a note like “shorter” or “lead with ChartD” has something to work from.</template>
+          </p>
+          <p v-if="oneFor.source === 'edited' || dirty(oneFor)" class="build-leave-test">
+            {{ dirty(oneFor) ? 'You have unsaved changes in this answer, and they' : 'You edited this answer yourself, and your words' }}
+            will be replaced.
+          </p>
+          <label>
+            <span>Note for this answer <small>optional</small></span>
+            <PrimeTextarea v-model="oneNote" rows="4" placeholder="Shorter. Lead with the ChartD work…" autocomplete="off" />
+          </label>
+        </div>
+        <template #footer>
+          <PrimeButton label="Cancel" severity="secondary" text size="small" @click="oneFor = null" />
+          <PrimeButton :label="oneFor?.answer.trim() ? 'Redraft' : 'Draft'" icon="pi pi-sparkles" size="small" @click="draftOne" />
         </template>
       </PrimeDialog>
 
