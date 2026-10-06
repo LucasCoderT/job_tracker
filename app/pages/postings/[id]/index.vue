@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
-import { letterText, normalizeUrl, evaluationExpected } from '#shared/postings'
+import { letterText, normalizeUrl, evaluationExpected, postingChannel } from '#shared/postings'
 import { inPackTest, packArm } from '#shared/pack-test'
 import type { NotionWriteResult, PostingApplyResult, PostingDetail } from '../../../../shared/types'
 
@@ -498,8 +498,13 @@ const files = computed(() =>
   })),
 )
 
-// ---- the rail's primary action, which moves with the state ----
+// ---- the rail (Posting Brief v3) ----
+// In the order the work happens: read the posting, build the pack, record the
+// application. The link to the posting is the one amber object. Recording an
+// application is a quiet button that is always there, because he applies with
+// or without a pack and the old rail only offered it once one was built.
 const applied = computed(() => meta.value?.state === 'applied')
+const dismissed = computed(() => meta.value?.state === 'dismissed')
 const packDone = computed(() => meta.value?.pack === 'done')
 const inFlight = computed(() => meta.value?.pack === 'requested' || meta.value?.pack === 'building')
 
@@ -509,60 +514,66 @@ const testArm = computed(() =>
   meta.value && inPackTest(meta.value, data.value?.packTest ?? null) ? packArm(meta.value.id) : null,
 )
 
-const primary = computed(() => {
-  if (applied.value)
-    return {
-      label: 'Open in Notion',
-      icon: 'pi pi-external-link',
-      hint: `Applied ${when(meta.value?.appliedAt)}. It sits in the funnel as Awaiting reply.`,
-    }
-  if (packDone.value)
-    return {
-      label: 'Mark applied',
-      icon: 'pi pi-send',
-      hint: 'Send it through their site, then mark it here: a row goes into Notion and the funnel picks it up within 5 minutes.',
-    }
-  if (testArm.value === 'base')
-    return {
-      label: 'Mark applied',
-      icon: 'pi pi-send',
-      hint: 'Pack test: this one goes out with your base CV and no cover letter. Download it below, send it through their site, then mark it here.',
-    }
-  if (inFlight.value)
-    return {
-      label: 'Building the pack…',
-      icon: 'pi pi-spin pi-spinner',
-      hint: 'The Mac tailors the CV and cover letter and uploads them here. Usually 15–20 minutes.',
-    }
-  return {
-    label: 'Build pack',
-    icon: 'pi pi-file-pdf',
-    hint: testArm.value === 'tailored'
-      ? 'Pack test: this one is in the tailored half. Queues the Mac to tailor a CV and cover letter to this JD.'
-      : 'Queues the Mac to tailor a CV and cover letter to this JD.',
-  }
-})
-
 const notionHref = computed(() =>
   meta.value?.notionPageId ? `https://notion.so/${meta.value.notionPageId.replace(/-/g, '')}` : '',
 )
 
-/** Just the host, so the link says where it goes without wrapping a long req URL. */
-const employerHost = computed(() => {
-  const raw = meta.value?.employerUrl
-  if (!raw) return ''
+const shortUrl = (raw: string) => raw.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')
+
+/** "Greenhouse" for a board it knows, the bare host for an employer's own site. */
+function siteName(href: string): string {
+  const channel = postingChannel(href)
+  if (channel !== 'Company site') return channel
   try {
-    return new URL(raw).hostname.replace(/^www\./, '')
+    return new URL(href).hostname.replace(/^www\./, '')
   } catch {
-    return raw.slice(0, 40)
+    return 'the site'
+  }
+}
+
+/**
+ * Where the amber button goes. The employer's own req when career-ops resolved
+ * one, because that is the link that converts: applications sent on the
+ * employer's page reach a screen about three times as often as ones sent
+ * through the board. The board link then drops to a line underneath.
+ */
+const target = computed(() => {
+  const m = meta.value
+  if (!m) return null
+  const href = m.employerUrl || m.url
+  if (!href) return null
+  return {
+    href,
+    name: siteName(href),
+    short: shortUrl(href),
+    foundOn: m.employerUrl && m.url ? { href: m.url, name: siteName(m.url) } : null,
   }
 })
 
-function onPrimary() {
-  if (applied.value || inFlight.value) return
-  if (packDone.value || testArm.value === 'base') return markApplied()
-  buildOpen.value = true
+const applyHint = computed(() => {
+  const where = target.value?.name ?? 'their site'
+  if (armed.value === 'applied') return 'Press again to confirm. This writes the row into Notion.'
+  if (testArm.value === 'base') return `Pack test: this one goes out with your base CV and no cover letter. Send it through ${where}, then record it here.`
+  if (packDone.value) return `Once it is sent through ${where}. A row goes into Notion and the funnel picks it up within 5 minutes.`
+  if (inFlight.value) return 'The pack is still building, but you can record an application any time.'
+  return `Once it is sent through ${where}, with or without a pack.`
+})
+
+/** Two presses, like every other state change in the rail: this one writes to Notion. */
+function onMarkApplied() {
+  if (busy.value === 'applied') return
+  if (armed.value !== 'applied') return arm('applied')
+  armed.value = null
+  return markApplied()
 }
+
+const buildHint = computed(() =>
+  testArm.value === 'base'
+    ? 'Pack test: the base CV half. Building one takes this posting out of the test.'
+    : testArm.value === 'tailored'
+      ? 'Pack test: the tailored half.'
+      : '',
+)
 </script>
 
 <template>
@@ -744,172 +755,128 @@ function onPrimary() {
 
         <!-- The rail: what to do next, and what has been built -->
         <aside class="brief-rail">
-          <PrimeCard class="sec rail-next" aria-label="Next">
+          <PrimeCard class="sec rail-card" aria-label="Apply">
             <template #content>
-              <h2 class="rail-title">Next</h2>
-              <a
-                v-if="applied"
-                class="rail-primary as-link"
-                :href="notionHref"
-                target="_blank"
-                rel="noopener"
-              >
-                <i :class="primary.icon" />{{ primary.label }}
-              </a>
-              <PrimeButton
-                v-else
-                class="rail-primary"
-                :label="primary.label"
-                :icon="primary.icon"
-                :loading="busy === 'applied' || busy === 'pack'"
-                :disabled="inFlight"
-                @click="onPrimary"
-              />
-              <p class="rail-hint">{{ primary.hint }}</p>
+              <div class="rail-head">
+                <h2>Apply</h2>
+                <span class="rail-state" :class="{ on: applied }">
+                  <span class="dot" />
+                  <ClientOnly v-if="applied">Applied {{ when(meta.appliedAt) }}<template #fallback>Applied</template></ClientOnly>
+                  <template v-else>{{ dismissed ? 'Dismissed' : 'Not applied yet' }}</template>
+                </span>
+              </div>
 
-              <div class="rail-pack">
-                <div class="rail-pack-head">
-                  <span class="rail-label">Apply pack</span>
-                  <span class="pack-chip" :class="'is-' + meta.pack">
-                    <i class="pi pi-file-pdf" />{{ PACK_LABEL[meta.pack] }}
-                  </span>
-                </div>
-
-                <div v-if="files.length" class="rail-files">
-                  <div v-for="f in files" :key="f.name" class="rail-file">
-                    <a class="file-card" :href="`/api/postings/${id}/artifacts/${encodeURIComponent(f.name)}`">
-                      <i :class="f.icon" />
-                      <span class="file-meta">
-                        <span class="file-label">{{ f.label }}</span>
-                        <span class="file-sub mono">{{ f.name }} · {{ kb(f.bytes) }}</span>
-                      </span>
-                      <i class="pi pi-download go" />
-                    </a>
-                    <button
-                      type="button"
-                      class="file-del"
-                      :class="{ armed: armed === `file:${f.name}` }"
-                      :aria-label="`Delete ${f.name}`"
-                      :title="armed === `file:${f.name}` ? 'Really delete?' : 'Delete'"
-                      @click="deleteFile(f.name)"
-                    >
-                      <i :class="armed === `file:${f.name}` ? 'pi pi-exclamation-triangle' : 'pi pi-trash'" />
-                    </button>
-                  </div>
-                </div>
-                <CopyCoverLetter v-if="letter" :posting-id="id" :name="letter.name" />
-                <div v-if="testArm === 'base'" class="rail-files">
-                  <a class="file-card" href="/api/base-cv">
-                    <i class="pi pi-file-pdf" />
-                    <span class="file-meta">
-                      <span class="file-label">Base CV · pack test</span>
-                      <span class="file-sub mono">{{ data?.packTest?.name }} · {{ kb(data?.packTest?.bytes ?? 0) }}</span>
-                    </span>
-                    <i class="pi pi-download go" />
-                  </a>
-                </div>
-                <p v-else-if="!files.length" class="muted small">
-                  {{ inFlight ? 'The Mac is building it — it lands here when it is done.' : 'Nothing built yet.' }}
+              <template v-if="target">
+                <a class="rail-primary as-link" :href="target.href" target="_blank" rel="noopener">
+                  <span>Open on {{ target.name }}</span><i class="pi pi-external-link" />
+                </a>
+                <p class="rail-url mono" :title="target.href">{{ target.short }}</p>
+                <p v-if="target.foundOn || meta.postedAt || meta.location" class="rail-sub">
+                  <template v-if="target.foundOn">
+                    <template v-if="!applied">The employer's own posting, which is the better place to apply. </template>Found on
+                    <a :href="target.foundOn.href" target="_blank" rel="noopener">{{ target.foundOn.name }}</a>.
+                  </template>
+                  <ClientOnly v-else>
+                    <template v-if="meta.postedAt">posted {{ when(meta.postedAt) }}</template>
+                    <template v-if="meta.postedAt && meta.location"> · </template>
+                    <template v-if="meta.location">{{ meta.location }}</template>
+                  </ClientOnly>
                 </p>
+              </template>
 
-                <p v-if="meta.pack === 'failed' && meta.packError" class="pack-error mono">{{ meta.packError }}</p>
-                <ClientOnly>
-                  <p v-if="meta.packBuiltAt" class="faint small mono built">
-                    built {{ when(meta.packBuiltAt) }}<template v-if="meta.packNote"> · “{{ meta.packNote }}”</template>
-                  </p>
-                </ClientOnly>
-
-                <PrimeButton
-                  class="rail-build"
-                  :label="testArm === 'base' ? 'Build anyway' : meta.pack === 'none' ? 'Build' : packDone ? 'Rebuild' : 'Re-queue'"
-                  icon="pi pi-refresh"
-                  size="small"
-                  severity="secondary"
-                  outlined
-                  :loading="busy === 'pack'"
-                  @click="buildOpen = true"
-                />
-              </div>
-
-              <div class="rail-danger">
-                <PrimeButton
-                  :label="armed === 'dismiss' ? 'Really?' : meta.state === 'dismissed' ? 'Un-dismiss' : 'Dismiss'"
-                  icon="pi pi-times"
-                  size="small"
-                  :severity="armed === 'dismiss' ? 'danger' : 'secondary'"
-                  text
-                  :loading="busy === 'dismiss'"
-                  @click="dismiss"
-                />
-                <PrimeButton
-                  class="danger-btn"
-                  label="Delete"
-                  icon="pi pi-trash"
-                  size="small"
-                  severity="danger"
-                  text
-                  @click="deleteOpen = true"
-                />
-              </div>
+              <template v-if="!applied">
+                <button
+                  type="button"
+                  class="rail-quiet"
+                  :class="{ armed: armed === 'applied' }"
+                  :disabled="busy === 'applied'"
+                  @click="onMarkApplied"
+                >
+                  <i :class="busy === 'applied' ? 'pi pi-spin pi-spinner' : armed === 'applied' ? 'pi pi-check-circle' : 'pi pi-check'" />
+                  <span>{{ busy === 'applied' ? 'Saving to Notion…' : armed === 'applied' ? 'Confirm applied' : 'Mark as applied' }}</span>
+                </button>
+                <p class="rail-hint" aria-live="polite">{{ applyHint }}</p>
+              </template>
+              <template v-else>
+                <a v-if="notionHref" class="rail-quiet" :href="notionHref" target="_blank" rel="noopener">
+                  <span>Open in Notion</span><i class="pi pi-external-link" />
+                </a>
+                <p class="rail-hint">Sits in the funnel as Awaiting reply.</p>
+                <!-- Fills in the page's summary and the Job Description / Apply Pack /
+                     Analytics sub-pages that are missing; never touches what is there. -->
+                <button v-if="notionHref" type="button" class="linkish notion-sync" :disabled="busy === 'notion'" @click="syncNotion">
+                  <i :class="busy === 'notion' ? 'pi pi-spin pi-spinner' : 'pi pi-sync'" /> Update Notion page
+                </button>
+              </template>
             </template>
           </PrimeCard>
 
-          <!--
-            The employer's own req, when career-ops resolved one. It leads,
-            because that is the link to apply through: applications sent on the
-            employer's page reach a screen at 15.4% against 4.9% through the
-            aggregators, and both processes that ever reached a third round came
-            in that way. The aggregator link stays below it, labelled as where
-            it was found rather than where to apply.
-          -->
-          <a
-            v-if="meta.employerUrl"
-            class="link-card link-card--primary"
-            :href="meta.employerUrl"
-            target="_blank"
-            rel="noopener"
-            aria-label="Apply on the employer's own posting"
-          >
-            <span class="link-meta">
-              <span class="link-title">Apply on the employer's site</span>
-              <span class="link-sub mono">{{ employerHost }} · far better odds than the board</span>
-            </span>
-            <i class="pi pi-external-link go" />
-          </a>
-
-          <a
-            v-if="meta.url"
-            class="link-card"
-            :href="meta.url"
-            target="_blank"
-            rel="noopener"
-            :aria-label="`Open the posting on ${meta.source || 'its site'}`"
-          >
-            <span class="link-meta">
-              <span class="link-title">{{ meta.employerUrl ? 'Where it was found' : 'The posting' }}<span v-if="meta.source" class="mono muted"> · {{ meta.source }}</span></span>
-              <ClientOnly>
-                <span v-if="meta.postedAt || meta.location" class="link-sub mono">
-                  <template v-if="meta.postedAt">posted {{ when(meta.postedAt) }}</template>
-                  <template v-if="meta.postedAt && meta.location"> · </template>
-                  <template v-if="meta.location">{{ meta.location }}</template>
+          <PrimeCard class="sec rail-card" aria-label="Apply pack">
+            <template #content>
+              <div class="rail-head">
+                <h2>Apply pack</h2>
+                <span class="pack-chip" :class="'is-' + meta.pack">
+                  <i class="pi pi-file-pdf" />{{ PACK_LABEL[meta.pack] }}
                 </span>
-              </ClientOnly>
-            </span>
-            <i class="pi pi-external-link go" />
-          </a>
+              </div>
 
-          <!--
-            First-call prep. Seven of the ten applications that reached an
-            interview stopped at the first screen, so this is reachable from
-            every posting, not only the ones with a booked call.
-          -->
-          <NuxtLink class="link-card" :to="`/postings/${id}/screen?from=${parent}`">
-            <span class="link-meta">
-              <span class="link-title">Screen prep</span>
-              <span class="link-sub mono">the first call, in your words</span>
-            </span>
-            <i class="pi pi-angle-right go" />
-          </NuxtLink>
+              <div v-if="files.length" class="rail-files">
+                <div v-for="f in files" :key="f.name" class="rail-file">
+                  <a class="file-card" :href="`/api/postings/${id}/artifacts/${encodeURIComponent(f.name)}`">
+                    <i :class="f.icon" />
+                    <span class="file-meta">
+                      <span class="file-label">{{ f.label }}</span>
+                      <span class="file-sub mono">{{ f.name }} · {{ kb(f.bytes) }}</span>
+                    </span>
+                    <i class="pi pi-download go" />
+                  </a>
+                  <button
+                    type="button"
+                    class="file-del"
+                    :class="{ armed: armed === `file:${f.name}` }"
+                    :aria-label="`Delete ${f.name}`"
+                    :title="armed === `file:${f.name}` ? 'Really delete?' : 'Delete'"
+                    @click="deleteFile(f.name)"
+                  >
+                    <i :class="armed === `file:${f.name}` ? 'pi pi-exclamation-triangle' : 'pi pi-trash'" />
+                  </button>
+                </div>
+              </div>
+              <CopyCoverLetter v-if="letter" :posting-id="id" :name="letter.name" />
+              <div v-if="testArm === 'base'" class="rail-files">
+                <a class="file-card" href="/api/base-cv">
+                  <i class="pi pi-file-pdf" />
+                  <span class="file-meta">
+                    <span class="file-label">Base CV · pack test</span>
+                    <span class="file-sub mono">{{ data?.packTest?.name }} · {{ kb(data?.packTest?.bytes ?? 0) }}</span>
+                  </span>
+                  <i class="pi pi-download go" />
+                </a>
+              </div>
+              <p v-else-if="!files.length" class="rail-empty">
+                {{ inFlight ? 'The Mac is building it — it lands here when it is done.' : 'Nothing built yet.' }}
+              </p>
+
+              <p v-if="meta.pack === 'failed' && meta.packError" class="pack-error mono">{{ meta.packError }}</p>
+
+              <button
+                type="button"
+                class="rail-build"
+                :class="{ first: meta.pack === 'none' && testArm !== 'base' }"
+                :disabled="busy === 'pack'"
+                @click="buildOpen = true"
+              >
+                <i :class="busy === 'pack' ? 'pi pi-spin pi-spinner' : 'pi pi-refresh'" />
+                {{ testArm === 'base' ? 'Build anyway' : meta.pack === 'none' ? 'Build' : packDone ? 'Rebuild' : 'Re-queue' }}
+              </button>
+              <p v-if="buildHint" class="rail-hint">{{ buildHint }}</p>
+              <ClientOnly>
+                <p v-if="meta.packBuiltAt" class="faint mono built">
+                  built {{ when(meta.packBuiltAt) }}<template v-if="meta.packNote"> · “{{ meta.packNote }}”</template>
+                </p>
+              </ClientOnly>
+            </template>
+          </PrimeCard>
 
           <!-- The supplemental questions a form asks, and their drafted answers. -->
           <NuxtLink class="link-card" :to="`/postings/${id}/questions?from=${parent}`">
@@ -923,18 +890,41 @@ function onPrimary() {
             <i class="pi pi-angle-right go" />
           </NuxtLink>
 
-          <a v-if="notionHref" class="link-card" :href="notionHref" target="_blank" rel="noopener">
+          <!--
+            First-call prep. Most applications that reach an interview stop at
+            the first screen, so this is reachable from every posting, not only
+            the ones with a booked call.
+          -->
+          <NuxtLink class="link-card" :to="`/postings/${id}/screen?from=${parent}`">
             <span class="link-meta">
-              <span class="link-title"><i class="pi pi-check-circle in-notion" />In Notion</span>
-              <ClientOnly><span class="link-sub mono">applied {{ when(meta.appliedAt) }}</span></ClientOnly>
+              <span class="link-title">Screen prep</span>
+              <span class="link-sub mono">the first call, in your words</span>
             </span>
-            <i class="pi pi-external-link go" />
-          </a>
-          <!-- Fills in the page's summary and the Job Description / Apply Pack /
-               Analytics sub-pages that are missing; never touches what is there. -->
-          <button v-if="notionHref" type="button" class="linkish notion-sync" :disabled="busy === 'notion'" @click="syncNotion">
-            <i :class="busy === 'notion' ? 'pi pi-spin pi-spinner' : 'pi pi-sync'" /> Update Notion page
-          </button>
+            <i class="pi pi-angle-right go" />
+          </NuxtLink>
+
+          <!-- State changes are quiet, and outside the cards: neither is the
+               next thing to do. -->
+          <div class="rail-danger">
+            <PrimeButton
+              :label="armed === 'dismiss' ? 'Really?' : dismissed ? 'Un-dismiss' : 'Dismiss'"
+              icon="pi pi-times"
+              size="small"
+              :severity="armed === 'dismiss' ? 'danger' : 'secondary'"
+              text
+              :loading="busy === 'dismiss'"
+              @click="dismiss"
+            />
+            <PrimeButton
+              class="danger-btn"
+              label="Delete"
+              icon="pi pi-trash"
+              size="small"
+              severity="danger"
+              text
+              @click="deleteOpen = true"
+            />
+          </div>
 
           <!-- Re-evaluate. Secondary on purpose: it spends a Claude run and the
                brief already shows an evaluation, so it is the thing you reach

@@ -1272,6 +1272,46 @@ Posting URL, then linking it so it lands as `applied`.
 Result: board cards reaching a brief went from 2 of 5 to 4 of 5, and 126 of 221
 overall to 130.
 
+## Posting Brief v3: the rail (2026-10-06)
+
+From `Posting Brief v3.dc.html`. The left column and the JD were already at v3
+(the last v2 revision brought them there); what changed is the rail, which is
+now two cards **in the order the work happens**: read the posting, build the
+pack, record the application.
+
+- **The one amber object is the link to the posting**, not a button that
+  changes with the state. v2's primary button was Build pack, then Building…,
+  then Mark applied, so the thing he most often wanted (open the job) was a
+  grey card further down, and Mark applied only appeared once a pack existed.
+- **"Mark as applied" is always there, and quiet.** He applies with or without
+  a pack. It takes two presses (arm, then confirm within 4s) because it writes
+  a row into Notion; in v2 it was one press on the loudest button on the page.
+- **The Apply pack card owns Build**, with the chip, the files, Copy cover
+  letter and the pack test's base CV. Dismiss and Delete sit outside both
+  cards with no border: neither is the next thing to do.
+
+Where the design had nothing, because it was drawn before the feature existed:
+
+- **`employerUrl` takes the amber button.** The design links `meta.url`. When
+  career-ops has resolved the employer's own req, that is the link that
+  converts, so the button goes there ("Open on Greenhouse") and the board drops
+  to a line beneath it ("Found on LinkedIn"). The three old link cards (employer
+  site, the posting, In Notion) are folded into the Apply card.
+- **The button names where it goes** with `postingChannel()`, and falls back to
+  the bare host for an employer's own domain, since "Open on Company site" says
+  nothing.
+- **Application questions and Screen prep keep their link cards** under the two
+  cards, and Re-evaluate and Update Notion page stay as quiet text buttons.
+- **The JD stays its own grid child** rather than the third card in the left
+  column, as the design draws it. On a phone that keeps it after the rail,
+  which the design's collapsed `<details>` would make harmless but the page
+  opens the JD by default when there is no evaluation.
+
+The rail's new buttons are plain `<button>`/`<a>` with token colours rather
+than PrimeButton: the design's quiet filled button and its outline Build have
+no PrimeVue severity that matches, and overriding one per button is more CSS
+than the buttons themselves.
+
 ## Redraft one answer (2026-10-05)
 
 "Draft answers" was all or nothing: the Mac answered every question and

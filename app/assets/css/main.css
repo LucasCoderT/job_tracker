@@ -651,8 +651,47 @@ a.rail-primary.as-link:hover { background: #d9bd71; border-color: #d9bd71; color
 .file-del.armed { color: var(--danger); }
 .file-del:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
 .rail-pack .built { margin: 8px 0 0; line-height: 1.5; text-wrap: pretty; }
-.rail-build { width: 100%; justify-content: center; margin-top: 10px; }
-.rail-danger { display: flex; gap: 4px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--panel-edge); }
+/* ---- Posting Brief v3 rail: two cards, in the order the work happens ---- */
+.rail-card .rail-head h2 { color: var(--muted); }
+.rail-state { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 500; color: var(--muted); }
+.rail-state .dot { width: 6px; height: 6px; border-radius: 50%; flex: none; background: var(--faint); }
+.rail-state.on { color: var(--green); }
+.rail-state.on .dot { background: var(--green); }
+a.rail-primary.as-link { gap: 8px; }
+a.rail-primary.as-link .pi { font-size: 12px; }
+.rail-url { margin: 8px 0 0; font-size: 11.5px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rail-sub { margin: 4px 0 0; font-size: 12px; color: var(--muted); line-height: 1.45; text-wrap: pretty; }
+.rail-sub a { color: var(--text); }
+.rail-sub a:hover { color: var(--amber); }
+/* Recording the application: always there, never the loudest thing. */
+.rail-quiet {
+  display: flex; width: 100%; align-items: center; justify-content: center; gap: 8px; margin-top: 14px;
+  padding: 9px 14px; font: inherit; font-size: 14px; font-weight: 600; border-radius: 6px; cursor: pointer;
+  background: var(--card); border: 1px solid var(--panel-edge); color: var(--text); text-decoration: none;
+  transition: border-color 120ms, background 120ms;
+}
+.rail-quiet:hover { border-color: var(--muted); color: var(--text); }
+.rail-quiet.armed { border-color: var(--text); }
+.rail-quiet:focus-visible, .rail-build:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.rail-quiet:disabled, .rail-build:disabled { opacity: .7; cursor: default; }
+.rail-quiet .pi { font-size: 13px; }
+.rail-empty { margin: 0; font-size: 12.5px; color: var(--muted); line-height: 1.45; text-wrap: pretty; }
+.rail-card .rail-files { margin-top: 0; }
+.rail-card .rail-files + .rail-files, .rail-card .copy-letter + .rail-files { margin-top: 8px; }
+.rail-build {
+  display: flex; width: 100%; align-items: center; justify-content: center; gap: 6px; margin-top: 10px;
+  padding: 7px 11px; font: inherit; font-size: 12.5px; font-weight: 500; border-radius: 6px; cursor: pointer;
+  background: transparent; border: 1px solid var(--panel-edge); color: var(--muted);
+  transition: border-color 120ms, color 120ms;
+}
+.rail-build.first { color: var(--text); border-color: var(--faint); }
+.rail-build:hover { color: var(--text); border-color: var(--muted); }
+.rail-build .pi { font-size: 12px; }
+.rail-card .built { margin: 8px 0 0; font-size: 11.5px; line-height: 1.5; text-wrap: pretty; }
+.rail-card .notion-sync { margin-top: 8px; }
+/* Posting Brief v3: Dismiss and Delete sit outside the cards. Neither is the
+   next thing to do, so neither gets a border or a rule. */
+.rail-danger { display: flex; gap: 4px; padding: 0 8px; }
 .rail-danger .p-button:last-child { margin-left: auto; }
 /* The links are tap targets on a phone, so they are cards rather than a row
    of small anchors inside one. */
