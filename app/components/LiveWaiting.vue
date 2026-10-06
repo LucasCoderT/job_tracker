@@ -47,7 +47,7 @@ const title = computed(() =>
 </script>
 
 <template>
-  <span v-if="count > 0" class="live-waiting" :title="title">
+  <span v-if="count > 0" class="live-waiting" role="status" :title="title">
     <span class="live-dot" :class="{ 'is-busy': refreshing }" aria-hidden="true" />
     <span>{{ text }}</span>
   </span>

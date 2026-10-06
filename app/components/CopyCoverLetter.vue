@@ -53,11 +53,12 @@ async function copy() {
   } catch {
     if (text.value === null) return say("Couldn't load the letter.")
     // No clipboard (an insecure origin, or a browser that did not count the
-    // tap): show the text selected, so it is one ⌘C away instead of none.
+    // tap): show the text selected, so it is one copy away instead of none.
+    // The message does not name a key: half the time this is a phone.
     selectable.value = true
     await nextTick()
     box.value?.select()
-    say('Copy failed — the letter is selected, press ⌘C.')
+    say('Copy failed. The letter is selected below, copy it from there.')
   }
 }
 </script>

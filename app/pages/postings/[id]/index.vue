@@ -74,8 +74,9 @@ const alreadyApplied = computed(() => {
 })
 
 const notice = ref<{ text: string; severity: 'success' | 'warn' | 'error' | 'info' } | null>(null)
+const reason = (err: any) => err?.data?.statusMessage || err?.message || 'no reason was given'
 function fail(err: any, what: string) {
-  notice.value = { text: `${what}: ${err?.data?.statusMessage || err?.message || 'failed'}`, severity: 'error' }
+  notice.value = { text: `${what}: ${reason(err)}`, severity: 'error' }
 }
 
 // ---- actions ----
@@ -139,16 +140,27 @@ const buildPack = () => {
   )
 }
 
+/**
+ * What happened to the last "Mark as applied", said beside the button.
+ *
+ * Every result used to go to the notice above the grid, which on a phone is
+ * about 750px above the thumb that pressed it. For the one action that writes a
+ * Notion row, a failure that looks like nothing happened is the worst outcome:
+ * he either believes an application is recorded when it is not, or presses again.
+ */
+const applyNote = ref<{ text: string; tone: 'ok' | 'warn' | 'error' | 'quiet' } | null>(null)
+
 async function markApplied() {
   busy.value = 'applied'
+  applyNote.value = null
   try {
     const res = await $fetch<PostingApplyResult>(`/api/postings/${id.value}/applied`, { method: 'POST' })
-    notice.value = res.notion.ok
-      ? { text: 'Added to Notion. It joins the funnel within 5 minutes (the stats are cached).', severity: 'success' }
-      : { text: `Marked applied here, but Notion refused: ${(res.notion as Extract<NotionWriteResult, { ok: false }>).error}`, severity: 'warn' }
+    applyNote.value = res.notion.ok
+      ? { text: 'Recorded in Notion. It joins the funnel within 5 minutes.', tone: 'ok' }
+      : { text: `Marked applied here, but Notion refused: ${(res.notion as Extract<NotionWriteResult, { ok: false }>).error}`, tone: 'warn' }
     await Promise.all([refresh(), refreshIndex()])
   } catch (err) {
-    fail(err, "Couldn't mark applied")
+    applyNote.value = { text: `Not recorded: ${reason(err)}. Nothing was written, so it is safe to try again.`, tone: 'error' }
   } finally {
     busy.value = ''
   }
@@ -156,12 +168,28 @@ async function markApplied() {
 
 // ---- two-step deletes (the app's own convention: arm, then confirm) ----
 const armed = ref<string | null>(null)
-let disarm: ReturnType<typeof setTimeout> | undefined
+/** Seconds left to confirm, counted down on the armed control so the window is not a guess. */
+const armedLeft = ref(0)
+let disarm: ReturnType<typeof setInterval> | undefined
 function arm(key: string) {
   armed.value = key
-  clearTimeout(disarm)
-  disarm = setTimeout(() => (armed.value = null), 4000)
+  armedLeft.value = 4
+  if (key === 'applied') applyNote.value = null
+  clearInterval(disarm)
+  disarm = setInterval(() => {
+    armedLeft.value--
+    if (armedLeft.value > 0) return
+    clearInterval(disarm)
+    // A lapsed confirm on the Notion write says so; it used to just go back.
+    if (armed.value === 'applied') applyNote.value = { text: 'Not recorded. The confirm timed out.', tone: 'quiet' }
+    armed.value = null
+  }, 1000)
 }
+function disarmNow() {
+  clearInterval(disarm)
+  armed.value = null
+}
+onBeforeUnmount(() => clearInterval(disarm))
 
 function dismiss() {
   if (armed.value !== 'dismiss') return arm('dismiss')
@@ -310,9 +338,28 @@ const PACK_LABEL: Record<string, string> = {
  * colour is read off the words rather than matched against an enum — the
  * same reason cleanAnalysis keeps them as strings.
  */
+/**
+ * career-ops's enum values and keys as words: `not_needed` -> "Not needed",
+ * `ai_screening_disclosure` -> "AI screening disclosure". Only strings that are
+ * plainly identifiers are touched (lowercase with underscores, or one bare
+ * lowercase word); a sentence the evaluation wrote is left exactly as written.
+ */
+const ACRONYM: Record<string, string> = { ai: 'AI', jd: 'JD', cv: 'CV', na: 'n/a', us: 'US', api: 'API' }
+function human(v: unknown): string {
+  const raw = String(v ?? '').trim()
+  if (!/^[a-z0-9]+(_[a-z0-9]+)*$/.test(raw)) return raw
+  if (ACRONYM[raw]) return ACRONYM[raw]!
+  const words = raw.split('_').map((w) => ACRONYM[w] ?? w)
+  return words.join(' ').replace(/^[a-z]/, (c) => c.toUpperCase())
+}
+
 function tone(v: unknown): string {
   const s = String(v ?? '').toLowerCase()
   if (!s) return 'var(--stone)'
+  // A requirement he does not meet is a gap, not an unknown: it rendered in the
+  // same neutral grey as "not assessed" and under-reported exactly what an
+  // interviewer pushes on.
+  if (/\bmissing\b|\babsent\b|not met|\bgap\b/.test(s)) return 'var(--danger)'
   if (/high confidence|legit|verified|\blow\b|strong|citizen|not[_ ]needed|no sponsorship|authorized|permanent resident|\bpass\b|\byes\b/.test(s))
     return 'var(--green)'
   if (/medium|partial|moderate|likely|caution/.test(s)) return 'var(--amber)'
@@ -340,7 +387,7 @@ const signals = computed(() => {
     { k: 'Confidence', v: a.confidence },
   ]
     .filter((s) => s.v)
-    .map((s) => ({ ...s, color: tone(s.v) }))
+    .map((s) => ({ ...s, v: human(s.v), color: tone(s.v) }))
 })
 
 const facts = computed(() => {
@@ -359,11 +406,19 @@ const requirements = computed(() =>
   (analysis.value?.requirements ?? []).map((r) => ({
     ...r,
     color: tone(r.match),
-    match: r.match || '—',
-    importance: r.importance || '',
+    match: r.match ? human(r.match) : '—',
+    importance: r.importance ? human(r.importance) : '',
     evidence: r.evidence || '',
   })),
 )
+
+/**
+ * The Evidence column only earns its place when it says something. The corpus
+ * is mostly one bare word per row ("stated" on all twelve of a real posting),
+ * which is a column of noise 70px wide; the screen-prep page drops anything
+ * under 24 characters for the same reason.
+ */
+const showEvidence = computed(() => requirements.value.some((r) => r.evidence.trim().length >= 24))
 
 /**
  * "must" is career-ops's older word; current reports say `critical`. Both
@@ -469,9 +524,40 @@ const hardStops = computed<string[]>(() => {
 const buildOpen = ref(false)
 const deleteOpen = ref(false)
 
-const fileCount = computed(() => {
-  const n = meta.value?.artifacts.length ?? 0
-  return n === 1 ? '1 built file' : `${n} built files`
+/** What goes with the posting, naming only what exists: "0 built files" was a clause about nothing. */
+const deleteParts = computed(() => {
+  const m = meta.value
+  if (!m) return ''
+  const n = m.artifacts.length
+  const parts = [
+    m.hasJD ? 'its job description' : '',
+    m.hasAnalysis ? 'the evaluation' : '',
+    n ? (n === 1 ? '1 built file' : `${n} built files`) : '',
+  ].filter(Boolean)
+  if (!parts.length) return ''
+  return parts.length === 1 ? parts[0]! : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
+})
+
+/** Why there is no JD, as what to do about it rather than what the fetch returned. */
+const jdWhy = computed(() => {
+  const err = meta.value?.jdError
+  if (!err) return 'Not fetched yet.'
+  if (/LinkedIn/.test(err)) return 'LinkedIn would not hand it over this time. The Mac retries every half hour, so this usually fills in on its own.'
+  if (/404|not found|closed|no longer/i.test(err)) return 'The posting could not be read, and it may have closed. Paste the description if you have it.'
+  if (/block/i.test(err)) return `${err}. Paste the description if you have it.`
+  return `It could not be read automatically (${err}). Try again, or paste it.`
+})
+
+/** With no evaluation, what the big number is and what happens next. */
+const scanNote = computed(() => {
+  const m = meta.value
+  if (!m || analysis.value) return ''
+  if (evalWaiting.value) return m.evalStatus === 'building' ? 'The Mac is evaluating this now.' : 'An evaluation is queued.'
+  const scan = m.score === null ? 'No score yet' : 'This is the morning scan\'s quick score'
+  // "On its way" only while that is believable: the worker runs hourly, so a
+  // posting it has not reached in two hours is not about to be reached.
+  const soon = evaluationExpected(m) && Date.now() - Date.parse(m.createdAt) < 2 * 3600_000
+  return soon ? `${scan}. The full evaluation is on its way.` : `${scan}, not a full evaluation.`
 })
 
 const deleteNote = computed(() =>
@@ -480,9 +566,14 @@ const deleteNote = computed(() =>
     : 'The morning scan can push it back up if it scores again; Dismiss is the quieter option if you just want it out of the way.',
 )
 
-const risks = computed(() => Object.entries(analysis.value?.risk ?? {}).map(([k, v]) => ({ k, v })))
+// Risk is folded into "everything else": three of its six rows restated the
+// signal pills at the top of the page, in raw keys. It leads the list so it is
+// the first thing there when he does open it.
 const extras = computed(() =>
-  Object.entries(analysis.value?.extra ?? {}).map(([k, v]) => ({ k: k.replace(/_/g, ' '), v })),
+  [...Object.entries(analysis.value?.risk ?? {}), ...Object.entries(analysis.value?.extra ?? {})].map(([k, v]) => ({
+    k: human(k),
+    v: typeof v === 'string' ? human(v) : v,
+  })),
 )
 
 // The letter's text is not a file to download; it is the Copy button under
@@ -553,6 +644,7 @@ const target = computed(() => {
 const applyHint = computed(() => {
   const where = target.value?.name ?? 'their site'
   if (armed.value === 'applied') return 'Press again to confirm. This writes the row into Notion.'
+  if (applyNote.value) return applyNote.value.text
   if (testArm.value === 'base') return `Pack test: this one goes out with your base CV and no cover letter. Send it through ${where}, then record it here.`
   if (packDone.value) return `Once it is sent through ${where}. A row goes into Notion and the funnel picks it up within 5 minutes.`
   if (inFlight.value) return 'The pack is still building, but you can record an application any time.'
@@ -563,7 +655,7 @@ const applyHint = computed(() => {
 function onMarkApplied() {
   if (busy.value === 'applied') return
   if (armed.value !== 'applied') return arm('applied')
-  armed.value = null
+  disarmNow()
   return markApplied()
 }
 
@@ -622,10 +714,11 @@ const buildHint = computed(() =>
         evaluated posting was 3,500px down. The better the posting, the further
         away the link to it.
       -->
-      <div class="brief-grid" :class="{ 'no-eval': !analysis }">
+      <main class="brief-grid" :class="{ 'no-eval': !analysis }">
           <!-- The call -->
           <PrimeCard class="sec brief-call" aria-label="The call">
             <template #content>
+              <h2 class="sr-only">The call</h2>
               <div class="verdict">
                 <div class="score-block">
                   <div class="score-n">
@@ -642,6 +735,16 @@ const buildHint = computed(() =>
                   <p v-if="analysis?.finalDecision" class="call">{{ analysis.finalDecision }}</p>
                   <p v-if="meta.why" class="why">{{ meta.why }}</p>
                   <p v-if="analysis?.archetype" class="arch">{{ analysis.archetype }}</p>
+                  <!-- No evaluation: say what the number is, and offer the
+                       evaluation here, where it would be, rather than as a
+                       footnote under Delete at the bottom of the rail. -->
+                  <template v-if="!analysis">
+                    <p class="scan-note">{{ scanNote }}</p>
+                    <button v-if="!evalWaiting" type="button" class="rail-build first scan-eval" :disabled="busy === 'eval'" @click="reEvalOpen = true">
+                      <i :class="busy === 'eval' ? 'pi pi-spin pi-spinner' : 'pi pi-sparkles'" />Evaluate now
+                    </button>
+                    <p v-if="meta.evalError" class="eval-error">Last evaluation failed: {{ meta.evalError }}</p>
+                  </template>
                 </div>
               </div>
 
@@ -668,8 +771,11 @@ const buildHint = computed(() =>
                       :title="t.title"
                       :style="t.assessed ? { borderColor: t.color, color: 'var(--text)' } : undefined"
                     >
-                      <span class="dot" :style="{ background: t.color }" />{{ t.name }}
+                      <span class="dot" :style="{ background: t.color }" />{{ t.name }}<span class="sr-only">, {{ t.title }}</span>
                     </span>
+                    <!-- The colours were explained only by a hover title, and a
+                         phone has no hover. -->
+                    <span v-if="stack.some((t) => t.assessed)" class="chip-key">coloured by how you match each in the requirements below</span>
                   </dd>
                 </template>
               </dl>
@@ -677,11 +783,11 @@ const buildHint = computed(() =>
           </PrimeCard>
 
         <!-- The rail: what to do next, and what has been built -->
-        <aside class="brief-rail">
-          <PrimeCard class="sec rail-card" aria-label="Apply">
+        <aside class="brief-rail" aria-label="Actions for this posting">
+          <PrimeCard class="sec rail-card" aria-label="Application">
             <template #content>
               <div class="rail-head">
-                <h2>Apply</h2>
+                <h2>Application</h2>
                 <span class="rail-state" :class="{ on: applied }">
                   <span class="dot" />
                   <ClientOnly v-if="applied">Applied {{ when(meta.appliedAt) }}<template #fallback>Applied</template></ClientOnly>
@@ -713,18 +819,22 @@ const buildHint = computed(() =>
                   class="rail-quiet"
                   :class="{ armed: armed === 'applied' }"
                   :disabled="busy === 'applied'"
+                  aria-describedby="apply-hint"
                   @click="onMarkApplied"
                 >
                   <i :class="busy === 'applied' ? 'pi pi-spin pi-spinner' : armed === 'applied' ? 'pi pi-check-circle' : 'pi pi-check'" />
                   <span>{{ busy === 'applied' ? 'Saving to Notion…' : armed === 'applied' ? 'Confirm applied' : 'Mark as applied' }}</span>
+                  <span v-if="armed === 'applied'" class="armed-left mono" aria-hidden="true">{{ armedLeft }}s</span>
                 </button>
-                <p class="rail-hint" aria-live="polite">{{ applyHint }}</p>
+                <p id="apply-hint" class="rail-hint" :class="armed !== 'applied' && applyNote ? 'is-' + applyNote.tone : ''" aria-live="polite">{{ applyHint }}</p>
               </template>
               <template v-else>
                 <a v-if="notionHref" class="rail-quiet" :href="notionHref" target="_blank" rel="noopener">
                   <span>Open in Notion</span><i class="pi pi-external-link" />
                 </a>
-                <p class="rail-hint">Sits in the funnel as Awaiting reply.</p>
+                <p class="rail-hint" :class="applyNote ? 'is-' + applyNote.tone : ''" aria-live="polite">
+                  {{ applyNote ? applyNote.text : 'Sits in the funnel as Awaiting reply.' }}
+                </p>
                 <!-- Fills in the page's summary and the Job Description / Apply Pack /
                      Analytics sub-pages that are missing; never touches what is there. -->
                 <button v-if="notionHref" type="button" class="linkish notion-sync" :disabled="busy === 'notion'" @click="syncNotion">
@@ -789,8 +899,8 @@ const buildHint = computed(() =>
                 :disabled="busy === 'pack'"
                 @click="buildOpen = true"
               >
-                <i :class="busy === 'pack' ? 'pi pi-spin pi-spinner' : 'pi pi-refresh'" />
-                {{ testArm === 'base' ? 'Build anyway' : meta.pack === 'none' ? 'Build' : packDone ? 'Rebuild' : 'Re-queue' }}
+                <i :class="busy === 'pack' ? 'pi pi-spin pi-spinner' : meta.pack === 'none' ? 'pi pi-file-plus' : 'pi pi-refresh'" />
+                {{ testArm === 'base' ? 'Build anyway' : meta.pack === 'none' ? 'Build pack' : packDone ? 'Rebuild' : 'Restart the build' }}
               </button>
               <p v-if="buildHint" class="rail-hint">{{ buildHint }}</p>
               <ClientOnly>
@@ -804,7 +914,7 @@ const buildHint = computed(() =>
           <!-- The supplemental questions a form asks, and their drafted answers. -->
           <NuxtLink class="link-card" :to="`/postings/${id}/questions?from=${parent}`">
             <span class="link-meta">
-              <span class="link-title"><i class="pi pi-list-check" />Application questions</span>
+              <span class="link-title"><i class="pi pi-list-check" />Application questions</span><span class="sr-only">, </span>
               <span class="link-sub mono">
                 <template v-if="meta.questions">{{ meta.answered }} of {{ meta.questions }} answered</template>
                 <template v-else>none added yet</template>
@@ -820,7 +930,7 @@ const buildHint = computed(() =>
           -->
           <NuxtLink class="link-card" :to="`/postings/${id}/screen?from=${parent}`">
             <span class="link-meta">
-              <span class="link-title">Screen prep</span>
+              <span class="link-title"><i class="pi pi-comments" />Screen prep</span><span class="sr-only">, </span>
               <span class="link-sub mono">the first call, in your words</span>
             </span>
             <i class="pi pi-angle-right go" />
@@ -849,15 +959,6 @@ const buildHint = computed(() =>
             />
           </div>
 
-          <!-- With no evaluation there is no card for this to live in, and asking
-               for one is then a real next step. -->
-          <template v-if="!analysis">
-            <button type="button" class="linkish notion-sync" :disabled="busy === 'eval' || evalWaiting" @click="reEvalOpen = true">
-              <i :class="busy === 'eval' || evalWaiting ? 'pi pi-spin pi-spinner' : 'pi pi-sparkles'" />
-              {{ evalWaiting ? (meta.evalStatus === 'building' ? 'Evaluating…' : 'Evaluation queued') : 'Evaluate now' }}
-            </button>
-            <p v-if="meta.evalError" class="eval-error">Last evaluation failed: {{ meta.evalError }}</p>
-          </template>
         </aside>
 
           <!-- The evaluation -->
@@ -885,7 +986,7 @@ const buildHint = computed(() =>
                 <table class="findings-table">
                   <tbody>
                     <tr v-for="(f, i) in findingRows" :key="i" :class="{ 'group-end': f.last && i < findingRows.length - 1 }">
-                      <td class="kind" :class="{ pt: f.first, pb: f.last }">
+                      <td class="kind" :class="{ pt: f.first, pb: f.last, blank: !f.first }">
                         <span v-if="f.first" class="kind-label" :class="f.tone">
                           <span class="dot" />{{ f.kind }}<span class="n mono">{{ f.n }}</span>
                         </span>
@@ -901,7 +1002,7 @@ const buildHint = computed(() =>
               <template v-if="requirements.length">
                 <div class="eval-sec">
                   <h3>Requirements <span class="mono">· {{ reqSummary }}</span></h3>
-                  <span class="sec-note">what the JD asked for, and what you have</span>
+                  <span class="sec-note">what the JD asked for, and how you match</span>
                 </div>
                 <div class="table-scroll">
                   <table class="reqs-table">
@@ -910,7 +1011,7 @@ const buildHint = computed(() =>
                         <th>Requirement</th>
                         <th class="tight">Importance</th>
                         <th class="tight">Match</th>
-                        <th class="tight">Evidence</th>
+                        <th v-if="showEvidence" class="tight">Evidence</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -922,25 +1023,15 @@ const buildHint = computed(() =>
                         <td class="req-match">
                           <span :style="{ color: r.color }"><span class="dot" :style="{ background: r.color }" />{{ r.match }}</span>
                         </td>
-                        <td class="req-ev">{{ r.evidence || '—' }}</td>
+                        <td v-if="showEvidence" class="req-ev">{{ r.evidence || '—' }}</td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
               </template>
 
-              <template v-if="risks.length">
-                <div class="eval-sec"><h3>Risk</h3></div>
-                <dl class="facts-grid lower risk-grid">
-                  <template v-for="r in risks" :key="r.k">
-                    <dt class="low">{{ r.k }}</dt>
-                    <dd>{{ r.v }}</dd>
-                  </template>
-                </dl>
-              </template>
-
               <details v-if="extras.length" class="extras-toggle">
-                <summary class="mono">everything else the report said · {{ extras.length }}</summary>
+                <summary class="mono">risk, and everything else the report said · {{ extras.length }}</summary>
                 <dl class="facts-grid lower">
                   <template v-for="e in extras" :key="e.k">
                     <dt class="low">{{ e.k }}</dt>
@@ -971,9 +1062,7 @@ const buildHint = computed(() =>
                 <h3>Job description</h3>
               </div>
               <p class="jd-missing-why">
-                <template v-if="meta.jdError">Couldn't fetch it: {{ meta.jdError }}.</template>
-                <template v-else>Not fetched yet.</template>
-                <template v-if="meta.jdError && /LinkedIn/.test(meta.jdError)"> The Mac fetches LinkedIn descriptions every half hour, so this usually fills in on its own.</template>
+                {{ jdWhy }}
               </p>
               <div v-if="!pasting" class="jd-missing-actions">
                 <PrimeButton label="Fetch it" icon="pi pi-download" size="small" severity="secondary" outlined :loading="busy === 'jd'" @click="fetchJD" />
@@ -989,7 +1078,7 @@ const buildHint = computed(() =>
             </div>
           </template>
         </PrimeCard>
-      </div>
+      </main>
 
       <!-- Build: a note steers emphasis, so it gets room to be written rather
            than a one-line field wedged into a 300px rail. -->
@@ -1015,13 +1104,15 @@ const buildHint = computed(() =>
             test, and the comparison is only fair if that stays rare.
           </p>
           <p class="muted small">
-            The Mac tailors a CV and cover letter to this JD and uploads them here — usually 15–20 minutes.
+            The Mac tailors a CV and cover letter to this JD and uploads them here. Builds have taken a median of about
+            40 minutes (as short as 11, as long as 3 hours), and your phone is notified when it lands.
             A note steers the emphasis and tone.
           </p>
           <label>
             <span>Note for the build <small>optional</small></span>
             <PrimeTextarea
               v-model="note"
+              autofocus
               rows="5"
               :placeholder="meta.packNote || 'Note for the build (emphasis, tone)…'"
               autocomplete="off"
@@ -1097,7 +1188,7 @@ const buildHint = computed(() =>
         <div class="delete-dialog">
           <p>
             Removes <b>{{ meta.company }}<template v-if="meta.role"> · {{ meta.role }}</template></b>
-            from postings, along with its job description, the evaluation, and {{ fileCount }}.
+            from postings<template v-if="deleteParts">, along with {{ deleteParts }}</template>.
           </p>
           <p class="muted">{{ deleteNote }}</p>
         </div>

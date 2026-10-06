@@ -26,6 +26,15 @@ export const JobPipelinePreset = definePreset(Aura, {
     },
     colorScheme: {
       dark: {
+        // Aura's dark scheme paints primary with the 400 step, which made every
+        // PrimeVue primary button (#cbac57) a different gold from --amber
+        // (#c2a24b) and from the brief's own amber link. Pin it to 500.
+        primary: {
+          color: '{primary.500}',
+          contrastColor: '{surface.900}',
+          hoverColor: '{primary.300}',
+          activeColor: '{primary.200}',
+        },
         // 950 = --bg, 900 = --panel, 800 = --card, 700 = --panel-edge,
         // light end = --text/--muted/--faint.
         surface: {

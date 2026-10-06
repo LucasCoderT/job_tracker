@@ -235,7 +235,8 @@ footer { margin-top: 18px; font-size: 12px; color: var(--faint); }
 .pack-chip.is-none { color: var(--muted); border-style: dashed; }
 .pack-chip.is-none:hover { color: var(--amber); border-color: var(--amber); }
 .pack-chip.is-requested { color: var(--amber); border-color: #4a3f1f; }
-.pack-chip.is-building { color: var(--blue); border-color: #23364a; }
+/* --blue on --panel is 3.95:1 at this size; mixed toward --text it clears 4.5. */
+.pack-chip.is-building { color: color-mix(in srgb, var(--blue) 62%, var(--text)); border-color: #23364a; }
 .pack-chip.is-done { color: var(--green); border-color: #1f4a34; }
 .pack-chip.is-failed { color: var(--danger); border-color: #4a2a25; }
 .pack-chip:disabled { opacity: 0.6; cursor: default; }
@@ -518,18 +519,18 @@ footer { margin-top: 18px; font-size: 12px; color: var(--faint); }
 .score-block { flex: none; display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 56px; }
 .score-n { display: flex; align-items: baseline; gap: 1px; }
 .verdict .big { font-size: 34px; font-weight: 600; letter-spacing: -0.05em; line-height: 1; }
-.verdict .of { font-size: 13px; color: var(--faint); }
+.verdict .of { font-size: 12.5px; color: var(--muted); }
 .score-track { height: 4px; width: 56px; border-radius: 2px; background: #26262c; position: relative; overflow: hidden; }
 .score-fill { position: absolute; inset: 0 auto 0 0; border-radius: 2px; }
 .verdict-text { min-width: 0; flex: 1; }
 .verdict .call { font-size: 15px; font-weight: 600; margin: 0 0 3px; line-height: 1.35; text-wrap: pretty; }
 .verdict .why { font-size: 13.5px; margin: 0; line-height: 1.5; text-wrap: pretty; }
-.verdict .arch { font-size: 12px; color: var(--muted); margin: 6px 0 0; }
+.verdict .arch { font-size: 12.5px; color: var(--muted); margin: 6px 0 0; }
 
 .signals { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
 .signal {
-  display: inline-flex; align-items: center; gap: 6px; font-size: 12px;
-  border-radius: 999px; padding: 2px 9px; border: 1px solid #35353d; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px;
+  border-radius: 999px; padding: 2px 9px; border: 1px solid var(--panel-edge); white-space: nowrap;
 }
 .signal .dot, .req .dot, .chip .dot { width: 6px; height: 6px; border-radius: 50%; flex: none; }
 .signal .sig-k { color: var(--muted); }
@@ -607,7 +608,6 @@ footer { margin-top: 18px; font-size: 12px; color: var(--faint); }
 .reqs-table td.req-match span { display: inline-flex; align-items: center; gap: 6px; }
 .reqs-table td.req-match .dot { width: 6px; height: 6px; border-radius: 50%; flex: none; }
 .reqs-table td.req-ev { color: var(--muted); white-space: nowrap; }
-@media (max-width: 880px) { .reqs-table { min-width: 560px; } }
 
 .risk-grid { gap: 8px 18px; max-width: 64ch; line-height: 1.5; }
 .extras-toggle { margin-top: 22px; }
@@ -623,12 +623,8 @@ a.rail-primary.as-link {
   border: 1px solid var(--amber); background: var(--amber); color: var(--panel);
   text-decoration: none; transition: background 120ms;
 }
-a.rail-primary.as-link:hover { background: #d9bd71; border-color: #d9bd71; color: var(--panel); }
+a.rail-primary.as-link:hover { background: color-mix(in srgb, var(--amber) 80%, var(--text)); border-color: color-mix(in srgb, var(--amber) 80%, var(--text)); color: var(--panel); }
 .rail-hint { margin: 8px 0 0; font-size: 11.5px; color: var(--muted); line-height: 1.45; text-wrap: pretty; }
-.rail-pack { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--panel-edge); }
-.rail-pack-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 6px; }
-.rail-label { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
-.rail-pack .pack-chip { margin-top: 0; }
 .rail-files { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
 .rail-file { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .file-card {
@@ -641,16 +637,15 @@ a.rail-primary.as-link:hover { background: #d9bd71; border-color: #d9bd71; color
 .file-card > .pi { color: var(--muted); font-size: 13px; flex: none; }
 .file-meta { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
 .file-label { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.file-sub { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.file-sub { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .file-del {
   flex: none; width: 30px; height: 30px; border: 0; background: transparent; border-radius: 6px;
   cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
-  color: var(--faint); transition: background 120ms, color 120ms;
+  color: var(--muted); transition: background 120ms, color 120ms;
 }
 .file-del:hover { background: var(--card); color: var(--danger); }
 .file-del.armed { color: var(--danger); }
 .file-del:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
-.rail-pack .built { margin: 8px 0 0; line-height: 1.5; text-wrap: pretty; }
 /* ---- Posting Brief v3 rail: two cards, in the order the work happens ---- */
 .rail-card .rail-head h2 { color: var(--muted); }
 .rail-state { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 500; color: var(--muted); }
@@ -660,7 +655,7 @@ a.rail-primary.as-link:hover { background: #d9bd71; border-color: #d9bd71; color
 a.rail-primary.as-link { gap: 8px; }
 a.rail-primary.as-link .pi { font-size: 12px; }
 .rail-url { margin: 8px 0 0; font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.rail-sub { margin: 4px 0 0; font-size: 12px; color: var(--muted); line-height: 1.45; text-wrap: pretty; }
+.rail-sub { margin: 4px 0 0; font-size: 11.5px; color: var(--muted); line-height: 1.45; text-wrap: pretty; }
 .rail-sub a { color: var(--text); }
 .rail-sub a:hover { color: var(--amber); }
 /* Recording the application: always there, never the loudest thing. */
@@ -671,7 +666,8 @@ a.rail-primary.as-link .pi { font-size: 12px; }
   transition: border-color 120ms, background 120ms;
 }
 .rail-quiet:hover { border-color: var(--muted); color: var(--text); }
-.rail-quiet.armed { border-color: var(--text); }
+.rail-quiet.armed { border-color: var(--amber); }
+.rail-quiet .armed-left { margin-left: 2px; font-size: 12.5px; font-weight: 500; color: var(--amber); }
 .rail-quiet:focus-visible, .rail-build:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
 .rail-quiet:disabled, .rail-build:disabled { opacity: .7; cursor: default; }
 .rail-quiet .pi { font-size: 13px; }
@@ -709,15 +705,10 @@ a.rail-primary.as-link .pi { font-size: 12px; }
   padding: 14px 20px; font-size: 12.5px; transition: border-color 120ms;
 }
 .link-card:hover, .link-card:focus-visible { border-color: var(--amber); }
-/* The employer's own req leads the rail: it is the link that converts. */
-.link-card--primary { border-color: var(--amber); background: color-mix(in srgb, var(--amber) 8%, transparent); }
-.link-card--primary .link-title { color: var(--amber); }
-.link-card--primary .go { color: var(--amber); }
 .link-meta { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 3px; }
 .link-title { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
 .link-sub { color: var(--muted); font-size: 11.5px; }
 .link-card .go { color: var(--muted); font-size: 13px; flex: none; }
-.link-card .in-notion { color: var(--green); font-size: 12px; }
 .rail-danger .danger-btn { margin-left: auto; }
 
 /* Dialogs */
@@ -779,7 +770,7 @@ a.rail-primary.as-link .pi { font-size: 12px; }
 }
 .eval-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 12px; }
 .eval-head h2 { margin: 0 !important; }
-.eval-again { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); white-space: nowrap; padding: 4px 0; }
+.eval-again { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--muted); white-space: nowrap; padding: 4px 0; }
 .eval-again:hover { color: var(--amber); }
 .eval-again .pi { font-size: 11px; }
 .eval-again:disabled { cursor: default; }
@@ -1380,14 +1371,13 @@ a.rail-primary.as-link .pi { font-size: 12px; }
    toolbar. */
 .copy-letter { margin-top: 10px; }
 .copy-letter .p-button { width: 100%; justify-content: center; }
-.copy-letter-sub { margin: 6px 0 0; font-size: 11px; color: var(--muted); text-align: center; }
+.copy-letter-sub { margin: 6px 0 0; font-size: 11.5px; color: var(--muted); }
 .copy-letter-text {
   width: 100%; margin-top: 8px; resize: vertical; font: inherit; font-size: 12.5px; line-height: 1.5;
   color: var(--text); background: var(--card); border: 1px solid var(--panel-edge); border-radius: 8px; padding: 8px 10px;
 }
 .copy-letter.compact { margin-top: 0; display: inline-flex; flex-direction: column; }
 .copy-letter.compact .p-button { width: auto; }
-.copy-letter.compact .copy-letter-sub { text-align: left; }
 
 /* ---- Calibration: what predicts a reply ---- */
 .cal-scope { margin: 0 0 4px; font-size: 12.5px; line-height: 1.5; }
@@ -1415,3 +1405,91 @@ a.rail-primary.as-link .pi { font-size: 12px; }
 .cal-test p.small { margin: 4px 0 0; }
 /* Drafting one question: the dialog names which. */
 .one-q { margin: 0; font-size: 14px; font-weight: 600; color: var(--text); line-height: 1.45; text-wrap: pretty; }
+
+/* ---- Posting brief: second critique pass (2026-10-06) ---- */
+
+/* One focus style for the whole page. The rail had four: a 2px amber ring on
+   three buttons, the browser's 1px blue on the amber link and the link cards,
+   and PrimeVue's grey and red. The amber button, the page's primary action,
+   was among the ones with no authored ring at all. */
+.brief :is(a, button, summary, [tabindex]):focus-visible,
+.brief .p-button:focus-visible,
+.p-dialog :is(button, textarea, a):focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.brief .danger-btn:focus-visible { outline-color: var(--danger); }
+
+/* PrimeVue's danger is a saturated red (#f87171) that appears nowhere in the
+   palette; --danger is the app's. And a dialog is a surface above the page by
+   its border and scrim, not by a shadow, which DESIGN.md keeps for the tooltip. */
+.p-button.p-button-danger:not(.p-button-text):not(.p-button-outlined) {
+  background: var(--danger); border-color: var(--danger); color: var(--panel);
+}
+.p-button.p-button-danger:not(.p-button-text):not(.p-button-outlined):hover {
+  background: color-mix(in srgb, var(--danger) 85%, var(--text)); border-color: color-mix(in srgb, var(--danger) 85%, var(--text));
+}
+.p-button.p-button-danger.p-button-text, .p-button.p-button-danger.p-button-outlined { color: var(--danger); }
+.p-dialog { box-shadow: none; border: 1px solid var(--panel-edge); }
+
+.brief .sec-note { color: var(--muted); }
+.brief .link-title .pi { margin-right: 7px; font-size: 12px; color: var(--muted); }
+
+/* What "Mark as applied" did, said in the hint beside it. */
+.rail-hint.is-ok { color: var(--green); }
+.rail-hint.is-warn { color: var(--amber); }
+.rail-hint.is-error { color: var(--danger); }
+
+/* No evaluation yet: what the number is, and the evaluation offered where it
+   would appear. */
+.scan-note { margin: 0; font-size: 12.5px; color: var(--muted); line-height: 1.5; text-wrap: pretty; }
+.scan-eval { width: auto; margin-top: 10px; padding-inline: 14px; }
+.verdict-text .eval-error { margin: 8px 0 0; }
+.chip-key { flex-basis: 100%; font-size: 11.5px; color: var(--muted); }
+
+@media (max-width: 880px) {
+  /* Requirements stack: the requirement, then importance and match on one
+     line under it. As a table it was forced to 560px in a 301px box, with
+     Importance, Match and Evidence all off-screen and nothing to say so. */
+  .reqs-table, .reqs-table tbody, .reqs-table tr { display: block; }
+  .reqs-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .reqs-table tr { padding: 10px 0; border-bottom: 1px solid var(--panel-edge); }
+  .reqs-table tr:last-child { border-bottom: 0; }
+  .reqs-table td { display: block; padding: 0; border: 0; }
+  .reqs-table td.req-name { max-width: none; padding: 0; margin-bottom: 4px; }
+  .reqs-table td.req-imp, .reqs-table td.req-match { display: inline-flex; align-items: center; margin-right: 14px; font-size: 11.5px; }
+  .reqs-table td.req-ev { margin-top: 4px; white-space: normal; font-size: 11.5px; }
+  .reqs-table tr:hover { background: transparent; }
+
+  /* Findings: the kind becomes a header across the full width. As a first
+     column it took 131px of 301 and was empty on every row but one. */
+  .findings-table, .findings-table tbody, .findings-table tr { display: block; }
+  .findings-table td { display: block; padding: 0 0 8px; }
+  .findings-table td.kind { width: auto; padding: 12px 0 6px; }
+  .findings-table td.kind.blank { display: none; }
+  .findings-table td.finding-text { max-width: none; }
+  .findings-table td.finding-text.pb { padding-bottom: 12px; }
+  .findings-table tr:hover { background: transparent; }
+
+  /* Thumb-sized: nothing in the rail but the link cards reached 44px. */
+  a.rail-primary.as-link, .rail-quiet, .rail-build, .copy-letter .p-button { min-height: 44px; }
+  .rail-danger .p-button { min-height: 44px; padding-inline: 12px; }
+  .eval-again { min-height: 44px; padding-inline: 4px; }
+  .rail-card .notion-sync { min-height: 44px; }
+  /* The trash sat 30px wide, 6px from the download it deletes. */
+  .rail-file { gap: 10px; }
+  .file-del { width: 44px; height: 44px; }
+  .brief-jd summary { padding-block: 8px; }
+  .scan-eval { min-height: 44px; }
+}
+
+@media (max-width: 600px) {
+  /* The call card ran 577px on a phone and pushed the link to the posting just
+     under the fold. Provenance and the archetype line are the two things on
+     the way to it that no decision turns on. */
+  .brief-meta > span:not(.state-pill) { display: none; }
+  .verdict .arch { display: none; }
+}
+
+/* PrimeVue locks scrolling under a dialog with `.p-overflow-hidden`, which sets
+   padding-right to the scrollbar's width. The page's own right gutter is body
+   padding, so that replaced 48px with 0 and the whole page jumped 24px sideways
+   every time a dialog opened. Keep the gutter and add the scrollbar to it. */
+body.p-overflow-hidden { padding-right: calc(clamp(16px, 4vw, 48px) + var(--p-scrollbar-width, 0px)); }

@@ -1175,8 +1175,8 @@ when the prompt is standing or asked) · `POST /api/postings/:id/screen/asked` �
 ## Apply where the job lives (2026-09-17)
 
 `PostingMeta.employerUrl` is the employer's own req for a job discovered on an
-aggregator. When it is set the brief leads with it (`.link-card--primary`) and
-demotes the original to "Where it was found", because that is the link that
+aggregator. When it is set the brief's amber button goes there and the
+original drops to a "Found on" line beneath it (see Posting Brief v3), because that is the link that
 converts: applications sent on the employer's page reach a screen at **15.4%**
 against **4.9%** through LinkedIn and Indeed, and both processes that ever
 reached a third round came in that way. Reply rate says the opposite — a named
@@ -1346,6 +1346,81 @@ Left for a second pass: one focus style across the rail (the amber button has
 only the browser's default ring), tap targets under 44px, amber meaning four
 things at once (the score is amber only because 4.2 falls in a band), a `main`
 landmark and a live region on the waiting indicator, and the dead v2 rail CSS.
+
+### The second critique, and everything from it (2026-10-06)
+
+A second `/impeccable critique` by a reviewer who had not seen the first scored
+26/40 against 27. The three P1s above were confirmed fixed by measurement, and
+a fresh eye found five different problems. **The score counts what one reviewer
+found, not what got fixed**, so it can sit flat while the page improves; the
+"confirmed fixed" list is the measure.
+
+On a phone:
+- **Requirements stack under 880px**: the requirement, then importance and
+  match on one line. As a table it was forced to 560px in a 301px box with
+  Importance, Match and Evidence all off-screen and no cue.
+- **The Evidence column only renders when it says something** (`showEvidence`:
+  some row of 24+ characters, the same threshold screen prep uses). It read
+  "stated" on twelve of twelve rows of a real posting.
+- **A finding's kind is a full-width header** under 880px. As a first column it
+  took 131 of 301px and was empty on every row but the first of each group.
+- **Rail controls are 44px tall** under 880px, and the file trash is 44x44 with
+  10px between it and the download it deletes (it was 30x30 at 6px).
+- **Under 600px the header's provenance and the archetype line are hidden.**
+  They were the two things between the top of the page and the link to the
+  posting that no decision turns on.
+
+Feedback:
+- **"Mark as applied" reports beside itself** (`applyNote`, in the hint under
+  the button), not in the notice above the grid, which on a phone was about
+  750px above the thumb. For the one action that writes a Notion row, a failure
+  that looks like nothing happened is the worst outcome. The armed state has an
+  amber border and counts down (`armedLeft`), and a lapsed confirm says "Not
+  recorded" instead of silently going back.
+- **A dialog no longer moves the page.** PrimeVue locks scroll with
+  `.p-overflow-hidden`, which sets body padding-right to the scrollbar width;
+  the page's right gutter *is* body padding, so 48px became 0 and everything
+  jumped 24px sideways. `body.p-overflow-hidden` restates the gutter. Site-wide.
+
+Words:
+- **`human()` turns identifiers into words** (`not_needed` -> "Not needed",
+  `ai_screening_disclosure` -> "AI screening disclosure"). It only touches
+  strings that are plainly identifiers; a sentence the evaluation wrote is left
+  exactly as written.
+- **`tone()` colours a missing requirement as a gap.** It had no rule for
+  "missing", which rendered in the same grey as "not assessed" and
+  under-reported what an interviewer pushes on.
+- **Risk is folded into "everything else"**: three of its six rows restated
+  the signal pills in raw keys.
+- The Build dialog gives the measured build time (median about 40 minutes), not
+  "15-20". The delete dialog names only what exists. A missing JD says what to
+  do about it rather than "the API answered 404". The rail card is
+  "Application", since "Apply" was also the verdict a few hundred pixels away.
+
+The thin posting:
+- **With no evaluation the call card says what the number is** (`scanNote`) and
+  offers **Evaluate now** there, as a real button. It had drifted to a 19px
+  text link under Delete. "On its way" is only claimed inside the same
+  two-hour window the waiting badge uses.
+
+Site-wide theme fixes this surfaced:
+- **PrimeVue's dark primary was `primary.400`**, a lighter gold (#cbac57) than
+  `--amber` (#c2a24b), so every PrimeVue primary button disagreed with the
+  amber link beside it. Pinned to 500 in `theme/primevue-preset.ts`.
+- **Solid danger buttons use `--danger`**, not PrimeVue's #f87171, and dialogs
+  have a border and no shadow (DESIGN.md keeps shadows for the tooltip).
+- **One focus ring**: 2px amber, 2px offset, on every link, button and summary
+  in the brief and in dialogs. The amber primary link had only the browser's.
+
+Accessibility: the grid is a `<main>`, the rail `aside` is labelled, the call
+card has a (visually hidden) heading, `LiveWaiting` is `role="status"`, link
+cards read as "Application questions, 4 of 5 answered", and the stack chips'
+colours are explained in text rather than only by a hover title.
+
+Deliberately not done, because they are features or reverse a decision:
+keyboard shortcuts and next/previous posting; collapsing the rail to one next
+step behind a menu (that undoes v3). Still true: on desktop, Tab goes through
+the rail before the evaluation, the price of the phone-first source order.
 
 ## Redraft one answer (2026-10-05)
 
