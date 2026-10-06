@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
-import { postingChannel, localityOf, LOCALITY_LABEL, inNewQueue } from '#shared/postings'
+import { postingChannel, localityOf, LOCALITY_LABEL } from '#shared/postings'
 import type { PostingApplyResult, PostingMeta, PostingsResponse } from '../../../shared/types'
 
 useHead({ title: 'Postings' })
@@ -43,37 +43,9 @@ const footer = computed(() => {
   return `Last change ${stamp} · evaluations run hourly · packs build every 20 min`
 })
 
-/**
- * Saved views. The counts are the navigation: the number tells him whether a
- * view is worth opening before he opens it, which a row of plain tabs cannot.
- *
- * "Ready to send" is the one that earns its place — a pack built and not yet
- * sent is the only state on this page with something to do right now.
- */
-const VIEWS: { key: string; label: string; dot: string; match: (p: PostingMeta) => boolean }[] = [
-  { key: 'all', label: 'All', dot: 'var(--stone)', match: () => true },
-  // Closed listings leave New rather than being deleted: the record is still
-  // worth keeping (it was evaluated, it may be reposted), it just is not
-  // something he can act on this morning.
-  { key: 'new', label: 'New', dot: 'var(--amber)', match: (p) => inNewQueue(p) },
-  // The morning scan publishes a quick score before the full evaluation, and
-  // anything it scored under the worker's gate is only evaluated on request.
-  // Those wait here rather than in New, which holds evaluated postings only.
-  { key: 'unevaluated', label: 'Not evaluated', dot: 'var(--stone)', match: (p) => p.state === 'new' && !p.closedAt && !p.hasAnalysis },
-  { key: 'ready', label: 'Ready to send', dot: 'var(--green)', match: (p) => p.pack === 'done' && p.state !== 'applied' },
-  // Edmonton and Alberta, in-office or hybrid — not remote roles that merely
-  // list an office here. The deepest process in the funnel has this shape and
-  // the scoring has never valued it, so it gets a view of its own.
-  { key: 'local', label: 'Local', dot: 'var(--teal)', match: (p) => ['edmonton', 'alberta'].includes(localityOf(p.location, p.geo)) },
-  { key: 'evaluated', label: 'Evaluated', dot: 'var(--blue)', match: (p) => p.hasAnalysis },
-  { key: 'applied', label: 'Applied', dot: 'var(--teal)', match: (p) => p.state === 'applied' },
-  // A source that refuses to be read leaves no role and no score, so the row
-  // sorts to the bottom of a hundred and fifty and is effectively lost. It
-  // needs a door of its own: the only fix is him pasting the description.
-  { key: 'needs', label: 'Needs details', dot: 'var(--amber)', match: (p) => !p.role && !p.hasJD && p.state === 'new' },
-  { key: 'closed', label: 'Listing closed', dot: 'var(--stone)', match: (p) => Boolean(p.closedAt) },
-  { key: 'dismissed', label: 'Dismissed', dot: 'var(--rust)', match: (p) => p.state === 'dismissed' },
-]
+// The views and the sort live in utils/posting-views.ts, shared with the
+// brief's next/previous so both mean the same list in the same order.
+const VIEWS = POSTING_VIEWS
 
 /** Shown only when it is the converting shape; remote rows stay unlabelled. */
 const localLabel = (p: PostingMeta) => {
@@ -81,8 +53,8 @@ const localLabel = (p: PostingMeta) => {
   return k === 'edmonton' || k === 'alberta' ? LOCALITY_LABEL[k] : ''
 }
 
-const STORE_KEY = 'postings.view'
-const SORT_KEY = 'postings.sort'
+const STORE_KEY = VIEW_STORE_KEY
+const SORT_KEY = SORT_STORE_KEY
 const view = ref('new')
 const page = ref(0)
 const selected = ref<Record<string, boolean>>({})
@@ -172,19 +144,6 @@ const sortKey = ref('age')
 const sortDir = ref(-1)
 const STATE_ORDER = ['new', 'applied', 'dismissed']
 
-function sortValue(p: PostingMeta): string | number {
-  switch (sortKey.value) {
-    case 'score': return p.score ?? -1
-    case 'company': return p.company.toLowerCase()
-    case 'comp': return p.comp || ''
-    case 'geo': return p.geo || p.location || ''
-    case 'source': return channel(p)
-    case 'state': return STATE_ORDER.indexOf(p.state)
-    case 'age': return Date.parse(p.firstSeen || p.createdAt) || 0
-    default: return 0
-  }
-}
-
 function sortBy(key: string) {
   if (sortKey.value === key) sortDir.value = -sortDir.value
   else {
@@ -200,18 +159,7 @@ function sortBy(key: string) {
   }
 }
 
-const sorted = computed(() =>
-  [...list.value].sort((a, b) => {
-    const x = sortValue(a)
-    const y = sortValue(b)
-    const cmp = typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y))
-    // Same-day ties are the common case when sorting by age, so fall back to
-    // score rather than leaving the order arbitrary.
-    if (cmp === 0 && sortKey.value !== 'score') return (b.score ?? -1) - (a.score ?? -1)
-    return cmp * sortDir.value
-  }),
-)
-
+const sorted = computed(() => sortPostings(list.value, sortKey.value, sortDir.value))
 const HEADS: { key: string; label: string; right?: boolean }[] = [
   { key: 'score', label: 'Score', right: true },
   { key: 'company', label: 'Company' },

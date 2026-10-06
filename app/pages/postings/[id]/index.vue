@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, watch, onMounted } from 'vue'
 import { letterText, normalizeUrl, evaluationExpected, postingChannel } from '#shared/postings'
 import { inPackTest, packArm } from '#shared/pack-test'
 import type { NotionWriteResult, PostingApplyResult, PostingDetail } from '../../../../shared/types'
@@ -10,7 +10,7 @@ const id = computed(() => String(route.params.id))
 const { data, pending, error, refresh } = await useFetch<PostingDetail>(() => `/api/postings/${id.value}`, {
   key: () => `posting:${id.value}`,
 })
-const { refresh: refreshIndex } = usePostings()
+const { refresh: refreshIndex, postings: allPostings } = usePostings()
 
 const meta = computed(() => data.value?.meta)
 
@@ -191,10 +191,25 @@ function disarmNow() {
 }
 onBeforeUnmount(() => clearInterval(disarm))
 
+/**
+ * What a quiet action in the rail just did, said in the rail, with the way
+ * back. Dismiss is fully reversible, so it takes one press and offers Undo
+ * rather than two presses every time: the same trade the tracker's status menu
+ * makes. It moved into the More menu, where an arm-then-confirm cannot work
+ * anyway, because the menu closes on the first press.
+ */
+const railNote = ref<{ text: string; undo?: () => void } | null>(null)
+
 function dismiss() {
-  if (armed.value !== 'dismiss') return arm('dismiss')
-  const next = meta.value?.state === 'dismissed' ? 'new' : 'dismissed'
-  return act('dismiss', () => $fetch(`/api/postings/${id.value}/state`, { method: 'POST', body: { state: next } }))
+  const was = meta.value?.state
+  const next = was === 'dismissed' ? 'new' : 'dismissed'
+  const set = (state: string) => $fetch(`/api/postings/${id.value}/state`, { method: 'POST', body: { state } })
+  return act('dismiss', () => set(next), () => {
+    railNote.value = {
+      text: next === 'dismissed' ? 'Dismissed. It has left the New list.' : 'Back in the New list.',
+      undo: () => act('dismiss', () => set(was ?? 'new'), () => (railNote.value = null)),
+    }
+  })
 }
 
 async function remove() {
@@ -208,13 +223,25 @@ async function remove() {
   }
 }
 
-async function deleteFile(name: string) {
-  if (armed.value !== `file:${name}`) return arm(`file:${name}`)
+// A built file is not recoverable, and it is chosen from a menu now, so the
+// confirmation is a dialog that names the file rather than a second press on a
+// trash icon 6px from the download.
+const fileToDelete = ref<string | null>(null)
+const fileDeleteOpen = computed({ get: () => fileToDelete.value !== null, set: (v) => { if (!v) fileToDelete.value = null } })
+
+async function deleteFile() {
+  const name = fileToDelete.value
+  if (!name) return
+  fileToDelete.value = null
+  busy.value = 'file'
   try {
     await $fetch(`/api/postings/${id.value}/artifacts/${encodeURIComponent(name)}`, { method: 'DELETE' })
     await refresh()
+    railNote.value = { text: `Deleted ${name}.` }
   } catch (err) {
-    fail(err, "Couldn't delete the file")
+    railNote.value = { text: `Could not delete ${name}: ${reason(err)}` }
+  } finally {
+    busy.value = ''
   }
 }
 
@@ -659,6 +686,76 @@ function onMarkApplied() {
   return markApplied()
 }
 
+// ---- More: everything in the rail that is not a next step ----
+const moreMenu = ref<any>(null)
+const moreItems = computed(() => {
+  const m = meta.value
+  if (!m) return []
+  const groups: any[] = [
+    {
+      label: 'This posting',
+      items: [
+        { label: dismissed.value ? 'Un-dismiss' : 'Dismiss', icon: 'pi pi-times', command: dismiss },
+        ...(notionHref.value ? [{ label: 'Update the Notion page', icon: 'pi pi-sync', command: syncNotion }] : []),
+      ],
+    },
+  ]
+  if (m.artifacts.length) {
+    groups.push({
+      label: 'Built files',
+      items: m.artifacts.map((f) => ({ label: `Delete ${f.name}…`, icon: 'pi pi-trash', command: () => (fileToDelete.value = f.name) })),
+    })
+  }
+  groups.push({ separator: true }, { label: 'Delete posting…', icon: 'pi pi-trash', class: 'menu-danger', command: () => (deleteOpen.value = true) })
+  return groups
+})
+const toggleMore = (event: Event) => moreMenu.value?.toggle(event)
+
+// ---- next / previous, and the keys ----
+const queue = usePostingQueue(() => id.value, allPostings)
+const helpOpen = ref(false)
+
+/** Keeps `?from=` so the back arrow still goes where he came from. */
+function go(p: { id: string } | null) {
+  if (p) navigateTo({ path: `/postings/${p.id}`, query: route.query })
+}
+
+// A different posting is a clean slate: nothing armed, no result from the last one.
+watch(id, () => {
+  disarmNow()
+  applyNote.value = null
+  railNote.value = null
+  notice.value = null
+  note.value = ''
+})
+
+const SHORTCUTS: { keys: string; does: string }[] = [
+  { keys: 'j / k', does: 'Next / previous posting' },
+  { keys: 'o', does: 'Open the posting' },
+  { keys: 'a', does: 'Mark as applied (press twice)' },
+  { keys: 'b', does: 'Build the apply pack' },
+  { keys: 'e', does: 'Evaluate, or re-evaluate' },
+  { keys: 'q', does: 'Application questions' },
+  { keys: 's', does: 'Screen prep' },
+  { keys: 'x', does: 'Dismiss, or un-dismiss' },
+  { keys: 'u', does: 'Back to where you came from' },
+  { keys: '?', does: 'This list' },
+]
+
+useShortcuts({
+  j: () => go(queue.next.value),
+  k: () => go(queue.prev.value),
+  o: () => { if (target.value) window.open(target.value.href, '_blank', 'noopener') },
+  a: () => { if (!applied.value) onMarkApplied() },
+  b: () => { buildOpen.value = true },
+  e: () => { if (!evalWaiting.value) reEvalOpen.value = true },
+  q: () => navigateTo(`/postings/${id.value}/questions?from=${parent.value}`),
+  s: () => navigateTo(`/postings/${id.value}/screen?from=${parent.value}`),
+  x: () => { dismiss() },
+  u: () => navigateTo(parent.value),
+  '?': () => { helpOpen.value = true },
+})
+
 const buildHint = computed(() =>
   testArm.value === 'base'
     ? 'Pack test: the base CV half. Building one takes this posting out of the test.'
@@ -682,6 +779,20 @@ const buildHint = computed(() =>
         </span>
         <span v-if="meta.reportNum">report {{ meta.reportNum }} ·</span>
         <ClientOnly><span>seen {{ when(meta.firstSeen || meta.createdAt) }}</span></ClientOnly>
+        <!-- Next and previous through the list he came from. Client only: the
+             view and sort are in localStorage. -->
+        <ClientOnly>
+          <nav v-if="queue.position.value" class="queue-nav" :aria-label="`Postings in ${queue.view.value.label}`">
+            <span class="queue-pos">{{ queue.position.value }}</span>
+            <button type="button" class="queue-btn" :disabled="!queue.prev.value" aria-label="Previous posting" title="Previous (k)" @click="go(queue.prev.value)">
+              <i class="pi pi-angle-left" />
+            </button>
+            <button type="button" class="queue-btn" :disabled="!queue.next.value" aria-label="Next posting" title="Next (j)" @click="go(queue.next.value)">
+              <i class="pi pi-angle-right" />
+            </button>
+            <button type="button" class="queue-btn queue-help" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)" @click="helpOpen = true">?</button>
+          </nav>
+        </ClientOnly>
       </div>
     </header>
 
@@ -835,11 +946,6 @@ const buildHint = computed(() =>
                 <p class="rail-hint" :class="applyNote ? 'is-' + applyNote.tone : ''" aria-live="polite">
                   {{ applyNote ? applyNote.text : 'Sits in the funnel as Awaiting reply.' }}
                 </p>
-                <!-- Fills in the page's summary and the Job Description / Apply Pack /
-                     Analytics sub-pages that are missing; never touches what is there. -->
-                <button v-if="notionHref" type="button" class="linkish notion-sync" :disabled="busy === 'notion'" @click="syncNotion">
-                  <i :class="busy === 'notion' ? 'pi pi-spin pi-spinner' : 'pi pi-sync'" /> Update Notion page
-                </button>
               </template>
             </template>
           </PrimeCard>
@@ -863,16 +969,6 @@ const buildHint = computed(() =>
                     </span>
                     <i class="pi pi-download go" />
                   </a>
-                  <button
-                    type="button"
-                    class="file-del"
-                    :class="{ armed: armed === `file:${f.name}` }"
-                    :aria-label="`Delete ${f.name}`"
-                    :title="armed === `file:${f.name}` ? 'Really delete?' : 'Delete'"
-                    @click="deleteFile(f.name)"
-                  >
-                    <i :class="armed === `file:${f.name}` ? 'pi pi-exclamation-triangle' : 'pi pi-trash'" />
-                  </button>
                 </div>
               </div>
               <CopyCoverLetter v-if="letter" :posting-id="id" :name="letter.name" />
@@ -936,27 +1032,27 @@ const buildHint = computed(() =>
             <i class="pi pi-angle-right go" />
           </NuxtLink>
 
-          <!-- State changes are quiet, and outside the cards: neither is the
-               next thing to do. -->
-          <div class="rail-danger">
-            <PrimeButton
-              :label="armed === 'dismiss' ? 'Really?' : dismissed ? 'Un-dismiss' : 'Dismiss'"
-              icon="pi pi-times"
-              size="small"
-              :severity="armed === 'dismiss' ? 'danger' : 'secondary'"
-              text
-              :loading="busy === 'dismiss'"
-              @click="dismiss"
-            />
-            <PrimeButton
-              class="danger-btn"
-              label="Delete"
-              icon="pi pi-trash"
-              size="small"
-              severity="secondary"
-              text
-              @click="deleteOpen = true"
-            />
+          <!-- Everything that is not a next step: dismiss, delete, the Notion
+               page, a built file. One menu instead of a row of small buttons,
+               with what it just did (and Undo) said beside it. -->
+          <div class="rail-more">
+            <p class="rail-note" aria-live="polite">
+              <template v-if="railNote">
+                {{ railNote.text }}
+                <button v-if="railNote.undo" type="button" class="linkish rail-undo" @click="railNote.undo()">Undo</button>
+              </template>
+            </p>
+            <button
+              type="button"
+              class="more-btn"
+              aria-haspopup="menu"
+              aria-controls="brief-more-menu"
+              :disabled="busy === 'dismiss' || busy === 'file' || busy === 'notion'"
+              @click="toggleMore"
+            >
+              <i :class="busy === 'dismiss' || busy === 'file' || busy === 'notion' ? 'pi pi-spin pi-spinner' : 'pi pi-ellipsis-h'" />More
+            </button>
+            <PrimeMenu id="brief-more-menu" ref="moreMenu" :model="moreItems" popup class="brief-more" />
           </div>
 
         </aside>
@@ -1179,6 +1275,40 @@ const buildHint = computed(() =>
       <!-- Delete: a modal rather than the arm-then-confirm used elsewhere.
            Not a browser dialog, so it does not block automation or screen
            readers — and unlike "Really delete?" it says what goes with it. -->
+      <PrimeDialog
+        v-model:visible="fileDeleteOpen"
+        modal
+        header="Delete this file?"
+        :style="{ width: 'min(440px, calc(100vw - 32px))' }"
+      >
+        <div class="delete-dialog">
+          <p>Removes <b>{{ fileToDelete }}</b> from this posting.</p>
+          <p class="muted">It is not kept anywhere else on the site. Rebuilding the pack is the way to get it back.</p>
+        </div>
+        <template #footer>
+          <PrimeButton label="Cancel" severity="secondary" text size="small" autofocus @click="fileToDelete = null" />
+          <PrimeButton label="Delete file" icon="pi pi-trash" severity="danger" size="small" @click="deleteFile" />
+        </template>
+      </PrimeDialog>
+
+      <PrimeDialog
+        v-model:visible="helpOpen"
+        modal
+        header="Keyboard shortcuts"
+        :style="{ width: 'min(420px, calc(100vw - 32px))' }"
+      >
+        <dl class="keys">
+          <template v-for="k in SHORTCUTS" :key="k.keys">
+            <dt class="mono">{{ k.keys }}</dt>
+            <dd>{{ k.does }}</dd>
+          </template>
+        </dl>
+        <p class="muted small keys-foot">
+          j and k follow the list you last had open on the postings page ({{ queue.view.value.label }}). Keys are ignored
+          while you are typing or a dialog is open, and Delete has none on purpose.
+        </p>
+      </PrimeDialog>
+
       <PrimeDialog
         v-model:visible="deleteOpen"
         modal

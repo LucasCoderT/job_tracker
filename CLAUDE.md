@@ -1422,6 +1422,52 @@ keyboard shortcuts and next/previous posting; collapsing the rail to one next
 step behind a menu (that undoes v3). Still true: on desktop, Tab goes through
 the rail before the evaluation, the price of the phone-first source order.
 
+### Keys, next/previous, and the More menu (2026-10-06)
+
+The two things the critiques flagged that were features rather than fixes.
+
+**Next and previous** (`j` / `k`, and a "2 of 87 ‹ ›" control in the header).
+"Next" means the next row of the list he was just looking at:
+`usePostingQueue` applies the postings page's saved view and sort, which moved
+to `app/utils/posting-views.ts` so the two cannot drift. The search box is not
+part of it (it is not saved).
+
+- **It remembers where a posting sat after it leaves the view.** Dismissing or
+  applying takes the posting out of "New", so there is nothing to step from.
+  `last` keeps its index: the row that slid into its place is "next", and
+  triage carries on down the queue instead of jumping to the top. The control
+  then reads "86 in New" rather than a position.
+- **`?from=` rides along**, so the back arrow still goes where he came from.
+- **Read after mount.** The view and sort are in localStorage, so the control
+  is client-only and renders nothing until then.
+- **On a phone it shares the breadcrumb's row.** On its own row it pushed the
+  link to the posting back under the fold, so under 600px it sits top-right
+  and the last crumb (the company, which the h1 below repeats) gives way.
+
+**Keys** (`useShortcuts`): `j k o a b e q s x u ?`. A key does nothing while he
+is typing, while a modifier is held, or while a dialog or menu is open, each of
+which is a way a shortcut would do something he did not mean. `a` arms and a
+second `a` confirms, the same two presses as the button. **Delete has no key,
+on purpose.**
+
+**The More menu** replaces the Dismiss / Delete row, the per-file trash icons
+and the Update Notion page link: 7 controls in the rail where there were 9 to
+12, and v3's two cards are untouched.
+
+- **Dismiss is one press with Undo**, not arm-then-confirm. It is fully
+  reversible, and an arm cannot work inside a menu that closes on the first
+  press. What it did, and Undo, are said in the rail beside the menu
+  (`railNote`), not in the notice at the top of the page.
+- **Deleting a built file is a dialog that names the file.** It is not
+  recoverable, and it used to be a second press on a trash icon 6px from the
+  download.
+
+`pages/postings/index.vue` lost about 80 lines to the shared views file. One of
+the edits doing that also removed `HEADS`, `pageCount` and `pg`, and **the
+build passed anyway**, because nothing type-checks `.vue` files here. It was
+caught by reading the diff. The vue-tsc note under "Hard stops reach the Build
+button" has now cost two near-misses.
+
 ## Redraft one answer (2026-10-05)
 
 "Draft answers" was all or nothing: the Mac answered every question and
