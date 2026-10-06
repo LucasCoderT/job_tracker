@@ -26,3 +26,6 @@ yarn-error.log*
 
 # Browser snapshots from the playwright MCP server — session artefacts.
 .playwright-mcp/
+
+# Impeccable critique snapshots: local working notes, not for a public repo
+.impeccable/

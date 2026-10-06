@@ -615,10 +615,16 @@ const buildHint = computed(() =>
         Already in your tracker — you applied to this one on {{ alreadyApplied.date || 'an unknown date' }}.
       </PrimeMessage>
 
-      <div class="brief-grid">
-        <div class="brief-main">
+      <!--
+        Four grid children in the order a phone should read them: the call, the
+        rail, the evaluation, the job description. One left-column wrapper put
+        the rail under the whole evaluation when stacked, which on a fully
+        evaluated posting was 3,500px down. The better the posting, the further
+        away the link to it.
+      -->
+      <div class="brief-grid" :class="{ 'no-eval': !analysis }">
           <!-- The call -->
-          <PrimeCard class="sec" aria-label="The call">
+          <PrimeCard class="sec brief-call" aria-label="The call">
             <template #content>
               <div class="verdict">
                 <div class="score-block">
@@ -669,89 +675,6 @@ const buildHint = computed(() =>
               </dl>
             </template>
           </PrimeCard>
-
-          <!-- The evaluation -->
-          <PrimeCard v-if="analysis" class="sec" aria-label="The evaluation">
-            <template #content>
-              <h2>Evaluation</h2>
-              <p v-if="analysis.nextAction" class="next-action">
-                <i class="pi pi-flag" /><span>{{ analysis.nextAction }}</span>
-              </p>
-
-              <div v-if="findingRows.length" class="eval-sec">
-                <h3>Findings <span class="mono">· {{ findSummary }}</span></h3>
-              </div>
-              <div class="table-scroll">
-                <table class="findings-table">
-                  <tbody>
-                    <tr v-for="(f, i) in findingRows" :key="i" :class="{ 'group-end': f.last && i < findingRows.length - 1 }">
-                      <td class="kind" :class="{ pt: f.first, pb: f.last }">
-                        <span v-if="f.first" class="kind-label" :class="f.tone">
-                          <span class="dot" />{{ f.kind }}<span class="n mono">{{ f.n }}</span>
-                        </span>
-                      </td>
-                      <td class="finding-text" :class="{ pt: f.first, pb: f.last, muted: f.muted }">{{ f.text }}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
-              <!-- What the JD asked for against what he has. The payload has
-                   carried this since the first push; nothing rendered it. -->
-              <template v-if="requirements.length">
-                <div class="eval-sec">
-                  <h3>Requirements <span class="mono">· {{ reqSummary }}</span></h3>
-                  <span class="sec-note">what the JD asked for, and what you have</span>
-                </div>
-                <div class="table-scroll">
-                  <table class="reqs-table">
-                    <thead>
-                      <tr>
-                        <th>Requirement</th>
-                        <th class="tight">Importance</th>
-                        <th class="tight">Match</th>
-                        <th class="tight">Evidence</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr v-for="(r, i) in requirements" :key="i">
-                        <td class="req-name">{{ r.requirement }}</td>
-                        <td class="req-imp mono" :class="{ critical: /critical|must|required/i.test(r.importance) }">
-                          {{ r.importance || '—' }}
-                        </td>
-                        <td class="req-match">
-                          <span :style="{ color: r.color }"><span class="dot" :style="{ background: r.color }" />{{ r.match }}</span>
-                        </td>
-                        <td class="req-ev">{{ r.evidence || '—' }}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </template>
-
-              <template v-if="risks.length">
-                <div class="eval-sec"><h3>Risk</h3></div>
-                <dl class="facts-grid lower risk-grid">
-                  <template v-for="r in risks" :key="r.k">
-                    <dt class="low">{{ r.k }}</dt>
-                    <dd>{{ r.v }}</dd>
-                  </template>
-                </dl>
-              </template>
-
-              <details v-if="extras.length" class="extras-toggle">
-                <summary class="mono">everything else the report said · {{ extras.length }}</summary>
-                <dl class="facts-grid lower">
-                  <template v-for="e in extras" :key="e.k">
-                    <dt class="low">{{ e.k }}</dt>
-                    <dd>{{ e.v }}</dd>
-                  </template>
-                </dl>
-              </details>
-            </template>
-          </PrimeCard>
-
-        </div>
 
         <!-- The rail: what to do next, and what has been built -->
         <aside class="brief-rail">
@@ -920,28 +843,113 @@ const buildHint = computed(() =>
               label="Delete"
               icon="pi pi-trash"
               size="small"
-              severity="danger"
+              severity="secondary"
               text
               @click="deleteOpen = true"
             />
           </div>
 
-          <!-- Re-evaluate. Secondary on purpose: it spends a Claude run and the
-               brief already shows an evaluation, so it is the thing you reach
-               for when the inputs changed, not the default action. -->
-          <button
-            type="button"
-            class="linkish notion-sync"
-            :disabled="busy === 'eval' || evalWaiting"
-            @click="reEvalOpen = true"
-          >
-            <i :class="busy === 'eval' || evalWaiting ? 'pi pi-spin pi-spinner' : 'pi pi-sparkles'" />
-            {{ evalWaiting ? (meta.evalStatus === 'building' ? 'Re-evaluating…' : 'Re-evaluation queued') : meta.hasAnalysis ? 'Re-evaluate' : 'Evaluate now' }}
-          </button>
-          <p v-if="meta.evalError" class="faint small eval-error">
-            Last re-evaluation failed: {{ meta.evalError }}
-          </p>
+          <!-- With no evaluation there is no card for this to live in, and asking
+               for one is then a real next step. -->
+          <template v-if="!analysis">
+            <button type="button" class="linkish notion-sync" :disabled="busy === 'eval' || evalWaiting" @click="reEvalOpen = true">
+              <i :class="busy === 'eval' || evalWaiting ? 'pi pi-spin pi-spinner' : 'pi pi-sparkles'" />
+              {{ evalWaiting ? (meta.evalStatus === 'building' ? 'Evaluating…' : 'Evaluation queued') : 'Evaluate now' }}
+            </button>
+            <p v-if="meta.evalError" class="eval-error">Last evaluation failed: {{ meta.evalError }}</p>
+          </template>
         </aside>
+
+          <!-- The evaluation -->
+          <PrimeCard v-if="analysis" class="sec brief-eval" aria-label="The evaluation">
+            <template #content>
+              <div class="eval-head">
+                <h2>Evaluation</h2>
+                <!-- Re-evaluate lives with the thing it replaces. It spends a
+                     Claude run, so it is quiet: what you reach for when the
+                     inputs changed, not a next step. -->
+                <button type="button" class="linkish eval-again" :disabled="busy === 'eval' || evalWaiting" @click="reEvalOpen = true">
+                  <i :class="busy === 'eval' || evalWaiting ? 'pi pi-spin pi-spinner' : 'pi pi-sparkles'" />
+                  {{ evalWaiting ? (meta.evalStatus === 'building' ? 'Re-evaluating…' : 'Re-evaluation queued') : 'Re-evaluate' }}
+                </button>
+              </div>
+              <p v-if="meta.evalError" class="eval-error">Last re-evaluation failed: {{ meta.evalError }}</p>
+              <p v-if="analysis.nextAction" class="next-action">
+                <i class="pi pi-flag" /><span>{{ analysis.nextAction }}</span>
+              </p>
+
+              <div v-if="findingRows.length" class="eval-sec">
+                <h3>Findings <span class="mono">· {{ findSummary }}</span></h3>
+              </div>
+              <div class="table-scroll">
+                <table class="findings-table">
+                  <tbody>
+                    <tr v-for="(f, i) in findingRows" :key="i" :class="{ 'group-end': f.last && i < findingRows.length - 1 }">
+                      <td class="kind" :class="{ pt: f.first, pb: f.last }">
+                        <span v-if="f.first" class="kind-label" :class="f.tone">
+                          <span class="dot" />{{ f.kind }}<span class="n mono">{{ f.n }}</span>
+                        </span>
+                      </td>
+                      <td class="finding-text" :class="{ pt: f.first, pb: f.last, muted: f.muted }">{{ f.text }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- What the JD asked for against what he has. The payload has
+                   carried this since the first push; nothing rendered it. -->
+              <template v-if="requirements.length">
+                <div class="eval-sec">
+                  <h3>Requirements <span class="mono">· {{ reqSummary }}</span></h3>
+                  <span class="sec-note">what the JD asked for, and what you have</span>
+                </div>
+                <div class="table-scroll">
+                  <table class="reqs-table">
+                    <thead>
+                      <tr>
+                        <th>Requirement</th>
+                        <th class="tight">Importance</th>
+                        <th class="tight">Match</th>
+                        <th class="tight">Evidence</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="(r, i) in requirements" :key="i">
+                        <td class="req-name">{{ r.requirement }}</td>
+                        <td class="req-imp mono" :class="{ critical: /critical|must|required/i.test(r.importance) }">
+                          {{ r.importance || '—' }}
+                        </td>
+                        <td class="req-match">
+                          <span :style="{ color: r.color }"><span class="dot" :style="{ background: r.color }" />{{ r.match }}</span>
+                        </td>
+                        <td class="req-ev">{{ r.evidence || '—' }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </template>
+
+              <template v-if="risks.length">
+                <div class="eval-sec"><h3>Risk</h3></div>
+                <dl class="facts-grid lower risk-grid">
+                  <template v-for="r in risks" :key="r.k">
+                    <dt class="low">{{ r.k }}</dt>
+                    <dd>{{ r.v }}</dd>
+                  </template>
+                </dl>
+              </template>
+
+              <details v-if="extras.length" class="extras-toggle">
+                <summary class="mono">everything else the report said · {{ extras.length }}</summary>
+                <dl class="facts-grid lower">
+                  <template v-for="e in extras" :key="e.k">
+                    <dt class="low">{{ e.k }}</dt>
+                    <dd>{{ e.v }}</dd>
+                  </template>
+                </dl>
+              </details>
+            </template>
+          </PrimeCard>
 
         <!-- The posting itself. Its own grid child rather than part of the
              main column: stacked on a phone that keeps the JD — the longest

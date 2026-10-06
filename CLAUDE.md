@@ -1312,6 +1312,41 @@ than PrimeButton: the design's quiet filled button and its outline Build have
 no PrimeVue severity that matches, and overriding one per button is more CSS
 than the buttons themselves.
 
+### After the first critique of it (2026-10-06)
+
+`/impeccable critique` scored the brief 27/40 the afternoon the v3 rail shipped.
+The three P1s were fixed the same day; the rest is listed under "left" below.
+
+- **The grid has four children, not three: call, rail, evaluation, JD.** One
+  left-column wrapper put the rail under the whole evaluation when stacked, so
+  on a fully evaluated posting the link to the job started 3,497px down a
+  4,305px page, and it got worse the better the posting was. It is 744px now.
+  `.brief-main` survives only for the loading skeleton.
+- **The last grid row is `1fr`.** The rail spans every row, and with all rows
+  `auto` the grid shares a spanning item's spare height between them. The v3
+  rail is taller than the one the 2026-09-18 fix was measured against, so row 1
+  grew around a 165px card and the gap came back at 214px. `.no-eval` drops the
+  middle row when there is no evaluation card to put in it.
+- **Cards in the brief were 28px apart, not 14.** `.postings-page .sec` carries a
+  14px bottom margin, which stacked on the grid's and the rail's 14px gap while
+  the link cards beside them sat at 14. `.brief-grid .sec { margin-bottom: 0 }`.
+- **`--faint` is 2.5:1 on `--panel` and 2.3:1 on `--card`**, not the ~3.4:1
+  DESIGN.md claimed. It was carrying text that has to be read: the URL the
+  amber button opens, file names and sizes, "4 of 5 answered", the cover
+  letter's character count, the requirements table's headers, "Not built".
+  Those are `--muted` (5.12:1) now, here and wherever the same classes are used.
+- **Re-evaluate lives in the Evaluation card's header**, beside the thing it
+  replaces. It stays in the rail as "Evaluate now" only when there is no
+  evaluation, because then there is no card and asking for one is a next step.
+- **Dismiss and Delete are muted at rest.** Delete was PrimeVue's saturated
+  red, the brightest thing on the page after the amber button, on a control the
+  design calls quiet. It is red on hover, on focus and when armed.
+
+Left for a second pass: one focus style across the rail (the amber button has
+only the browser's default ring), tap targets under 44px, amber meaning four
+things at once (the score is amber only because 4.2 falls in a band), a `main`
+landmark and a live region on the waiting indicator, and the dead v2 rail CSS.
+
 ## Redraft one answer (2026-10-05)
 
 "Draft answers" was all or nothing: the Mac answered every question and

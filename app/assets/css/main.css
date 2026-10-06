@@ -232,7 +232,7 @@ footer { margin-top: 18px; font-size: 12px; color: var(--faint); }
 .pack-chip .pi { font-size: 10px; }
 .pack-chip .n { color: var(--faint); }
 .pack-chip:hover, .pack-chip:focus-visible { color: var(--text); border-color: var(--faint); }
-.pack-chip.is-none { color: var(--faint); border-style: dashed; }
+.pack-chip.is-none { color: var(--muted); border-style: dashed; }
 .pack-chip.is-none:hover { color: var(--amber); border-color: var(--amber); }
 .pack-chip.is-requested { color: var(--amber); border-color: #4a3f1f; }
 .pack-chip.is-building { color: var(--blue); border-color: #23364a; }
@@ -491,7 +491,7 @@ footer { margin-top: 18px; font-size: 12px; color: var(--faint); }
 .brief { max-width: 1040px; }
 .brief header { align-items: flex-end; }
 .brief-head { min-width: 0; }
-.brief-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--faint); }
+.brief-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
 .state-pill {
   display: inline-flex; align-items: center; font-size: 12px; font-weight: 600;
   padding: 2px 8px; border-radius: 999px; border: 1px solid;
@@ -583,7 +583,7 @@ footer { margin-top: 18px; font-size: 12px; color: var(--faint); }
   letter-spacing: 0.06em; text-transform: uppercase; line-height: 19px; color: var(--muted);
 }
 .kind-label .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
-.kind-label .n { color: var(--faint); letter-spacing: 0; }
+.kind-label .n { color: var(--muted); letter-spacing: 0; }
 .kind-label.stop { color: var(--danger); }
 .kind-label.gap { color: var(--amber); }
 .kind-label.good { color: var(--green); }
@@ -594,7 +594,7 @@ footer { margin-top: 18px; font-size: 12px; color: var(--faint); }
 .reqs-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 .reqs-table th {
   padding: 0 10px 8px; font-size: 11px; font-weight: 500; letter-spacing: 0.04em;
-  color: var(--faint); border-bottom: 1px solid var(--panel-edge); text-align: left; white-space: nowrap;
+  color: var(--muted); border-bottom: 1px solid var(--panel-edge); text-align: left; white-space: nowrap;
 }
 .reqs-table th:first-child { padding-left: 0; padding-right: 16px; }
 .reqs-table th.tight { width: 1%; }
@@ -641,7 +641,7 @@ a.rail-primary.as-link:hover { background: #d9bd71; border-color: #d9bd71; color
 .file-card > .pi { color: var(--muted); font-size: 13px; flex: none; }
 .file-meta { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
 .file-label { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.file-sub { font-size: 11px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.file-sub { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .file-del {
   flex: none; width: 30px; height: 30px; border: 0; background: transparent; border-radius: 6px;
   cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
@@ -659,7 +659,7 @@ a.rail-primary.as-link:hover { background: #d9bd71; border-color: #d9bd71; color
 .rail-state.on .dot { background: var(--green); }
 a.rail-primary.as-link { gap: 8px; }
 a.rail-primary.as-link .pi { font-size: 12px; }
-.rail-url { margin: 8px 0 0; font-size: 11.5px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rail-url { margin: 8px 0 0; font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rail-sub { margin: 4px 0 0; font-size: 12px; color: var(--muted); line-height: 1.45; text-wrap: pretty; }
 .rail-sub a { color: var(--text); }
 .rail-sub a:hover { color: var(--amber); }
@@ -690,8 +690,16 @@ a.rail-primary.as-link .pi { font-size: 12px; }
 .rail-card .built { margin: 8px 0 0; font-size: 11.5px; line-height: 1.5; text-wrap: pretty; }
 .rail-card .notion-sync { margin-top: 8px; }
 /* Posting Brief v3: Dismiss and Delete sit outside the cards. Neither is the
-   next thing to do, so neither gets a border or a rule. */
+   next thing to do, so neither gets a border or a rule, and neither is loud
+   at rest: Delete was PrimeVue's saturated red, the brightest thing on the
+   page after the amber button. It is red on hover, on focus and when armed. */
 .rail-danger { display: flex; gap: 4px; padding: 0 8px; }
+.rail-danger .p-button { font-size: 12.5px; color: var(--muted); }
+.rail-danger .p-button .p-button-icon { font-size: 11px; }
+.rail-danger .p-button:hover { color: var(--text); }
+.rail-danger .p-button.p-button-danger,
+.rail-danger .danger-btn:hover,
+.rail-danger .danger-btn:focus-visible { color: var(--danger); }
 .rail-danger .p-button:last-child { margin-left: auto; }
 /* The links are tap targets on a phone, so they are cards rather than a row
    of small anchors inside one. */
@@ -707,7 +715,7 @@ a.rail-primary.as-link .pi { font-size: 12px; }
 .link-card--primary .go { color: var(--amber); }
 .link-meta { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 3px; }
 .link-title { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
-.link-sub { color: var(--faint); font-size: 11.5px; }
+.link-sub { color: var(--muted); font-size: 11.5px; }
 .link-card .go { color: var(--muted); font-size: 13px; flex: none; }
 .link-card .in-notion { color: var(--green); font-size: 12px; }
 .rail-danger .danger-btn { margin-left: auto; }
@@ -739,14 +747,46 @@ a.rail-primary.as-link .pi { font-size: 12px; }
  * deliberate ordering that keeps the buttons above two hundred lines of job
  * description on a phone.
  */
-.brief-main { grid-column: 1; grid-row: 1; }
-.brief-rail { grid-column: 2; grid-row: 1 / span 2; }
-.brief-jd { grid-column: 1; grid-row: 2; }
+/*
+ * 2026-10-06: four children now (call, rail, evaluation, JD) so the stacked
+ * order puts the actions straight after the call. And the last row is 1fr:
+ * the rail spans every row, and with all rows `auto` the grid shares a
+ * spanning item's extra height between them, which grew row 1 around a small
+ * card and reopened the gap (214px on a thin posting, once the v3 rail got
+ * taller than the one this was first measured against).
+ */
+/* Every card on the postings pages carries a 14px bottom margin, and inside
+   this grid (and the rail's flex column) that stacked on the 14px gap: cards
+   sat 28px apart while the link cards beside them sat 14px apart. */
+.brief-grid .sec { margin-bottom: 0; }
+.brief-grid { grid-template-rows: auto auto 1fr; }
+.brief-grid.no-eval { grid-template-rows: auto 1fr; }
+:is(.brief-call, .brief-eval) { min-width: 0; }
+.brief-main { grid-column: 1; grid-row: 1 / -1; }
+.brief-call { grid-column: 1; grid-row: 1; }
+.brief-eval { grid-column: 1; grid-row: 2; }
+.brief-jd { grid-column: 1; grid-row: 3; }
+.brief-grid.no-eval .brief-jd { grid-row: 2; }
+.brief-rail { grid-column: 2; grid-row: 1 / -1; }
 @media (max-width: 880px) {
+  .brief-grid, .brief-grid.no-eval { grid-template-rows: none; }
   .brief-main,
+  .brief-call,
+  .brief-eval,
   .brief-rail,
-  .brief-jd { grid-column: auto; grid-row: auto; }
+  .brief-jd,
+  .brief-grid.no-eval .brief-jd { grid-column: auto; grid-row: auto; }
 }
+.eval-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+.eval-head h2 { margin: 0 !important; }
+.eval-again { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); white-space: nowrap; padding: 4px 0; }
+.eval-again:hover { color: var(--amber); }
+.eval-again .pi { font-size: 11px; }
+.eval-again:disabled { cursor: default; }
+/* .eval-sec is declared later with the same weight, so this needs both
+   classes to win: without it the no-JD state opened on a rule with nothing
+   above it and a 45px blank band. */
+.eval-sec.jd-missing-head { margin-top: 0; padding-top: 0; border-top: 0; }
 
 /* ---- Add a posting by URL ---- */
 .add-posting { display: flex; flex-direction: column; gap: 12px; }
@@ -1332,14 +1372,15 @@ a.rail-primary.as-link .pi { font-size: 12px; }
 }
 
 /* A failed re-evaluation says why, under the button that started it. */
-.eval-error { margin: 4px 0 0; color: var(--amber); line-height: 1.35; }
+.eval-error { margin: 0 0 10px; font-size: 12px; color: var(--amber); line-height: 1.35; }
+.brief-rail .eval-error { margin: 4px 0 0; }
 
 /* Copy cover letter: the body as text, for a form with a textarea instead of
    an upload. Sits under the files in the brief's rail and in the questions
    toolbar. */
 .copy-letter { margin-top: 10px; }
 .copy-letter .p-button { width: 100%; justify-content: center; }
-.copy-letter-sub { margin: 6px 0 0; font-size: 11px; color: var(--faint); text-align: center; }
+.copy-letter-sub { margin: 6px 0 0; font-size: 11px; color: var(--muted); text-align: center; }
 .copy-letter-text {
   width: 100%; margin-top: 8px; resize: vertical; font: inherit; font-size: 12.5px; line-height: 1.5;
   color: var(--text); background: var(--card); border: 1px solid var(--panel-edge); border-radius: 8px; padding: 8px 10px;

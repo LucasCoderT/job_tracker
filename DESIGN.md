@@ -154,7 +154,7 @@ propose the token — don't inline a hex.
   a table, a board, or a chart may, each inside its own scroll container.
 - **Accessible by default:** `:focus-visible` on every interactive element,
   `aria-label` on every section and chart, 4.5:1 on body text
-  (`--faint` on `--panel` is ~3.4:1 — tertiary/decorative use only, never for
+  (`--faint` on `--panel` measures 2.5:1, and 2.3:1 on `--card` — tertiary/decorative use only, never for
   something that must be read).
 
 ---
