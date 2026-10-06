@@ -92,6 +92,8 @@ npm run deploy                            # nuxt build, then wrangler deploy
 
 Set your own hostname in `wrangler.toml`, and put Cloudflare Access in front of it before you deploy anything real. Without Access the site is open to anyone, because it has no login of its own.
 
+`SETUP.md` has the full steps, including the Access service token the scripts need.
+
 The Notion database it expects has `Company`, `Position`, `Status`, `Application Date`, `Job Posting`, `Next Action`, `Furthest Stage`, `Interviewed` and `Replied` properties. The dashboard half works with just the first four.
 
 ## What is missing
