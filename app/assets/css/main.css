@@ -1542,3 +1542,10 @@ body.p-overflow-hidden { padding-right: calc(clamp(16px, 4vw, 48px) + var(--p-sc
 /* Under "Update status" the Notion link is the lesser of the two. */
 .rail-quiet--link { margin-top: 10px; background: transparent; font-weight: 500; font-size: 12.5px; padding-block: 7px; color: var(--muted); }
 .rail-quiet--link:hover { color: var(--text); }
+
+/* ---- Postings: score and date filters (2026-10-07) ---- */
+.listing-tools .score-min { width: 68px; text-align: right; }
+.listing-tools .date-range .p-inputtext { width: 138px; color-scheme: dark; }
+@media (max-width: 880px) {
+  .listing-tools .score-min, .listing-tools .date-range .p-inputtext, .listing-tools .inline-field .p-select { min-height: 44px; }
+}

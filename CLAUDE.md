@@ -927,6 +927,36 @@ they were. Accept, decline and reopen are covered by the rule tests only: there
 has been no offer to try them on, and trying them would have added "Offer
 Declined" to his Notion options for a test.
 
+## Postings: score and date filters, for a mass build (2026-10-07)
+
+He wanted "every posting at or over x, added within these dates" as one list
+he could select whole and build packs for. The listing had a view, a search and
+a source filter, and its select-all stopped at the page (50 at most).
+
+- **Min score** is a typed number (step 0.1) and **Added** is a preset (Today,
+  Last 3 / 7 / 14 days) or a custom From and To. Everything is ANDed with the
+  view, the search and the source, and the view counts follow, because the
+  filters sit in `matches`. The rules are `passesFilter` in
+  `app/utils/posting-views.ts`.
+- **A minimum score excludes unscored postings.** "At least 4.0" is a claim an
+  unscored row cannot meet, and letting them through would put postings nobody
+  has read into a mass build.
+- **The date is the Added column's** (`firstSeen`, else `createdAt` as an
+  Edmonton day). A UTC instant from an evening add would land on the next day.
+  Presets are inclusive of today: "Last 3 days" is today and the two before.
+- **"Select all N in this list"** in the bulk bar selects every row the filters
+  leave, across pages. The header checkbox still means this page.
+- **Narrowing the list prunes the selection** to rows still on it. A bulk action
+  must not act on postings he can no longer see.
+- **Bulk build skips what a build would be wasted on**, and says how many of
+  each: already applied to, listing closed, already has a pack, already
+  building. Selecting a whole list makes those inevitable, and before this a
+  selected `done` row was simply rebuilt. Skips are a `Skip(why)` return, so
+  one bulk action can report several reasons.
+
+Not persisted and not shared with the brief's next/previous, the same as search
+and source: `j`/`k` on the brief walk the saved view and sort only.
+
 ## A source that will not be read (2026-09-23)
 
 "Add posting doesn't work" for an Indeed link. It did work — the posting was

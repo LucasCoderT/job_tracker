@@ -46,6 +46,66 @@ export const POSTING_VIEWS: { key: string; label: string; dot: string; match: (p
 
 const STATE_ORDER = ['new', 'applied', 'dismissed']
 
+// ---- score and date filters (2026-10-07) ----
+//
+// "Everything at 4.0 or better from the last three days" is the list he wants
+// to select whole and build packs for. Both narrow whatever view is open, and
+// with search and source: every filter is ANDed.
+
+const EDMONTON_DAY = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Edmonton', year: 'numeric', month: '2-digit', day: '2-digit' })
+
+/** A Date as YYYY-MM-DD in Edmonton, the same day boundary the EI log uses. */
+export const edmontonDay = (d: Date): string => EDMONTON_DAY.format(d)
+
+/**
+ * The day a posting was added, as the Added column shows it. `firstSeen` is
+ * date-only and already local; `createdAt` is a UTC instant and an evening
+ * add would otherwise land on the next day.
+ */
+export function addedDay(p: PostingMeta): string {
+  if (p.firstSeen && /^\d{4}-\d{2}-\d{2}$/.test(p.firstSeen)) return p.firstSeen
+  const t = Date.parse(p.firstSeen || p.createdAt)
+  return Number.isFinite(t) ? edmontonDay(new Date(t)) : ''
+}
+
+export const DATE_PRESETS: { value: string; label: string; days: number }[] = [
+  { value: 'any', label: 'Any time', days: 0 },
+  { value: '1', label: 'Today', days: 1 },
+  { value: '3', label: 'Last 3 days', days: 3 },
+  { value: '7', label: 'Last 7 days', days: 7 },
+  { value: '14', label: 'Last 14 days', days: 14 },
+  { value: 'custom', label: 'Custom range', days: 0 },
+]
+
+/** The inclusive day range a preset means today. "Last 3 days" is today and the two before it. */
+export function presetRange(preset: string, now = new Date()): { from: string; to: string } {
+  const days = DATE_PRESETS.find((d) => d.value === preset)?.days ?? 0
+  if (!days) return { from: '', to: '' }
+  return { from: edmontonDay(new Date(now.getTime() - (days - 1) * 86_400_000)), to: '' }
+}
+
+export interface PostingFilter {
+  minScore: number | null
+  from: string // YYYY-MM-DD inclusive, '' = open
+  to: string
+}
+
+/**
+ * A minimum score excludes unscored postings: "at least 4.0" is a claim an
+ * unscored row cannot meet, and letting them through would put postings nobody
+ * has read into a mass build.
+ */
+export function passesFilter(p: PostingMeta, f: PostingFilter): boolean {
+  if (f.minScore != null && !((p.score ?? -1) >= f.minScore)) return false
+  if (f.from || f.to) {
+    const day = addedDay(p)
+    if (!day) return false
+    if (f.from && day < f.from) return false
+    if (f.to && day > f.to) return false
+  }
+  return true
+}
+
 function sortValue(p: PostingMeta, key: string): string | number {
   switch (key) {
     case 'score': return p.score ?? -1

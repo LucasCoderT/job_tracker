@@ -103,12 +103,41 @@ const per = ref(12)
  */
 const channel = (p: PostingMeta) => postingChannel(p.url)
 
+// Minimum score and the day it was added. Both AND with the view, the search
+// and the source, so the view counts above follow them too.
+const minScoreText = ref('')
+const datePreset = ref('any')
+const dateFrom = ref('')
+const dateTo = ref('')
+
+const minScore = computed(() => {
+  const n = Number.parseFloat(minScoreText.value)
+  return Number.isFinite(n) ? n : null
+})
+const activeFilter = computed<PostingFilter>(() => {
+  if (datePreset.value === 'custom') {
+    // Entered backwards is still a range; swapping beats an empty list.
+    const [a, b] = dateFrom.value && dateTo.value && dateFrom.value > dateTo.value ? [dateTo.value, dateFrom.value] : [dateFrom.value, dateTo.value]
+    return { minScore: minScore.value, from: a, to: b }
+  }
+  return { minScore: minScore.value, ...presetRange(datePreset.value) }
+})
+const filtering = computed(() => minScore.value != null || Boolean(activeFilter.value.from || activeFilter.value.to))
+
+function clearFilters() {
+  minScoreText.value = ''
+  datePreset.value = 'any'
+  dateFrom.value = ''
+  dateTo.value = ''
+}
+
 const matches = computed(() => {
   const q = search.value.trim().toLowerCase()
   return postings.value.filter(
     (p) =>
       (!q || `${p.company} ${p.role} ${p.source} ${channel(p)}`.toLowerCase().includes(q)) &&
-      (source.value === 'all' || channel(p) === source.value),
+      (source.value === 'all' || channel(p) === source.value) &&
+      passesFilter(p, activeFilter.value),
   )
 })
 
@@ -215,6 +244,20 @@ function toggleAll() {
   selected.value = next
 }
 
+/** Every row the filters leave, not just this page: a mass build should not be capped by the page size. */
+function selectAllListed() {
+  selected.value = Object.fromEntries(sorted.value.map((p) => [p.id, true]))
+}
+
+// A filter that narrows the list must not leave rows selected that are no
+// longer on it: a bulk action would then act on postings he cannot see.
+watch([search, source, activeFilter], () => {
+  page.value = 0
+  if (!selectedIds.value.length) return
+  const listed = new Set(list.value.map((p) => p.id))
+  selected.value = Object.fromEntries(selectedIds.value.filter((id) => listed.has(id)).map((id) => [id, true]))
+})
+
 // ---- bulk actions ----
 const busy = ref('')
 const notice = ref<{ text: string; severity: 'success' | 'warn' | 'error' | 'info' } | null>(null)
@@ -225,14 +268,15 @@ const selectedPostings = computed(
 )
 
 /** One call per selected posting, reporting how many actually landed. */
-async function runBulk(key: string, label: string, call: (p: PostingMeta) => Promise<unknown>, skippedAs = '') {
+async function runBulk(key: string, label: string, call: (p: PostingMeta) => Promise<unknown>) {
   busy.value = key
   let ok = 0
-  let skipped = 0
+  const skips = new Map<string, number>()
   const failed: string[] = []
   for (const p of selectedPostings.value) {
     try {
-      if ((await call(p)) === SKIPPED) skipped++
+      const res = await call(p)
+      if (res instanceof Skip) skips.set(res.why, (skips.get(res.why) ?? 0) + 1)
       else ok++
     } catch {
       failed.push(p.company)
@@ -241,12 +285,15 @@ async function runBulk(key: string, label: string, call: (p: PostingMeta) => Pro
   selected.value = {}
   busy.value = ''
   await refresh()
-  const held = skipped ? ` ${skipped} ${skippedAs}.` : ''
+  const held = [...skips].map(([why, n]) => ` ${n} ${why}.`).join('')
   notice.value = failed.length
     ? { text: `${label}: ${ok} done, ${failed.length} failed (${failed.slice(0, 3).join(', ')}).${held}`, severity: 'warn' }
     : { text: `${label}: ${ok} done.${held}`, severity: 'success' }
 }
-const SKIPPED = Symbol('skipped')
+/** A selected posting the action left alone, and why. Reported, never counted as a failure. */
+class Skip {
+  constructor(public why: string) {}
+}
 
 /**
  * Bulk build leaves the pack test's base half alone: the route refuses those
@@ -254,15 +301,23 @@ const SKIPPED = Symbol('skipped')
  * Leaving the test is a per-posting decision made on the brief, never a side
  * effect of a selection.
  */
+//
+// It also skips what a build would be wasted on. Selecting a whole filtered
+// list is now one press, so the list will include rows that already have a
+// pack, were already applied to, or whose listing has closed.
 const bulkBuild = () =>
   runBulk('build', 'Queued', async (p) => {
+    if (p.state === 'applied') return new Skip('already applied to')
+    if (p.closedAt) return new Skip('skipped, the listing has closed')
+    if (p.pack === 'done') return new Skip('already had a pack')
+    if (p.pack === 'requested' || p.pack === 'building') return new Skip('already building')
     try {
       await $fetch(`/api/postings/${p.id}/pack`, { method: 'POST', body: {} })
     } catch (err: any) {
-      if (err?.statusCode === 409 && /pack test/.test(err?.data?.statusMessage ?? err?.statusMessage ?? '')) return SKIPPED
+      if (err?.statusCode === 409 && /pack test/.test(err?.data?.statusMessage ?? err?.statusMessage ?? '')) return new Skip('left for the base CV (pack test)')
       throw err
     }
-  }, 'left for the base CV (pack test)')
+  })
 
 const bulkDismiss = () =>
   runBulk('dismiss', 'Dismissed', (p) =>
@@ -357,6 +412,7 @@ const lede = computed(() => {
 function resetFilters() {
   search.value = ''
   source.value = 'all'
+  clearFilters()
   pickView('all')
 }
 </script>
@@ -435,6 +491,31 @@ function resetFilters() {
             <span>Source</span>
             <PrimeSelect v-model="source" :options="sourceOpts" option-label="label" option-value="value" size="small" />
           </label>
+          <label class="inline-field">
+            <span>Min score</span>
+            <PrimeInputText
+              v-model="minScoreText"
+              class="score-min mono"
+              type="number"
+              inputmode="decimal"
+              min="0"
+              max="5"
+              step="0.1"
+              placeholder="Any"
+              size="small"
+              aria-label="Minimum score"
+            />
+          </label>
+          <label class="inline-field">
+            <span>Added</span>
+            <PrimeSelect v-model="datePreset" :options="DATE_PRESETS" option-label="label" option-value="value" size="small" aria-label="Added within" />
+          </label>
+          <span v-if="datePreset === 'custom'" class="inline-field date-range">
+            <PrimeInputText v-model="dateFrom" type="date" size="small" aria-label="Added from" />
+            <span>to</span>
+            <PrimeInputText v-model="dateTo" type="date" size="small" aria-label="Added to" />
+          </span>
+          <button v-if="filtering" type="button" class="linkish" @click="clearFilters">Clear filters</button>
           <PrimeButton
             label="Group by state"
             icon="pi pi-list"
@@ -450,6 +531,9 @@ function resetFilters() {
         <!-- Only present when something is selected. -->
         <div v-if="selectedIds.length" class="bulk" role="status">
           <span class="bulk-n mono">{{ selectedIds.length }} selected</span>
+          <button v-if="selectedIds.length < sorted.length" type="button" class="linkish" @click="selectAllListed">
+            Select all {{ sorted.length }} in this list
+          </button>
           <PrimeButton label="Build packs" icon="pi pi-file-pdf" size="small" severity="secondary" outlined :loading="busy === 'build'" @click="bulkBuild" />
           <PrimeButton label="Mark applied" icon="pi pi-send" size="small" severity="secondary" outlined :loading="busy === 'applied'" @click="applyOpen = true" />
           <PrimeButton label="Dismiss" icon="pi pi-times" size="small" severity="secondary" outlined :loading="busy === 'dismiss'" @click="bulkDismiss" />
@@ -541,7 +625,7 @@ function resetFilters() {
                 <td colspan="9" class="tbl-empty">
                   <p class="empty-title">Nothing matches this view.</p>
                   <p class="muted small">
-                    {{ search.trim() ? `No posting mentions “${search.trim()}”.` : 'This view has no postings under the current source filter.' }}
+                    {{ search.trim() ? `No posting mentions “${search.trim()}”.` : filtering ? 'No posting in this view meets the score and date filters.' : 'This view has no postings under the current source filter.' }}
                   </p>
                   <PrimeButton label="Reset filters" size="small" severity="secondary" outlined @click="resetFilters" />
                 </td>
