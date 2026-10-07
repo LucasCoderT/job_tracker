@@ -1825,6 +1825,24 @@ seconds after a `DELETE` can still answer 200. `jd-store.ts`'s "deleted while
 we were fetching" guard is subject to exactly this. Don't diagnose delete bugs
 inside that window — check the namespace with `wrangler kv key get --remote`.
 
+## A tab that outlives a deploy (2026-10-07)
+
+"500 · Importing a module script failed" after two deploys in one morning. The
+site was fine: every page and every `/_nuxt` file answered 200. A tab loaded
+before the deploy asked for a chunk name the new build no longer has (a missing
+`/_nuxt` file is a 404), and Nuxt showed its error page for the failed import.
+
+Nuxt reloads by itself when a *route* chunk fails, and a simulated deploy
+confirmed that path works. It does not cover every import, and its reload is
+skipped inside a 10-second window, which two quick deploys can land in.
+`app/plugins/stale-build.client.ts` catches the rest: any error whose message
+is a failed chunk import (Safari's and Chrome's wordings both) reloads the page,
+**once per 30 seconds**, so a reload that does not help shows the error instead
+of looping. Unrelated errors are left alone.
+
+A tab opened before this plugin shipped does not have it, so the deploy that
+added it can still strand one last time.
+
 ## Tunable constants (`server/utils/config.ts`)
 
 `DEFAULT_STALE_DAYS` 30 · `ATTENTION_MIN_DAYS` 10 · `MAX_SOURCES` 6 · `CACHE_TTL_SECONDS` 300 · `SCHEMA_VERSION` (bump on payload change).
