@@ -275,7 +275,9 @@ export function buildCandidates(
   // Status changes he made from the tracker: the reply came in, he recorded it.
   for (const e of events) {
     if (!inWeek(e.day, monday, sunday)) continue
-    const what = e.action === 'reject' ? 'rejection' : e.stage === 'Offer' ? 'offer' : `moved on to ${e.stage}`
+    const WHAT: Record<string, string> = { reject: 'rejection', hold: 'put on hold', accept: 'offer accepted', decline: 'offer declined' }
+    const MARKED: Record<string, string> = { reject: 'rejected', hold: 'on hold', accept: 'as offer accepted', decline: 'as offer declined' }
+    const what = WHAT[e.action] ?? (e.stage === 'Offer' ? 'offer' : `moved on to ${e.stage}`)
     push(
       map,
       `correspondence:${e.day}`,
@@ -287,7 +289,7 @@ export function buildCandidates(
         subject: '',
       },
       `${e.company}: ${what}`,
-      `marked ${e.company} ${e.action === 'reject' ? 'rejected' : `as ${e.stage}`} at ${stamp(e.at)}`,
+      `marked ${e.company} ${MARKED[e.action] ?? `as ${e.stage}`} at ${stamp(e.at)}`,
     )
     // An interview being set up is the outcome worth recording, if any update
     // that day was one.

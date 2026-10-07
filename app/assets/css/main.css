@@ -189,7 +189,10 @@ h1 { font-size: 20px; font-weight: 600; letter-spacing: 0.01em; margin: 0; }
    leaves room for it so a long name does not run underneath. */
 .card { position: relative; }
 .card .co { padding-right: 24px; }
-.job-status-btn { position: absolute; top: 5px; right: 4px; width: 28px; height: 28px; color: var(--faint); }
+/* The way to change a status. It was 28px in --faint (2.5:1) and only
+   brightened on hover, so on a phone it was close to invisible and he asked
+   for a feature the board already had. */
+.job-status-btn { position: absolute; top: 4px; right: 3px; width: 30px; height: 30px; color: var(--muted); }
 .job-status-btn .pi { font-size: 12px; }
 .card:hover .job-status-btn, .job-status-btn:focus-visible, .job-status-btn[disabled] { color: var(--muted); }
 .col-status-action { width: 1%; }
@@ -1523,3 +1526,19 @@ body.p-overflow-hidden { padding-right: calc(clamp(16px, 4vw, 48px) + var(--p-sc
   .brief .queue-btn::after { content: ''; position: absolute; inset: -7px; }
   .brief .crumbs .p-breadcrumb-list > li:nth-last-child(-n + 2) { display: none; }
 }
+
+/* ---- Changing a status (2026-10-07) ---- */
+.search-scope { margin: 0 0 10px; font-size: 12px; color: var(--muted); line-height: 1.5; }
+.search-scope .pi { font-size: 11px; vertical-align: -1px; }
+.status-menu .p-menu-item-label { white-space: nowrap; }
+@media (max-width: 880px) {
+  /* Thumb-sized on a phone, where there is no hover to find it by. */
+  .job-status-btn { width: 44px; height: 44px; top: 0; right: 0; }
+  .status-btn { width: 44px; height: 44px; }
+  .card .card-main { padding-right: 34px; }
+}
+.rail-state.closed { color: var(--muted); }
+.rail-state.closed .dot { background: var(--rust); }
+/* Under "Update status" the Notion link is the lesser of the two. */
+.rail-quiet--link { margin-top: 10px; background: transparent; font-weight: 500; font-size: 12.5px; padding-block: 7px; color: var(--muted); }
+.rail-quiet--link:hover { color: var(--text); }

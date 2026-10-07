@@ -60,6 +60,7 @@ export interface Job {
   nextAction: string | null
   stage: string | null // furthest interview round reached; null = never interviewed
   repliedAt: string | null // YYYY-MM-DD the first human reply arrived; null = none recorded
+  status: string | null // the Notion Status as written: "On Hold" and "Offer" are not recoverable from the bucket
 }
 
 // One rung of the interview-depth ladder: how many processes got this far.
@@ -733,6 +734,6 @@ export interface ActivityEvent {
   pageId: string
   company: string
   position: string
-  action: 'reject' | 'advance'
+  action: 'reject' | 'advance' | 'hold' | 'accept' | 'decline'
   stage: string | null
 }

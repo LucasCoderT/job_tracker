@@ -871,6 +871,62 @@ knows when the button was pressed, not when the interview happened, and the EI
 log records the latter. And career-ops's `data/applications.md` is not updated;
 it was already drifting from Notion (70 of 177 applications are not in it).
 
+### Reaching it, and the rest of the moves (2026-10-07)
+
+He asked for "a way to update the status of a job from the website", including
+from the dashboard board. The board had had one for three weeks. Three things
+made it invisible:
+
+- **The ⋮ was 28px in `--faint`** (2.5:1) and only brightened on hover, so on a
+  phone it was barely there. It is `--muted` now, and 44px under 880px.
+- **Search stayed inside the status filter.** A rejection nearly always arrives
+  for an application that is still awaiting a reply, and those are not in the
+  default "In conversation" view. Typing the company there found nothing, which
+  read as "this job cannot be reached". **A search now looks across every
+  status** and says so under the tools, since the filter chips still look
+  selected while it does.
+- **An applied posting's brief was a dead end.** Its Application card now shows
+  where the application stands (`jobStatusLabel`) and has **Update status**,
+  the same menu as the board, with the result and Undo in the hint beside it.
+  The job is found by the posting's `notionPageId` in `stats.jobs`; until the
+  5-minute stats cache has the new row, the card says so instead of offering a
+  menu for a job it cannot see.
+
+`useJobStatus().menuFor(job)` builds the one menu the board, the table and the
+brief all use, from `statusMoves()` in `shared/pipeline.ts`, which the route
+checks again (409 "That no longer applies" for a stale menu).
+
+Four moves were added to reject and advance:
+
+| Action | Status | Furthest Stage | Interviewed | Next Action | Replied |
+|---|---|---|---|---|---|
+| hold | On Hold | *unchanged* | *unchanged* | Waiting | today unless earlier |
+| accept | Accepted | Offer | ✓ | Nothing | today unless earlier |
+| decline | Offer Declined | Offer | ✓ | Nothing | today unless earlier |
+| reopen | Interviewing if it has a stage, else Applied | *unchanged* | *unchanged* | Prepare Interview / Waiting | see below |
+
+- **`jobs[].status` is the Notion status as written** (**SCHEMA_VERSION 13**).
+  Two buckets hide a difference the label needs: "On Hold" is `pending` for the
+  funnel, and a bare "Offer" is the same bucket as an accepted one.
+- **Un-rejecting to Applied clears Replied.** The rejection was the reply and it
+  was wrong, and a row waiting for its first reply cannot carry a reply date. A
+  hold that ends keeps its date, because someone did write.
+- **"Offer Declined" is not in the Notion select yet.** Status is a `select`, so
+  Notion adds the option the first time it is written. `STATUS_BUCKETS` has
+  mapped it to `offerDeclined` all along.
+- **Reopen leaves no EI event** and, like Undo, takes back one made in the last
+  15 minutes: it is a correction, not correspondence he processed. Hold, accept
+  and decline do record one.
+- An offer he has received can now be acted on from the board. The ⋮ was hidden
+  for both offer buckets, which was right when there was nothing to do there.
+
+Verified with one real round trip on a dead application (applied in March, no
+answer): hold from the brief wrote On Hold / Waiting / Replied today, the label
+and the menu followed, and restore returned all five properties to exactly what
+they were. Accept, decline and reopen are covered by the rule tests only: there
+has been no offer to try them on, and trying them would have added "Offer
+Declined" to his Notion options for a test.
+
 ## A source that will not be read (2026-09-23)
 
 "Add posting doesn't work" for an Indeed link. It did work — the posting was

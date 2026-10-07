@@ -39,6 +39,7 @@ import {
   ROLE_ORDER,
   readInterviewed,
   readStage,
+  readStatus,
   readTitle,
   readRichText,
   readSelect,
@@ -78,6 +79,7 @@ export function jobFromPage(page: NotionPage, bucket: BucketKey, now: number): J
     nextAction: readSelect(page, NEXT_ACTION_PROP),
     stage: readStage(page),
     repliedAt: page.properties?.[REPLIED_PROP]?.date?.start?.slice(0, 10) ?? null,
+    status: readStatus(page),
   }
 }
 

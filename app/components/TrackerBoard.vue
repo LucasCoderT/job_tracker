@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import type { Bucket, Job, PackMeta, PostingMeta } from '../../shared/types'
+import { canChangeStatus } from '#shared/pipeline'
 
 // Board view. Search, the status filter and the section header live in
 // TrackerSection, which passes an already-filtered `jobs` set.
@@ -38,8 +39,9 @@ function linkProps(job: Job) {
 // The status menu lives in TrackerSection; a card only says which job.
 const emit = defineEmits<{ status: [event: MouseEvent, job: Job] }>()
 
-// An accepted or declined offer is where a process ends; nothing to move.
-const movable = (job: Job) => job.bucket !== 'offerAccepted' && job.bucket !== 'offerDeclined'
+// Shown whenever there is a move to offer. An offer he has received can still
+// be accepted or declined, which the old bucket test hid.
+const movable = (job: Job) => canChangeStatus(job)
 
 function dotColor(color: string): string {
   return `var(--${color})`

@@ -1,5 +1,6 @@
 import { ref, onBeforeUnmount } from 'vue'
 import type { Job, JobStatusResult, JobStatusSnapshot, Stats } from '../../shared/types'
+import { statusMoves } from '#shared/pipeline'
 
 /**
  * Marking an application rejected or moved on a round, from the tracker.
@@ -120,5 +121,56 @@ export function useJobStatus() {
       undo: undoFor(res),
     }))
 
-  return { busyId, toast, reject, advance, dismiss: () => (toast.value = null) }
+  const simple = (action: 'hold' | 'accept' | 'decline' | 'reopen', said: (job: Job) => string) => (job: Job) =>
+    send(job, { action }, (res) => ({ text: said(job), error: false, undo: undoFor(res) }))
+
+  const hold = simple('hold', (j) => `${j.company} is on hold.`)
+  const accept = simple('accept', (j) => `${j.company}: offer accepted.`)
+  const decline = simple('decline', (j) => `${j.company}: offer declined.`)
+  const reopen = simple('reopen', (j) => `${j.company} is open again.`)
+
+  /**
+   * The menu for one application, as a PrimeMenu model. One builder for the
+   * board, the table and the posting brief, so all three offer the same moves
+   * from the same state: statusMoves(), which the route checks again.
+   */
+  function menuFor(job: Job) {
+    const moves = statusMoves(job)
+    const groups: any[] = []
+    if (moves.rungs.length) {
+      groups.push({
+        label: 'Progressed to',
+        items: moves.rungs.map((stage) => ({
+          label: stage === 'Offer' ? 'Offer received' : stage,
+          icon: stage === 'Offer' ? 'pi pi-star' : 'pi pi-arrow-right',
+          command: () => advance(job, stage),
+        })),
+      })
+    }
+    if (moves.accept || moves.decline) {
+      groups.push({
+        label: 'The offer',
+        items: [
+          ...(moves.accept ? [{ label: 'Accepted it', icon: 'pi pi-check', command: () => accept(job) }] : []),
+          ...(moves.decline ? [{ label: 'Declined it', icon: 'pi pi-times', command: () => decline(job) }] : []),
+        ],
+      })
+    }
+    const other = [
+      ...(moves.hold ? [{ label: 'On hold', icon: 'pi pi-pause', command: () => hold(job) }] : []),
+      ...(moves.reopen
+        ? [{ label: job.bucket === 'rejected' ? 'Not rejected after all' : 'No longer on hold', icon: 'pi pi-undo', command: () => reopen(job) }]
+        : []),
+    ]
+    if (other.length) groups.push({ label: 'Paused', items: other })
+    if (moves.reject) {
+      groups.push({
+        label: 'Closed',
+        items: [{ label: 'Rejected', icon: 'pi pi-times', class: 'is-reject', command: () => reject(job) }],
+      })
+    }
+    return groups
+  }
+
+  return { busyId, toast, reject, advance, hold, accept, decline, reopen, menuFor, dismiss: () => (toast.value = null) }
 }

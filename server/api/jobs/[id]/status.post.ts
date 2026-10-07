@@ -3,6 +3,7 @@
  *
  * Body: { action: 'reject' }
  *     | { action: 'advance', stage?: 'Round 1 — Screen' | 'Round 2' | 'Round 3+' | 'Offer' }
+ *     | { action: 'hold' | 'accept' | 'decline' | 'reopen' }
  *     | { action: 'restore', previous: JobStatusSnapshot }      ← Undo
  *
  * What each one writes to the Notion row:
@@ -15,6 +16,16 @@
  *   advance  Furthest Stage → the chosen rung (default: the next one)
  *            · Status → Interviewing, or Offer at the top rung
  *            · Interviewed → ✓ · Next Action → Prepare Interview, or Decide
+ *   hold     Status → On Hold · Next Action → Waiting. The employer paused it;
+ *            how far it got is left alone, like a rejection.
+ *   accept   Status → Accepted · Furthest Stage → Offer · Interviewed → ✓
+ *            · Next Action → Nothing
+ *   decline  Status → Offer Declined (the same three, his decision the other
+ *            way). Status is a select, so Notion adds the option on first use.
+ *   reopen   a rejection that was wrong, or a hold that ended: back to
+ *            Interviewing where it has a stage, else to Applied. Un-rejecting
+ *            to Applied clears Replied: the rejection was the reply, and it was
+ *            wrong. A hold that ends keeps its date, since someone did write.
  *   restore  exactly the snapshot given — the only way a stage goes back down
  *
  * reject and advance both set Replied to today unless an earlier date is
@@ -25,7 +36,7 @@
  * second round trip. The /api/stats edge cache is purged on success.
  */
 import type { JobStatusResult, JobStatusSnapshot, BucketKey } from '../../../../shared/types'
-import { STAGE_ORDER, reachableStages, nextStage, stageRank } from '../../../../shared/pipeline'
+import { STAGE_ORDER, reachableStages, nextStage, stageRank, statusMoves } from '../../../../shared/pipeline'
 import { getCloudflareEnv, resolveStaleDays, classify, readTitle, readRichText } from '../../../utils/notion'
 import { POSITION_PROP } from '../../../utils/config'
 import { jobFromPage } from '../../../utils/aggregate'
@@ -33,7 +44,8 @@ import { readApplication, snapshotOf, updateJobStatus, earliestReply, localDate 
 import { purgeStats } from '../../../utils/stats-cache'
 import { recordActivity, cancelLatestActivity } from '../../../utils/activity'
 
-const STATUSES = new Set(['Applied', 'Interviewing', 'On Hold', 'Offer', 'Accepted', 'Rejected'])
+const STATUSES = new Set(['Applied', 'Interviewing', 'On Hold', 'Offer', 'Accepted', 'Offer Declined', 'Rejected'])
+const ACTIONS = ['reject', 'advance', 'hold', 'accept', 'decline', 'reopen', 'restore']
 const NEXT_ACTIONS = new Set(['Follow up', 'Waiting', 'Prepare Interview', 'Send email', 'Decide', 'Nothing'])
 
 const bad = (statusMessage: string) => createError({ statusCode: 400, statusMessage })
@@ -61,7 +73,7 @@ export default defineEventHandler(async (event): Promise<JobStatusResult> => {
 
   const body = (await readBody(event).catch(() => ({}))) ?? {}
   const action = body.action
-  if (!['reject', 'advance', 'restore'].includes(action)) throw bad('action must be reject, advance or restore.')
+  if (!ACTIONS.includes(action)) throw bad(`action must be one of ${ACTIONS.join(', ')}.`)
 
   let page
   try {
@@ -103,8 +115,28 @@ export default defineEventHandler(async (event): Promise<JobStatusResult> => {
       nextAction: offer ? 'Decide' : 'Prepare Interview',
       replied: earliestReply(previous.replied, localDate()),
     }
-  } else {
+  } else if (action === 'restore') {
     next = restoreSnapshot(body.previous)
+  } else {
+    // The four moves the menu offers besides reject and advance. Checked
+    // against the same statusMoves() the menu was built from, so a stale menu
+    // (the row changed in Notion since the page loaded) gets a plain refusal
+    // instead of an odd write.
+    const bucket = classify(page, { staleMs, now })
+    const moves = statusMoves({ bucket: bucket ?? 'awaiting', stage: previous.stage, status: previous.status })
+    if (!moves[action as 'hold' | 'accept' | 'decline' | 'reopen']) {
+      throw createError({ statusCode: 409, statusMessage: `That no longer applies: this application is ${previous.status ?? 'in an unknown state'} now.` })
+    }
+    const today = earliestReply(previous.replied, localDate())
+    if (action === 'hold') {
+      next = { ...previous, status: 'On Hold', nextAction: 'Waiting', replied: today }
+    } else if (action === 'accept' || action === 'decline') {
+      next = { status: action === 'accept' ? 'Accepted' : 'Offer Declined', stage: 'Offer', interviewed: true, nextAction: 'Nothing', replied: today }
+    } else {
+      next = previous.stage
+        ? { ...previous, status: 'Interviewing', nextAction: 'Prepare Interview' }
+        : { ...previous, status: 'Applied', nextAction: 'Waiting', replied: previous.status === 'Rejected' ? null : previous.replied }
+    }
   }
 
   let updated
@@ -121,7 +153,9 @@ export default defineEventHandler(async (event): Promise<JobStatusResult> => {
   // error on the card.
   if (env.POSTINGS) {
     const kv = env.POSTINGS
-    const note = action === 'restore'
+    // Reopening is a correction, not correspondence he processed, so it leaves
+    // no EI event; like Undo, it takes back the one it is correcting.
+    const note = action === 'restore' || action === 'reopen'
       ? cancelLatestActivity(kv, id)
       : recordActivity(kv, {
           pageId: id,

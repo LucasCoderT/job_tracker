@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick } from 'vue'
 import type { Bucket, BucketKey, Job } from '../../shared/types'
-import { reachableStages } from '#shared/pipeline'
 
 const props = defineProps<{
   buckets: Bucket[]
@@ -20,35 +19,12 @@ const { byNotionPage: postings } = usePostings()
 //
 // One menu for the whole tracker, re-anchored to whichever card's button was
 // pressed: a PrimeMenu per card would be ~180 overlays on the All filter.
-const { busyId, toast, reject, advance, dismiss } = useJobStatus()
+const { busyId, toast, menuFor, dismiss } = useJobStatus()
 const menu = ref<any>(null)
 const menuJob = ref<Job | null>(null)
 const menuOpen = ref(false)
 
-const menuItems = computed(() => {
-  const job = menuJob.value
-  if (!job) return []
-  const interviewing = job.bucket === 'interviewed' || job.bucket === 'progressing'
-  const rungs = reachableStages(job.stage, interviewing, job.bucket === 'offerAccepted')
-  const groups: any[] = []
-  if (rungs.length) {
-    groups.push({
-      label: 'Progressed to',
-      items: rungs.map((stage) => ({
-        label: stage,
-        icon: stage === 'Offer' ? 'pi pi-star' : 'pi pi-arrow-right',
-        command: () => advance(job, stage),
-      })),
-    })
-  }
-  if (job.bucket !== 'rejected') {
-    groups.push({
-      label: 'Closed',
-      items: [{ label: 'Rejected', icon: 'pi pi-times', class: 'is-reject', command: () => reject(job) }],
-    })
-  }
-  return groups
-})
+const menuItems = computed(() => (menuJob.value ? menuFor(menuJob.value) : []))
 
 function openStatusMenu(event: MouseEvent, job: Job) {
   if (menuOpen.value && menuJob.value?.id === job.id) return menu.value?.hide()
@@ -127,8 +103,16 @@ const inGroup = (bucket: BucketKey, key: string) => {
   return !g || g.includes(bucket)
 }
 
-const filtered = computed(() => found.value.filter((j) => inGroup(j.bucket, filter.value)))
-const shownBuckets = computed(() => props.buckets.filter((b) => inGroup(b.key, filter.value)))
+// A search looks everywhere, whatever the filter. A rejection nearly always
+// arrives for an application that is still awaiting a reply, and those are not
+// in the default "In conversation" view: typing the company there found
+// nothing, which read as "this job cannot be reached from here".
+const filtered = computed(() => (searching.value ? found.value : found.value.filter((j) => inGroup(j.bucket, filter.value))))
+const shownBuckets = computed(() =>
+  searching.value
+    ? props.buckets.filter((b) => found.value.some((j) => j.bucket === b.key))
+    : props.buckets.filter((b) => inGroup(b.key, filter.value)),
+)
 
 const filters = computed(() =>
   FILTER_LABELS.map(([key, label]) => ({
@@ -182,6 +166,12 @@ const filters = computed(() =>
           </PrimeIconField>
         </div>
       </div>
+      <!-- Said out loud, because the filter chips above still look selected
+           while the results ignore them. -->
+      <p v-if="searching" class="search-scope" role="status">
+        {{ filtered.length }} of all {{ jobs.length }} applications match, whatever their status.
+        <template v-if="filtered.length">Press <i class="pi pi-ellipsis-v" aria-hidden="true" /> on one to update it.</template>
+      </p>
 
       <TrackerBoard
         v-if="view === 'board'"

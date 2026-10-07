@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { Bucket, Job, PackMeta, PostingMeta } from '../../shared/types'
+import { canChangeStatus } from '#shared/pipeline'
 
 const props = defineProps<{
   jobs: Job[]
@@ -153,9 +154,9 @@ const rows = computed(() =>
       <PrimeColumn class="col-right col-status-action">
         <template #body="{ data }">
           <button
-            v-if="data.bucket !== 'offerAccepted' && data.bucket !== 'offerDeclined'"
+            v-if="canChangeStatus(data)"
             type="button"
-            class="icon-btn"
+            class="icon-btn status-btn"
             :aria-label="`Change status for ${data.company}`"
             aria-haspopup="menu"
             :disabled="busyId === data.id"

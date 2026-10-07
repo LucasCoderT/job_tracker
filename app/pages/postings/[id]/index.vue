@@ -2,6 +2,7 @@
 import { computed, ref, watch, onMounted } from 'vue'
 import { letterText, normalizeUrl, evaluationExpected, postingChannel } from '#shared/postings'
 import { inPackTest, packArm } from '#shared/pack-test'
+import { jobStatusLabel, canChangeStatus } from '#shared/pipeline'
 import type { NotionWriteResult, PostingApplyResult, PostingDetail } from '../../../../shared/types'
 
 const route = useRoute()
@@ -686,6 +687,25 @@ function onMarkApplied() {
   return markApplied()
 }
 
+// ---- where the application stands, and changing it ----
+//
+// Once a posting is applied, this page was a dead end for its status: a
+// rejection had to be marked from the dashboard's board, on a card he first
+// had to find. The row is the same Notion application the board moves, so this
+// uses the same composable and the same menu (useJobStatus().menuFor).
+const idsMatch = (a: string, b: string) => a.replace(/-/g, '').toLowerCase() === b.replace(/-/g, '').toLowerCase()
+const job = computed(() => {
+  const pageId = meta.value?.notionPageId
+  if (!pageId) return null
+  return stats.value?.jobs.find((j) => idsMatch(j.id, pageId)) ?? null
+})
+const { busyId: statusBusy, toast: statusToast, menuFor: statusMenuFor, dismiss: dismissStatusToast } = useJobStatus()
+const statusMenu = ref<any>(null)
+const statusItems = computed(() => (job.value ? statusMenuFor(job.value) : []))
+const statusLabel = computed(() => (job.value ? jobStatusLabel(job.value) : ''))
+const statusClosed = computed(() => job.value?.bucket === 'rejected' || job.value?.bucket === 'offerDeclined' || job.value?.bucket === 'noAnswer')
+const toggleStatus = (event: Event) => statusMenu.value?.toggle(event)
+
 // ---- More: everything in the rail that is not a next step ----
 const moreMenu = ref<any>(null)
 const moreItems = computed(() => {
@@ -723,6 +743,7 @@ function go(p: { id: string } | null) {
 // A different posting is a clean slate: nothing armed, no result from the last one.
 watch(id, () => {
   disarmNow()
+  dismissStatusToast()
   applyNote.value = null
   railNote.value = null
   notice.value = null
@@ -899,9 +920,10 @@ const buildHint = computed(() =>
             <template #content>
               <div class="rail-head">
                 <h2>Application</h2>
-                <span class="rail-state" :class="{ on: applied }">
+                <span class="rail-state" :class="{ on: applied && !statusClosed, closed: applied && statusClosed }">
                   <span class="dot" />
-                  <ClientOnly v-if="applied">Applied {{ when(meta.appliedAt) }}<template #fallback>Applied</template></ClientOnly>
+                  <template v-if="applied && job">{{ statusLabel }}</template>
+                  <ClientOnly v-else-if="applied">Applied {{ when(meta.appliedAt) }}<template #fallback>Applied</template></ClientOnly>
                   <template v-else>{{ dismissed ? 'Dismissed' : 'Not applied yet' }}</template>
                 </span>
               </div>
@@ -940,12 +962,41 @@ const buildHint = computed(() =>
                 <p id="apply-hint" class="rail-hint" :class="armed !== 'applied' && applyNote ? 'is-' + applyNote.tone : ''" aria-live="polite">{{ applyHint }}</p>
               </template>
               <template v-else>
-                <a v-if="notionHref" class="rail-quiet" :href="notionHref" target="_blank" rel="noopener">
+                <!-- A reply came in: say so here. The same menu as the board's. -->
+                <button
+                  v-if="job && canChangeStatus(job)"
+                  type="button"
+                  class="rail-quiet"
+                  aria-haspopup="menu"
+                  aria-controls="brief-status-menu"
+                  :disabled="statusBusy === job.id"
+                  @click="toggleStatus"
+                >
+                  <i :class="statusBusy === job.id ? 'pi pi-spin pi-spinner' : 'pi pi-flag'" />
+                  <span>Update status</span>
+                </button>
+                <PrimeMenu id="brief-status-menu" ref="statusMenu" :model="statusItems" popup class="status-menu" />
+                <p
+                  class="rail-hint"
+                  :class="statusToast ? (statusToast.error ? 'is-error' : 'is-ok') : applyNote ? 'is-' + applyNote.tone : ''"
+                  aria-live="polite"
+                >
+                  <template v-if="statusToast">
+                    {{ statusToast.text }}
+                    <button v-if="statusToast.undo" type="button" class="linkish rail-undo" @click="statusToast.undo()">Undo</button>
+                  </template>
+                  <template v-else-if="applyNote">{{ applyNote.text }}</template>
+                  <template v-else-if="job">
+                    <ClientOnly>Applied {{ when(job.date || meta.appliedAt) }}.<template #fallback>Applied.</template></ClientOnly>
+                    <template v-if="job.repliedAt"> First reply {{ job.repliedAt }}.</template>
+                  </template>
+                  <template v-else>
+                    The funnel has not picked this up yet (its numbers are cached for 5 minutes). Its status can be updated here once it has.
+                  </template>
+                </p>
+                <a v-if="notionHref" class="rail-quiet rail-quiet--link" :href="notionHref" target="_blank" rel="noopener">
                   <span>Open in Notion</span><i class="pi pi-external-link" />
                 </a>
-                <p class="rail-hint" :class="applyNote ? 'is-' + applyNote.tone : ''" aria-live="polite">
-                  {{ applyNote ? applyNote.text : 'Sits in the funnel as Awaiting reply.' }}
-                </p>
               </template>
             </template>
           </PrimeCard>
