@@ -1031,6 +1031,17 @@ Left out on purpose: streaming (settled in
 `_profile.md`), his education and that he does not drive (both known), and
 per-posting decisions such as whether to send a second application.
 
+**Saving one answer leaves the others alone.** The brief used to refetch the
+posting after a save, and its skeleton was `v-if="pending"`, so the whole page
+unmounted and every other box he had typed into came back empty. He filled in
+several, saved one, and lost the rest. The save now patches the returned
+question into `data.open` with no refetch. Separately, the skeleton on every
+page with something to type into (the brief, application questions, screen
+prep, the pack page, `/about-you`) shows only while there is nothing on screen
+for that page yet, so a refetch from a live update or another action no longer
+swaps typed text for a loading state. On the brief that test is "the data is
+for a different posting", because `j`/`k` reuse the page.
+
 On `/about-you` the employer questions are grouped by where the posting
 stands, unapplied first: before applying a question is a reason to hold off,
 after applying it is something for the first call. Dismissed, closed and

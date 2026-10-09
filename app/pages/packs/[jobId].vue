@@ -358,7 +358,7 @@ async function saveDetails() {
       </div>
     </header>
 
-    <div v-if="pending" class="skel pack-grid" aria-busy="true" aria-label="Loading pack">
+    <div v-if="pending && !data" class="skel pack-grid" aria-busy="true" aria-label="Loading pack">
       <div class="skel-panel sk" style="height: 520px" />
       <div class="skel-panel sk" style="height: 300px; animation-delay: 120ms" />
     </div>

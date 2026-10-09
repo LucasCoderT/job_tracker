@@ -326,7 +326,7 @@ const words = (s: string) => (s.trim() ? s.trim().split(/\s+/).length : 0)
       </div>
     </header>
 
-    <div v-if="pending" class="skel" aria-busy="true" aria-label="Loading questions">
+    <div v-if="pending && !data" class="skel" aria-busy="true" aria-label="Loading questions">
       <div class="skel-panel sk" style="height: 120px; margin-bottom: 14px" />
       <div class="skel-panel sk" style="height: 360px; animation-delay: 120ms" />
     </div>

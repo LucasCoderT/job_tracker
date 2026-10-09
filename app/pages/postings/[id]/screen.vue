@@ -129,7 +129,7 @@ async function save(p: ScreenPrompt) {
   <div class="packs-page">
     <AppCrumbs :crumbs="crumbs" />
 
-    <PrimeProgressSpinner v-if="pending" style="width:42px;height:42px" />
+    <PrimeProgressSpinner v-if="pending && !data" style="width:42px;height:42px" />
     <PrimeMessage v-else-if="error" severity="error">Could not load the screen prep.</PrimeMessage>
 
     <template v-else>

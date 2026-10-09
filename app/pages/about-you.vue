@@ -98,7 +98,7 @@ async function add() {
       say it.
     </p>
 
-    <div v-if="pending" class="skel" aria-busy="true" aria-label="Loading questions">
+    <div v-if="pending && !data" class="skel" aria-busy="true" aria-label="Loading questions">
       <div class="skel-panel sk" style="height: 320px" />
     </div>
     <PrimeMessage v-else-if="error" severity="error" :closable="false">Could not load the questions.</PrimeMessage>

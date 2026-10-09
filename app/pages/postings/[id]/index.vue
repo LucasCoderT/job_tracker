@@ -712,10 +712,20 @@ const openEmployer = computed(() => data.value?.open?.employer ?? [])
 const openLeft = computed(() => [...openAbout.value, ...openEmployer.value].filter((q) => !q.answeredAt).length)
 // Offered, never done for him: a re-evaluation is a full run on the Mac.
 const openSaved = ref(false)
-async function onOpenSaved() {
-  await refresh()
+// Saving one answer must not disturb the others. This used to refetch the
+// posting, which swapped the whole page for its loading skeleton and threw away
+// everything typed into the other boxes. The route returns the saved question,
+// so it is patched in place. useFetch data is a shallow ref: replace, never edit.
+function patchOpen(kind: 'about' | 'employer', change: (list: any[]) => any[]) {
+  const d = data.value
+  if (!d?.open) return
+  data.value = { ...d, open: { ...d.open, [kind]: change(d.open[kind]) } }
+}
+function onOpenSaved(kind: 'about' | 'employer', q: { id: string }) {
+  patchOpen(kind, (list) => list.map((x) => (x.id === q.id ? q : x)))
   openSaved.value = true
 }
+const onOpenRemoved = (kind: 'about' | 'employer', qid: string) => patchOpen(kind, (list) => list.filter((x) => x.id !== qid))
 
 // ---- More: everything in the rail that is not a next step ----
 const moreMenu = ref<any>(null)
@@ -830,7 +840,10 @@ const buildHint = computed(() =>
     </header>
 
     <!-- Skeleton at the real dimensions, so nothing jumps (DESIGN.md §7.8) -->
-    <div v-if="pending" class="brief-grid" aria-busy="true" aria-label="Loading posting">
+    <!-- Only while there is nothing to show for this posting. A refetch of the
+         one already on screen (a live update, any action's refresh) keeps the
+         page mounted, so nothing he has typed is lost to a skeleton. -->
+    <div v-if="pending && data?.meta?.id !== id" class="brief-grid" aria-busy="true" aria-label="Loading posting">
       <div class="brief-main">
         <div class="skel-panel sk" style="height: 236px" />
         <div class="skel-panel sk" style="height: 420px; animation-delay: 120ms" />
@@ -1147,8 +1160,8 @@ const buildHint = computed(() =>
                   <NuxtLink to="/about-you" class="linkish oq-link">All questions</NuxtLink>
                 </div>
                 <div class="oq-list">
-                  <OpenQuestionRow v-for="q in openAbout" :key="q.id" kind="about" :q="q" bare @saved="onOpenSaved" @removed="refresh()" />
-                  <OpenQuestionRow v-for="q in openEmployer" :key="q.id" kind="employer" :q="q" bare @saved="onOpenSaved" @removed="refresh()" />
+                  <OpenQuestionRow v-for="q in openAbout" :key="q.id" kind="about" :q="q" bare @saved="onOpenSaved('about', $event)" @removed="onOpenRemoved('about', $event)" />
+                  <OpenQuestionRow v-for="q in openEmployer" :key="q.id" kind="employer" :q="q" bare @saved="onOpenSaved('employer', $event)" @removed="onOpenRemoved('employer', $event)" />
                 </div>
                 <p v-if="openSaved" class="oq-after" role="status">
                   Saved. This evaluation was written without it.
