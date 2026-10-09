@@ -973,9 +973,26 @@ Two kinds, split by who can answer:
 - **For the employer** (the real band, whether Alberta is eligible). His answer
   for one company says nothing about the next, so these belong to one posting.
 
-Where it lives: one KV document, `facts:doc` in POSTINGS
-(`server/utils/facts.ts`). Every reader wants all of it (the Mac, the list
-page, the count on the postings header), and one document is one read.
+Where it lives: **two** KV documents in POSTINGS (`server/utils/facts.ts`),
+split by who writes them. `facts:questions` is written only by producers (an
+evaluation push, the backlog ingest, a posting being deleted). `facts:answers`
+is written only by him, and each entry carries a copy of its question.
+`readFacts()` merges them, so a listing is two reads.
+
+**It was one document for about six hours, and lost data on day one.** He
+answered three questions within a minute of 51 employer questions being added,
+and his save wrote back the document as it was before the batch. Re-reading
+before the write did not help: a KV read can be up to a minute stale at a colo
+that did not make the write, the same trap recorded under the KV index. His
+answers survived and the 51 were re-added. With one document per writer neither
+side can overwrite the other, and a test replays the stale read both ways.
+Any future store that both he and a producer write should start out split.
+
+"Not a real question" on an unanswered question writes a tombstone in his
+document, so it stays hidden when a later evaluation asks again. Remove on an
+answered one deletes the answer and the question goes back to being asked.
+The old `facts:doc` is read as a fallback until each new key is first written,
+and is otherwise dead.
 
 - **`/about-you`** lists everything: to answer (most-asked first), to find out
   from employers, answered, and a form for something no evaluation has asked.

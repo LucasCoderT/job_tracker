@@ -11,7 +11,7 @@
 import type { OpenQuestionInput } from '../../../shared/types'
 import { getCloudflareEnv } from '../../utils/notion'
 import { postingsKV, getMeta } from '../../utils/postings'
-import { foldQuestions, readFacts } from '../../utils/facts'
+import { foldQuestions, updateQuestions } from '../../utils/facts'
 
 export default defineEventHandler(async (event) => {
   const kv = postingsKV(getCloudflareEnv(event))
@@ -26,19 +26,20 @@ export default defineEventHandler(async (event) => {
     byPosting.get(id)!.push({ about: it.about === 'employer' ? 'employer' : 'candidate', topic: it.topic, question: it.question })
   }
 
-  let doc = await readFacts(kv)
-  const before = JSON.stringify(doc)
-  const stamp = new Date().toISOString()
+  // Resolve the postings first, so the read-change-write below is as short as it can be.
+  const askers = new Map<string, { postingId: string; company: string; role: string }>()
   let skipped = 0
-  for (const [postingId, list] of byPosting) {
+  for (const postingId of byPosting.keys()) {
     const meta = await getMeta(kv, postingId)
-    if (!meta) {
-      skipped++
-      continue
-    }
-    doc = foldQuestions(doc, { postingId, company: meta.company, role: meta.role }, list, false, stamp)
+    if (meta) askers.set(postingId, { postingId, company: meta.company, role: meta.role })
+    else skipped++
   }
-  // One write for the whole batch.
-  if (JSON.stringify(doc) !== before) await kv.put('facts:doc', JSON.stringify({ ...doc, updatedAt: stamp }))
+  const stamp = new Date().toISOString()
+  // One write for the whole batch, to the producers' document only.
+  const { doc } = await updateQuestions(kv, (start) => {
+    let next = start
+    for (const [postingId, asker] of askers) next = foldQuestions(next, asker, byPosting.get(postingId)!, false, stamp)
+    return next
+  })
   return { ok: true, postings: byPosting.size - skipped, skipped, about: doc.about.length, employer: doc.employer.length }
 })
