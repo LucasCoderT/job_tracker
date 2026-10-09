@@ -460,7 +460,7 @@ export interface PostingMeta {
 
 export interface PostingsResponse { enabled: boolean; postings: PostingMeta[] }
 
-export interface PostingDetail { meta: PostingMeta; jd: string | null; analysis: PostingAnalysis | null; packTest?: PackTestInfo }
+export interface PostingDetail { meta: PostingMeta; jd: string | null; analysis: PostingAnalysis | null; packTest?: PackTestInfo; open?: PostingOpenQuestions }
 
 /** The base CV the pack test sends; `startedAt` is when it was first uploaded, which is when the test began. */
 export interface PackTestInfo {
@@ -737,3 +737,48 @@ export interface ActivityEvent {
   action: 'reject' | 'advance' | 'hold' | 'accept' | 'decline'
   stage: string | null
 }
+
+// ---- Open questions an evaluation raised (2026-10-09) ----
+
+/** How he answered a question about himself. Optional: a preference ("how much on-call") has no yes or no. */
+export type FactVerdict = 'yes' | 'some' | 'no'
+
+/** A posting whose evaluation asked a question about him. */
+export interface FactAsker { postingId: string; company: string; role: string }
+
+/**
+ * A question about him, asked once however many evaluations raise it. Keyed by
+ * topic, so "Kubernetes" from twelve postings is one row with twelve askers.
+ * `answer` is his own words and is the only thing that may be repeated in a CV
+ * or a letter.
+ */
+export interface ProfileQuestion {
+  id: string
+  topic: string
+  question: string
+  answer: string | null
+  verdict: FactVerdict | null
+  answeredAt: string | null
+  createdAt: string
+  askedBy: FactAsker[]
+}
+
+/** Something only the employer can answer, so it belongs to one posting. */
+export interface EmployerQuestion {
+  id: string
+  postingId: string
+  company: string
+  role: string
+  question: string
+  answer: string | null
+  answeredAt: string | null
+  createdAt: string
+}
+
+export interface FactsDoc { updatedAt: string | null; about: ProfileQuestion[]; employer: EmployerQuestion[] }
+
+/** One open question as an evaluation or the backlog pass states it. */
+export interface OpenQuestionInput { about: 'candidate' | 'employer'; topic?: string; question: string }
+
+/** The questions that belong on one posting's brief. */
+export interface PostingOpenQuestions { about: ProfileQuestion[]; employer: EmployerQuestion[] }

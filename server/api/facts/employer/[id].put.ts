@@ -1,0 +1,15 @@
+/**
+ * PUT /api/facts/employer/:id — his answer. Body: { answer }
+ * An empty answer puts the question back to unanswered.
+ */
+import { getCloudflareEnv } from '../../../utils/notion'
+import { postingsKV, getMeta } from '../../../utils/postings'
+import { answerEmployer } from '../../../utils/facts'
+
+export default defineEventHandler(async (event) => {
+  const kv = postingsKV(getCloudflareEnv(event))
+  if (!kv) throw createError({ statusCode: 503, statusMessage: 'No POSTINGS KV binding configured.' })
+  const res = await answerEmployer(kv, getRouterParam(event, 'id') ?? '', await readBody(event))
+  if (!res) throw createError({ statusCode: 404, statusMessage: 'No such question.' })
+  return res
+})

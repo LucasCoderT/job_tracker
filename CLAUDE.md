@@ -957,6 +957,72 @@ a source filter, and its select-all stopped at the page (50 at most).
 Not persisted and not shared with the brief's next/previous, the same as search
 and source: `j`/`k` on the brief walk the saved view and sort only.
 
+## Open questions get answered once (2026-10-09)
+
+An evaluation that cannot settle something ends by asking: "Confirm with Lucas
+whether he has any unlisted Kubernetes exposure beyond ECS". 101 of 210
+evaluated postings carried a note like that, there was nowhere to answer it,
+and so the next evaluation asked again. The one answer that had stuck
+(streaming, in career-ops's `modes/_profile.md`) was typed in by hand.
+
+Two kinds, split by who can answer:
+
+- **About him** (experience, preferences). Keyed by **topic**, so "Kubernetes"
+  from twelve postings is one question with twelve askers. The answer applies
+  to every posting, past and future.
+- **For the employer** (the real band, whether Alberta is eligible). His answer
+  for one company says nothing about the next, so these belong to one posting.
+
+Where it lives: one KV document, `facts:doc` in POSTINGS
+(`server/utils/facts.ts`). Every reader wants all of it (the Mac, the list
+page, the count on the postings header), and one document is one read.
+
+- **`/about-you`** lists everything: to answer (most-asked first), to find out
+  from employers, answered, and a form for something no evaluation has asked.
+  The posting brief shows its own questions under the next action, with the
+  same row (`OpenQuestionRow`).
+- **An answer is his words, plus an optional Yes / Some / No.** Nothing drafts
+  it. That rule matters more here than anywhere: what he types is what a later
+  CV or letter may repeat.
+- **Re-evaluation is offered, never run.** Saving on a brief says the
+  evaluation was written without the answer and offers Re-evaluate. One answer
+  can touch a dozen postings and each is a full run on the Mac.
+- **How questions arrive.** New evaluations emit `open_questions` in the
+  Machine Summary (`about`, `topic`, `question`), and `PUT /api/postings/:id`
+  folds them in. That is a *replace* for the posting: a question the new
+  evaluation no longer asks comes off it. **Only when the key is present**: an
+  older report has none, and reading that as "asks nothing" would wipe the
+  backlog. **An answered question is never removed by a producer**, even with
+  no posting left asking it.
+- **How answers get back.** career-ops's `site-facts.mjs` turns `GET
+  /api/facts` into `modes/_confirmed.md` at the start of every eval and apply
+  tick. The eval prompt reads it as a primary file, is told not to re-ask, to
+  reuse the exact topic string of anything still unanswered, and to stop
+  putting "confirm with Lucas" in `next_action`. Every pack and form-answer
+  prompt carries a line pointing at it. A NO is a gap to name plainly; a YES may
+  be stated only in the words he used, and `verify-cv-facts.mjs` stays the gate.
+  If the site cannot be reached the last copy is kept.
+- **The validator checks `open_questions` only when present.** Requiring it
+  would fail all 300-odd older reports, and failing validation is what queues a
+  posting for re-evaluation.
+
+The backlog was read once, by hand in a session, not by a script:
+`POST /api/facts/ingest` (additive) took 25 questions about him from 46 notes,
+and 26 employer questions. Employer questions were taken **only from postings
+he has not applied to**; the sixty-odd on applied postings are "ask at the
+screen" notes that would have buried the list, and they are still on each
+brief as the note they always were. Left out on purpose: streaming (settled in
+`_profile.md`), his education and that he does not drive (both known), and
+per-posting decisions such as whether to send a second application.
+
+Topics are matched by exact text, case and spacing aside. Two evaluations that
+name the same thing differently make two questions; the prompt's "reuse this
+string" is the only guard, and Remove on the list page is the repair.
+
+Routes: `GET /api/facts` · `POST /api/facts/ingest` · `POST /api/facts/about` ·
+`PUT|DELETE /api/facts/about/:id` · `PUT|DELETE /api/facts/employer/:id`.
+`GET /api/postings/:id` carries `open` for that posting.
+
 ## A source that will not be read (2026-09-23)
 
 "Add posting doesn't work" for an Indeed link. It did work — the posting was

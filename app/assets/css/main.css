@@ -1549,3 +1549,50 @@ body.p-overflow-hidden { padding-right: calc(clamp(16px, 4vw, 48px) + var(--p-sc
 @media (max-width: 880px) {
   .listing-tools .score-min, .listing-tools .date-range .p-inputtext, .listing-tools .inline-field .p-select { min-height: 44px; }
 }
+
+/* ---- Open questions an evaluation raised (2026-10-09) ---- */
+.oq-list { display: grid; gap: 10px; margin-top: 12px; }
+.oq { border: 1px solid var(--panel-edge); border-radius: 10px; padding: 12px 14px; background: var(--card); min-width: 0; }
+.oq.answered { background: transparent; }
+.oq-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.oq-kind { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--amber); }
+.oq-kind.employer { color: var(--muted); }
+.oq-when { font-size: 11.5px; color: var(--muted); }
+.oq-q { margin: 5px 0 0; font-size: 13.5px; line-height: 1.5; text-wrap: pretty; max-width: 70ch; }
+.oq-a { margin: 9px 0 0; font-size: 13.5px; line-height: 1.55; display: flex; gap: 9px; align-items: baseline; }
+.oq-a-text { white-space: pre-wrap; max-width: 70ch; }
+.oq-verdict { flex: none; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; border: 1px solid currentColor; }
+.oq-verdict.yes, .oq-chip.yes.on { color: var(--green); }
+.oq-verdict.some, .oq-chip.some.on { color: var(--amber); }
+.oq-verdict.no, .oq-chip.no.on { color: var(--rust); }
+.oq-chips { display: flex; gap: 6px; margin-top: 10px; }
+.oq-chip {
+  font: inherit; font-size: 12.5px; padding: 4px 13px; border-radius: 999px; cursor: pointer;
+  background: transparent; color: var(--muted); border: 1px solid var(--panel-edge);
+}
+.oq-chip:hover { color: var(--text); }
+.oq-chip.on { border-color: currentColor; background: rgba(255, 255, 255, 0.03); font-weight: 600; }
+.oq-chip:focus-visible, .oq-link:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.oq-box.p-textarea { width: 100%; margin-top: 8px; font-size: 13.5px; }
+.oq-foot { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 9px; }
+.oq-link { color: var(--muted); font-size: 12.5px; }
+.oq-link:hover { color: var(--text); }
+.oq-link.danger { color: var(--danger); }
+.oq-scope { font-size: 12px; color: var(--muted); margin-left: auto; }
+.oq-note { margin: 8px 0 0; font-size: 12.5px; color: var(--muted); }
+.oq-note.is-error { color: var(--danger); }
+.oq-askers { margin: 9px 0 0; font-size: 12px; color: var(--muted); }
+.oq-askers a { color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
+.oq-askers a:hover { color: var(--text); }
+.oq-after { margin: 10px 0 0; font-size: 12.5px; color: var(--muted); }
+.oq-after .linkish { color: var(--amber); font-size: 12.5px; }
+.about-page .about-lede { color: var(--muted); font-size: 13.5px; line-height: 1.6; max-width: 68ch; margin: 0 0 4px; }
+.about-page h2 { font-size: 14px; margin: 0; }
+.about-page h2 .mono { color: var(--muted); font-weight: 400; }
+.about-add { display: grid; gap: 8px; margin-top: 12px; max-width: 560px; }
+.about-add .p-inputtext, .about-add .p-textarea { width: 100%; font-size: 13.5px; }
+@media (max-width: 880px) {
+  .oq-chip { min-height: 44px; padding-inline: 18px; }
+  .oq-link { min-height: 44px; }
+  .oq-scope { margin-left: 0; flex-basis: 100%; }
+}

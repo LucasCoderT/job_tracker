@@ -635,6 +635,8 @@ export function cleanAnalysis(raw: any): PostingAnalysis {
     'hard_stops', 'hardStops', 'soft_gaps', 'softGaps', 'top_strengths', 'topStrengths',
     'discard_reasons', 'discardReasons', 'requirement_importance', 'requirements',
     'risk_summary', 'risk',
+    // Open questions live in their own store (server/utils/facts.ts), with his answers.
+    'open_questions', 'openQuestions',
   ])
   const extra: Record<string, string> = {}
   for (const [k, val] of Object.entries(v).slice(0, 60)) {

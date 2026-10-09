@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
 import { postingChannel, localityOf, LOCALITY_LABEL } from '#shared/postings'
-import type { PostingApplyResult, PostingMeta, PostingsResponse } from '../../../shared/types'
+import type { FactsDoc, PostingApplyResult, PostingMeta, PostingsResponse } from '../../../shared/types'
 
 useHead({ title: 'Postings' })
 
@@ -86,6 +86,12 @@ function pickView(key: string) {
     /* the filter still works for this visit */
   }
 }
+
+// How many questions about him are waiting. Fetched on the client only, after
+// the rows: a second fetch during SSR is how this page once server-rendered its
+// skeleton (see CLAUDE.md, the AddPostingButton trap).
+const { data: facts } = useFetch<FactsDoc>('/api/facts', { key: 'facts', server: false, lazy: true })
+const factsLeft = computed(() => (facts.value?.about ?? []).filter((q) => !q.answeredAt).length)
 
 // ---- filtering ----
 const search = ref('')
@@ -435,6 +441,15 @@ function resetFilters() {
           label="Open in Notion"
           icon="pi pi-external-link"
           icon-pos="right"
+          severity="secondary"
+          outlined
+          size="small"
+        />
+        <PrimeButton
+          as="a"
+          href="/about-you"
+          :label="factsLeft ? `Questions for you · ${factsLeft}` : 'Questions for you'"
+          icon="pi pi-comment"
           severity="secondary"
           outlined
           size="small"

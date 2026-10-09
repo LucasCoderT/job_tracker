@@ -706,6 +706,17 @@ const statusLabel = computed(() => (job.value ? jobStatusLabel(job.value) : ''))
 const statusClosed = computed(() => job.value?.bucket === 'rejected' || job.value?.bucket === 'offerDeclined' || job.value?.bucket === 'noAnswer')
 const toggleStatus = (event: Event) => statusMenu.value?.toggle(event)
 
+// ---- open questions the evaluation raised ----
+const openAbout = computed(() => data.value?.open?.about ?? [])
+const openEmployer = computed(() => data.value?.open?.employer ?? [])
+const openLeft = computed(() => [...openAbout.value, ...openEmployer.value].filter((q) => !q.answeredAt).length)
+// Offered, never done for him: a re-evaluation is a full run on the Mac.
+const openSaved = ref(false)
+async function onOpenSaved() {
+  await refresh()
+  openSaved.value = true
+}
+
 // ---- More: everything in the rail that is not a next step ----
 const moreMenu = ref<any>(null)
 const moreItems = computed(() => {
@@ -744,6 +755,7 @@ function go(p: { id: string } | null) {
 watch(id, () => {
   disarmNow()
   dismissStatusToast()
+  openSaved.value = false
   applyNote.value = null
   railNote.value = null
   notice.value = null
@@ -1125,6 +1137,24 @@ const buildHint = computed(() =>
               <p v-if="analysis.nextAction" class="next-action">
                 <i class="pi pi-flag" /><span>{{ analysis.nextAction }}</span>
               </p>
+
+              <!-- What the evaluation could not settle, with somewhere to
+                   answer it. Until 2026-10-09 the note above was all there
+                   was: it asked, and nothing could reply. -->
+              <template v-if="openAbout.length || openEmployer.length">
+                <div class="eval-sec">
+                  <h3>Open questions <span class="mono">· {{ openLeft ? `${openLeft} to answer` : 'all answered' }}</span></h3>
+                  <NuxtLink to="/about-you" class="linkish oq-link">All questions</NuxtLink>
+                </div>
+                <div class="oq-list">
+                  <OpenQuestionRow v-for="q in openAbout" :key="q.id" kind="about" :q="q" bare @saved="onOpenSaved" @removed="refresh()" />
+                  <OpenQuestionRow v-for="q in openEmployer" :key="q.id" kind="employer" :q="q" bare @saved="onOpenSaved" @removed="refresh()" />
+                </div>
+                <p v-if="openSaved" class="oq-after" role="status">
+                  Saved. This evaluation was written without it.
+                  <button type="button" class="linkish" :disabled="busy === 'eval' || evalWaiting" @click="reEvalOpen = true">Re-evaluate with your answer</button>
+                </p>
+              </template>
 
               <div v-if="findingRows.length" class="eval-sec">
                 <h3>Findings <span class="mono">· {{ findSummary }}</span></h3>

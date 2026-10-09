@@ -18,6 +18,7 @@ import {
 } from '../../../utils/postings'
 import { MAX_JD, wantsCapture, captureForPosting, inBackground } from '../../../utils/jd-store'
 import { announce } from '../../../utils/realtime'
+import { ingestQuestions, readOpenQuestions } from '../../../utils/facts'
 
 export default defineEventHandler(async (event): Promise<PostingDetail> => {
   const ctx = postingContext(event)
@@ -63,6 +64,13 @@ export default defineEventHandler(async (event): Promise<PostingDetail> => {
     const stored = await getAnalysis(ctx.kv, ctx.id)
     if (JSON.stringify(stored) !== JSON.stringify(next)) await putAnalysis(ctx.kv, ctx.id, next)
     meta.hasAnalysis = true
+    // Questions the evaluation could not settle go where he can answer them.
+    // Only when the report carries the key: an older report has none, and
+    // reading that as "asks nothing" would wipe what the backlog pass found.
+    const open = readOpenQuestions(body.analysis)
+    if (open) {
+      await ingestQuestions(ctx.kv, { postingId: ctx.id, company: meta.company, role: meta.role }, open, true).catch(() => {})
+    }
   } else {
     meta.hasAnalysis = existing?.hasAnalysis ?? false
   }
