@@ -725,6 +725,7 @@ function onOpenSaved(kind: 'about' | 'employer', q: { id: string }) {
   patchOpen(kind, (list) => list.map((x) => (x.id === q.id ? q : x)))
   openSaved.value = true
 }
+const openBulk = provideOpenQuestionBulk()
 const onOpenRemoved = (kind: 'about' | 'employer', qid: string) => patchOpen(kind, (list) => list.filter((x) => x.id !== qid))
 
 // ---- More: everything in the rail that is not a next step ----
@@ -1163,6 +1164,7 @@ const buildHint = computed(() =>
                   <OpenQuestionRow v-for="q in openAbout" :key="q.id" kind="about" :q="q" bare @saved="onOpenSaved('about', $event)" @removed="onOpenRemoved('about', $event)" />
                   <OpenQuestionRow v-for="q in openEmployer" :key="q.id" kind="employer" :q="q" bare @saved="onOpenSaved('employer', $event)" @removed="onOpenRemoved('employer', $event)" />
                 </div>
+                <OpenQuestionSaveAll :count="openBulk.count.value" :busy="openBulk.busy.value" :note="openBulk.note.value" @save="openBulk.saveAll" />
                 <p v-if="openSaved" class="oq-after" role="status">
                   Saved. This evaluation was written without it.
                   <button type="button" class="linkish" :disabled="busy === 'eval' || evalWaiting" @click="reEvalOpen = true">Re-evaluate with your answer</button>

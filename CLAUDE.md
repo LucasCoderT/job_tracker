@@ -1042,6 +1042,22 @@ for that page yet, so a refetch from a live update or another action no longer
 swaps typed text for a loading state. On the brief that test is "the data is
 for a different posting", because `j`/`k` reuse the page.
 
+**Save all, and drafts** (same day). Two things he asked for after losing a
+run of typed answers:
+
+- **Drafts live in the browser**, one `localStorage` entry per question
+  (`oq.draft.<kind>.<id>`), written as he types and dropped on save, cancel or
+  discard. Restored after mount, never during setup, for the usual hydration
+  reason. A restored row says so and offers Discard. They are per device: a
+  draft typed on the phone is not on the laptop.
+- **Save all is one request and one write.** `PUT /api/facts/answers` takes
+  every unsaved row at once (`answerMany`). A save per row would be a burst of
+  read-change-writes on his single answers document, which is the shape that
+  already lost data once here. An item with nothing in it is skipped, so Save
+  all can never blank an answer he did not touch. Rows register with the page
+  through `provideOpenQuestionBulk()`; the bar sticks to the bottom of the list
+  and only exists while something is unsaved.
+
 On `/about-you` the employer questions are grouped by where the posting
 stands, unapplied first: before applying a question is a reason to hold off,
 after applying it is something for the first call. Dismissed, closed and

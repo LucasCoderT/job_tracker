@@ -1601,3 +1601,21 @@ body.p-overflow-hidden { padding-right: calc(clamp(16px, 4vw, 48px) + var(--p-sc
 .oq-group .mono { color: var(--muted); font-weight: 400; }
 .oq-group-hint { color: var(--muted); font-weight: 400; font-size: 12px; }
 .oq-group + .oq-list { margin-top: 8px; }
+
+/* ---- Open questions: Save all, and drafts (2026-10-09) ---- */
+.oq-saveall {
+  position: sticky; bottom: 12px; z-index: 5; margin-top: 14px;
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 10px 14px; border-radius: 10px;
+  background: var(--panel); border: 1px solid var(--amber);
+}
+.oq-saveall.idle { border-color: var(--panel-edge); position: static; }
+.oq-saveall-n { font-size: 13px; font-weight: 600; color: var(--amber); }
+.oq-saveall-note { font-size: 12.5px; color: var(--muted); }
+.oq-saveall-note.is-error { color: var(--danger); }
+.oq-saveall .p-button { margin-left: auto; }
+.oq-draft { font-size: 12px; color: var(--amber); margin-left: auto; display: inline-flex; align-items: center; gap: 10px; }
+@media (max-width: 880px) {
+  .oq-draft { margin-left: 0; flex-basis: 100%; }
+  .oq-saveall .p-button { min-height: 44px; }
+}

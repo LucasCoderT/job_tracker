@@ -60,6 +60,8 @@ function drop(kind: 'about' | 'employer', id: string) {
   data.value = { ...data.value, [kind]: (data.value[kind] as any[]).filter((x) => x.id !== id) }
 }
 
+const bulk = provideOpenQuestionBulk()
+
 // ---- something no evaluation has asked ----
 const addTopic = ref('')
 const addAnswer = ref('')
@@ -154,6 +156,7 @@ async function add() {
           </div>
         </template>
       </PrimeCard>
+      <OpenQuestionSaveAll :count="bulk.count.value" :busy="bulk.busy.value" :note="bulk.note.value" @save="bulk.saveAll" />
     </template>
   </div>
 </template>

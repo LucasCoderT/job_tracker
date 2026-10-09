@@ -33,12 +33,50 @@ const armed = ref(false)
 let armTimer: ReturnType<typeof setTimeout> | undefined
 onBeforeUnmount(() => clearTimeout(armTimer))
 
+// ---- drafts ----
+//
+// What he has typed and not saved is kept in this browser, per question, so a
+// reload, a closed tab or a trip to another posting does not cost him the
+// text. Read after mount, never during setup: the server has no drafts, and
+// restoring one while hydrating would make the first client render disagree
+// with the markup it was sent.
+const draftKey = () => `oq.draft.${props.kind}.${props.q.id}`
+const restored = ref(false)
+function dropDraft() {
+  try {
+    localStorage.removeItem(draftKey())
+  } catch {
+    /* no storage: nothing was kept, nothing to drop */
+  }
+  restored.value = false
+}
+function restoreDraft() {
+  try {
+    const raw = localStorage.getItem(draftKey())
+    if (!raw) return
+    const d = JSON.parse(raw)
+    const t = typeof d?.text === 'string' ? d.text : ''
+    const v = (['yes', 'some', 'no'] as const).includes(d?.verdict) ? (d.verdict as FactVerdict) : null
+    // A draft equal to what is stored is not a draft any more.
+    if (t.trim() === (props.q.answer ?? '') && v === (about.value?.verdict ?? null)) return dropDraft()
+    text.value = t
+    verdict.value = props.kind === 'about' ? v : null
+    editing.value = true
+    restored.value = true
+  } catch {
+    /* blocked storage or a damaged entry: start from what is stored */
+  }
+}
+onMounted(restoreDraft)
+
 // A different question in the same slot (the list re-sorted) starts clean.
 watch(() => props.q.id, () => {
   text.value = props.q.answer ?? ''
   verdict.value = about.value?.verdict ?? null
   editing.value = !props.q.answeredAt
   note.value = null
+  restored.value = false
+  restoreDraft()
 })
 
 const VERDICTS: { value: FactVerdict; label: string }[] = [
@@ -51,6 +89,34 @@ const VERDICT_WORD: Record<FactVerdict, string> = { yes: 'Yes', some: 'Some', no
 const canSave = computed(() => Boolean(text.value.trim() || verdict.value))
 const dirty = computed(() => text.value.trim() !== (props.q.answer ?? '') || verdict.value !== (about.value?.verdict ?? null))
 const askers = computed(() => about.value?.askedBy ?? [])
+
+// Keep the draft in step with the box. Not dirty means nothing to keep.
+watch([text, verdict], () => {
+  try {
+    if (dirty.value) localStorage.setItem(draftKey(), JSON.stringify({ text: text.value, verdict: verdict.value }))
+    else localStorage.removeItem(draftKey())
+  } catch {
+    /* private mode or full storage: the box still works, it just is not kept */
+  }
+})
+
+function done(saved: ProfileQuestion | EmployerQuestion) {
+  // Show exactly what was stored (the server trims), so the row is not dirty against it.
+  text.value = saved.answer ?? ''
+  editing.value = false
+  note.value = null
+  dropDraft()
+  emit('saved', saved)
+}
+
+// The page's "Save all" sees this row while it has something worth saving.
+useOpenQuestionBulkRow({
+  kind: props.kind,
+  id: props.q.id,
+  dirty: () => editing.value && dirty.value && canSave.value,
+  payload: () => ({ kind: props.kind, id: props.q.id, answer: text.value, verdict: verdict.value }),
+  done,
+})
 const when = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '')
 
 async function save() {
@@ -62,8 +128,7 @@ async function save() {
       method: 'PUT',
       body: { answer: text.value, verdict: verdict.value },
     })
-    editing.value = false
-    emit('saved', saved)
+    done(saved)
   } catch (err: any) {
     note.value = { text: err?.data?.statusMessage || 'Could not save. Your text is still here.', error: true }
   } finally {
@@ -75,6 +140,14 @@ function cancel() {
   text.value = props.q.answer ?? ''
   verdict.value = about.value?.verdict ?? null
   editing.value = false
+  dropDraft()
+}
+
+/** Throw the unsaved text away, back to what is stored (or to empty). */
+function discard() {
+  text.value = props.q.answer ?? ''
+  verdict.value = about.value?.verdict ?? null
+  dropDraft()
 }
 
 // Two presses: an answer is his writing and a delete does not come back.
@@ -88,6 +161,7 @@ async function remove() {
   busy.value = true
   try {
     await $fetch(`/api/facts/${props.kind}/${props.q.id}`, { method: 'DELETE' })
+    dropDraft()
     emit('removed', props.q.id)
   } catch {
     note.value = { text: 'Could not remove it.', error: true }
@@ -149,7 +223,11 @@ async function remove() {
         <button v-else-if="kind === 'employer' || !askers.length" type="button" class="linkish oq-link" :class="{ danger: armed }" :disabled="busy" @click="remove">
           {{ armed ? 'Press again to remove' : 'Not a real question' }}
         </button>
-        <span v-if="kind === 'about'" class="oq-scope">Applies to every posting.</span>
+        <span v-if="dirty" class="oq-draft">
+          {{ restored ? 'Unsaved draft, restored.' : 'Not saved yet.' }}
+          <button type="button" class="linkish oq-link" @click="discard">Discard</button>
+        </span>
+        <span v-else-if="kind === 'about'" class="oq-scope">Applies to every posting.</span>
       </div>
     </template>
 

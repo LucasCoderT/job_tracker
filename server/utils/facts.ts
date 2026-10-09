@@ -333,6 +333,45 @@ export async function answerEmployer(kv: KVNamespace, id: string, body: any): Pr
 }
 
 /**
+ * Several answers in one write: "Save all". One read and one write of his
+ * document however many boxes he filled in, where a save per box would be a
+ * run of read-change-writes racing each other from the browser. An id that no
+ * longer exists is skipped and counted; an item with nothing in it is skipped
+ * too, since Save all must never blank an answer he did not touch.
+ */
+export async function answerMany(kv: KVNamespace, raw: unknown) {
+  const list: any[] = Array.isArray(raw) ? raw.slice(0, 200) : []
+  const doc = await readFacts(kv)
+  const stamp = new Date().toISOString()
+  const about: ProfileQuestion[] = []
+  const employer: EmployerQuestion[] = []
+  const writes: StoredAnswer[] = []
+  let skipped = 0
+  for (const it of list) {
+    const id = String(it?.id ?? '')
+    const answer = cleanAnswer(it?.answer)
+    if (it?.kind === 'employer') {
+      const q = doc.employer.find((x) => x.id === id)
+      if (!q || !answer) { skipped++; continue }
+      writes.push({ kind: 'employer', id, question: q.question, postingId: q.postingId, company: q.company, role: q.role, answer, verdict: null, answeredAt: stamp })
+      employer.push({ ...q, answer, answeredAt: stamp })
+    } else {
+      const q = doc.about.find((x) => x.id === id)
+      const verdict = parseVerdict(it?.verdict)
+      if (!q || (!answer && !verdict)) { skipped++; continue }
+      writes.push({ kind: 'about', id, topic: q.topic, question: q.question, answer: answer || null, verdict, answeredAt: stamp })
+      about.push({ ...q, answer: answer || null, verdict, answeredAt: stamp })
+    }
+  }
+  if (writes.length) {
+    await changeAnswers(kv, (items) => {
+      for (const w of writes) items[answerKey(w.kind, w.id)] = w
+    })
+  }
+  return { about, employer, skipped }
+}
+
+/**
  * Remove, from his side. An answered question loses its answer and goes back
  * to being asked. An unanswered one is "not a real question": it gets a
  * tombstone, so it stays hidden even when a later evaluation asks it again.
