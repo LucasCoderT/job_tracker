@@ -1014,6 +1014,11 @@ Left out on purpose: streaming (settled in
 `_profile.md`), his education and that he does not drive (both known), and
 per-posting decisions such as whether to send a second application.
 
+On `/about-you` the employer questions are grouped by where the posting
+stands, unapplied first: before applying a question is a reason to hold off,
+after applying it is something for the first call. Dismissed, closed and
+missing postings share a last group.
+
 Deleting a posting takes it off what it asked (`forgetPosting`), since
 career-ops removes unapplied postings after 14 days. An answer outlives the
 posting that prompted it.

@@ -7,7 +7,7 @@
  * not asked again. Unanswered ones are ordered by how many postings are
  * waiting on them, because that is the order they are worth answering in.
  */
-import type { EmployerQuestion, FactsDoc, ProfileQuestion } from '../../shared/types'
+import type { EmployerQuestion, FactsDoc, PostingsResponse, ProfileQuestion } from '../../shared/types'
 
 const { data, pending, error } = await useFetch<FactsDoc>('/api/facts', { key: 'facts' })
 useHead({ title: 'Questions for you' })
@@ -22,6 +22,31 @@ const answered = computed(() =>
   about.value.filter((q) => q.answeredAt).sort((a, b) => (b.answeredAt ?? '').localeCompare(a.answeredAt ?? '')),
 )
 const employerOpen = computed(() => employer.value.filter((q) => !q.answeredAt))
+
+// Employer questions are grouped by where the posting stands, because that is
+// what decides when one can be asked: before applying it is a reason to hold
+// off, after applying it is something for the first call. The listing is one
+// index read. Awaited directly, not through usePostings(), which is not
+// awaitable (see CLAUDE.md).
+const { data: listing } = await useFetch<PostingsResponse>('/api/postings', { key: 'postings' })
+const postingById = computed(() => new Map((listing.value?.postings ?? []).map((p) => [p.id, p])))
+const EMPLOYER_GROUPS = [
+  { key: 'open', label: 'Not applied yet', hint: 'Worth knowing before you apply.' },
+  { key: 'applied', label: 'Applied', hint: 'To ask on the first call.' },
+  { key: 'gone', label: 'Dismissed or closed', hint: '' },
+] as const
+function employerGroup(q: EmployerQuestion): (typeof EMPLOYER_GROUPS)[number]['key'] {
+  const p = postingById.value.get(q.postingId)
+  // A posting the site no longer holds cannot be acted on either.
+  if (!p || p.state === 'dismissed' || p.closedAt) return 'gone'
+  return p.state === 'applied' ? 'applied' : 'open'
+}
+const employerGroups = computed(() =>
+  EMPLOYER_GROUPS.map((g) => ({
+    ...g,
+    rows: employerOpen.value.filter((q) => employerGroup(q) === g.key).sort((a, b) => a.company.localeCompare(b.company)),
+  })).filter((g) => g.rows.length),
+)
 const employerDone = computed(() => employer.value.filter((q) => q.answeredAt))
 
 // useFetch data is a shallow ref: replace the document, never edit a row in place.
@@ -94,9 +119,15 @@ async function add() {
       <PrimeCard v-if="employerOpen.length" class="sec">
         <template #content>
           <h2>To find out from employers <span class="mono">· {{ employerOpen.length }}</span></h2>
-          <div class="oq-list">
-            <OpenQuestionRow v-for="q in employerOpen" :key="q.id" kind="employer" :q="q" @saved="put('employer', $event)" @removed="drop('employer', $event)" />
-          </div>
+          <template v-for="g in employerGroups" :key="g.key">
+            <h3 class="oq-group">
+              {{ g.label }} <span class="mono">· {{ g.rows.length }}</span>
+              <span v-if="g.hint" class="oq-group-hint">{{ g.hint }}</span>
+            </h3>
+            <div class="oq-list">
+              <OpenQuestionRow v-for="q in g.rows" :key="q.id" kind="employer" :q="q" @saved="put('employer', $event)" @removed="drop('employer', $event)" />
+            </div>
+          </template>
         </template>
       </PrimeCard>
 
