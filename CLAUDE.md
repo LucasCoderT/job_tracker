@@ -1008,10 +1008,9 @@ page, the count on the postings header), and one document is one read.
 
 The backlog was read once, by hand in a session, not by a script:
 `POST /api/facts/ingest` (additive) took 25 questions about him from 46 notes,
-and 26 employer questions. Employer questions were taken **only from postings
-he has not applied to**; the sixty-odd on applied postings are "ask at the
-screen" notes that would have buried the list, and they are still on each
-brief as the note they always were. Left out on purpose: streaming (settled in
+and 77 employer questions: 26 from postings he had not applied to, then, at
+his request the same day, 51 from applied ones (the "ask at the screen" notes).
+Left out on purpose: streaming (settled in
 `_profile.md`), his education and that he does not drive (both known), and
 per-posting decisions such as whether to send a second application.
 
