@@ -1015,6 +1015,10 @@ brief as the note they always were. Left out on purpose: streaming (settled in
 `_profile.md`), his education and that he does not drive (both known), and
 per-posting decisions such as whether to send a second application.
 
+Deleting a posting takes it off what it asked (`forgetPosting`), since
+career-ops removes unapplied postings after 14 days. An answer outlives the
+posting that prompted it.
+
 Topics are matched by exact text, case and spacing aside. Two evaluations that
 name the same thing differently make two questions; the prompt's "reuse this
 string" is the only guard, and Remove on the list page is the repair.

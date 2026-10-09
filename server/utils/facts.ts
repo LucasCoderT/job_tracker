@@ -117,6 +117,27 @@ export async function ingestQuestions(kv: KVNamespace, asker: FactAsker, items: 
   return true
 }
 
+/**
+ * A posting was deleted: take it off what it asked. Its unanswered employer
+ * questions go with it; an answered one stays, since he found that out. A
+ * question about him survives as long as it is answered or another posting
+ * still asks it. Reads first and writes only on a change, because career-ops
+ * deletes old postings in batches and most of them asked nothing.
+ */
+export async function forgetPosting(kv: KVNamespace, postingId: string): Promise<boolean> {
+  const doc = await readFacts(kv)
+  const next: FactsDoc = {
+    ...doc,
+    about: doc.about
+      .map((q) => ({ ...q, askedBy: q.askedBy.filter((a) => a.postingId !== postingId) }))
+      .filter((q) => q.askedBy.length || q.answer || q.verdict),
+    employer: doc.employer.filter((q) => q.postingId !== postingId || q.answer),
+  }
+  if (same(doc, next)) return false
+  await writeFacts(kv, next)
+  return true
+}
+
 /** The evaluation's list, whatever shape the report gave it. `null` means the key was absent, which is not the same as an empty list. */
 export function readOpenQuestions(analysis: any): OpenQuestionInput[] | null {
   const raw = analysis?.open_questions ?? analysis?.openQuestions
