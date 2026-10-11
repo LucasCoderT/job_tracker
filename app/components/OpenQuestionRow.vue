@@ -2,10 +2,15 @@
 /**
  * One open question and the place to answer it.
  *
- * The same row serves both kinds. A question about him has the yes / some / no
- * chips, since most of them are "do you have X", and its answer applies to
- * every posting. A question for the employer has only the text, and belongs to
- * the one posting.
+ * The same component serves both kinds, and they must not look alike. For two
+ * days they did: both were a card with a question and an open text box, and he
+ * kept answering the employer's questions as though they were his.
+ *
+ *  - A question about **him** is a form: yes / some / no and a box, open and
+ *    waiting, and the answer applies to every posting.
+ *  - A question for **the employer** is a thing to go and ask. It shows no box
+ *    at all until he presses "Record their answer", and the box that then
+ *    opens says whose answer it is.
  *
  * Nothing here writes for him. The box is a place to type, the same rule the
  * answer bank and the screen prep keep, and it matters more here: what he
@@ -27,6 +32,9 @@ const employer = computed(() => (props.kind === 'employer' ? (props.q as Employe
 const text = ref(props.q.answer ?? '')
 const verdict = ref<FactVerdict | null>(about.value?.verdict ?? null)
 const editing = ref(!props.q.answeredAt)
+// An employer question has nothing to fill in until they have answered: the box stays shut until he asks for it.
+const recording = ref(false)
+const boxOpen = computed(() => props.kind === 'about' || recording.value || Boolean(props.q.answeredAt))
 const busy = ref(false)
 const note = ref<{ text: string; error: boolean } | null>(null)
 const armed = ref(false)
@@ -62,6 +70,7 @@ function restoreDraft() {
     text.value = t
     verdict.value = props.kind === 'about' ? v : null
     editing.value = true
+    recording.value = true
     restored.value = true
   } catch {
     /* blocked storage or a damaged entry: start from what is stored */
@@ -76,6 +85,7 @@ watch(() => props.q.id, () => {
   editing.value = !props.q.answeredAt
   note.value = null
   restored.value = false
+  recording.value = false
   restoreDraft()
 })
 
@@ -104,6 +114,7 @@ function done(saved: ProfileQuestion | EmployerQuestion) {
   // Show exactly what was stored (the server trims), so the row is not dirty against it.
   text.value = saved.answer ?? ''
   editing.value = false
+  recording.value = false
   note.value = null
   dropDraft()
   emit('saved', saved)
@@ -147,6 +158,7 @@ function cancel() {
 function discard() {
   text.value = props.q.answer ?? ''
   verdict.value = about.value?.verdict ?? null
+  recording.value = false
   dropDraft()
 }
 
@@ -173,11 +185,14 @@ async function remove() {
 </script>
 
 <template>
-  <div class="oq" :class="{ answered: q.answeredAt && !editing }">
+  <div class="oq" :class="[kind, { answered: q.answeredAt && !editing }]">
     <div class="oq-head">
-      <span class="oq-kind" :class="kind">{{ kind === 'about' ? about?.topic : 'For the employer' }}</span>
+      <span class="oq-kind" :class="kind">
+        <template v-if="kind === 'about'">{{ about?.topic }}</template>
+        <template v-else><i class="pi pi-comments" aria-hidden="true" /> Ask the employer</template>
+      </span>
       <span v-if="q.answeredAt && !editing" class="oq-when mono">
-        <ClientOnly>answered {{ when(q.answeredAt) }}</ClientOnly>
+        <ClientOnly>{{ kind === 'about' ? 'answered' : 'recorded' }} {{ when(q.answeredAt) }}</ClientOnly>
       </span>
     </div>
     <p class="oq-q">{{ q.question }}</p>
@@ -185,6 +200,7 @@ async function remove() {
     <template v-if="q.answeredAt && !editing">
       <p class="oq-a">
         <span v-if="about?.verdict" class="oq-verdict" :class="about.verdict">{{ VERDICT_WORD[about.verdict] }}</span>
+        <span v-if="kind === 'employer'" class="oq-said">They said</span>
         <span v-if="q.answer" class="oq-a-text">{{ q.answer }}</span>
       </p>
       <div class="oq-foot">
@@ -194,6 +210,16 @@ async function remove() {
         </button>
       </div>
     </template>
+
+    <!-- Nothing to fill in yet: this one is his to ask, not to answer. -->
+    <div v-else-if="!boxOpen" class="oq-foot">
+      <button type="button" class="oq-record" @click="recording = true">
+        <i class="pi pi-pencil" aria-hidden="true" /> Record their answer
+      </button>
+      <button type="button" class="linkish oq-link" :class="{ danger: armed }" :disabled="busy" @click="remove">
+        {{ armed ? 'Press again to remove' : 'Not a real question' }}
+      </button>
+    </div>
 
     <template v-else>
       <div v-if="kind === 'about'" class="oq-chips" role="group" :aria-label="`${about?.topic}: yes, some or no`">
@@ -209,18 +235,22 @@ async function remove() {
           {{ v.label }}
         </button>
       </div>
+      <p v-else class="oq-whose">
+        <strong>Their answer, not yours.</strong> What the recruiter or the posting told you, for this posting only.
+      </p>
       <PrimeTextarea
         v-model="text"
         rows="2"
         auto-resize
         class="oq-box"
-        :placeholder="kind === 'about' ? 'In your own words: what you have done with it, where, and what you have not.' : 'What they told you, or what you found.'"
-        :aria-label="`Answer: ${q.question}`"
+        :placeholder="kind === 'about' ? 'In your own words: what you have done with it, where, and what you have not.' : 'They said…'"
+        :aria-label="kind === 'about' ? `Your answer: ${q.question}` : `What the employer said: ${q.question}`"
       />
       <div class="oq-foot">
-        <PrimeButton label="Save" size="small" :loading="busy" :disabled="!canSave || !dirty" @click="save" />
+        <PrimeButton :label="kind === 'about' ? 'Save' : 'Save their answer'" size="small" :loading="busy" :disabled="!canSave || !dirty" @click="save" />
         <button v-if="q.answeredAt" type="button" class="linkish oq-link" @click="cancel">Cancel</button>
-        <button v-else-if="kind === 'employer' || !askers.length" type="button" class="linkish oq-link" :class="{ danger: armed }" :disabled="busy" @click="remove">
+        <button v-else-if="kind === 'employer' && !dirty" type="button" class="linkish oq-link" @click="recording = false">Close</button>
+        <button v-else-if="kind === 'about' && !askers.length" type="button" class="linkish oq-link" :class="{ danger: armed }" :disabled="busy" @click="remove">
           {{ armed ? 'Press again to remove' : 'Not a real question' }}
         </button>
         <span v-if="dirty" class="oq-draft">

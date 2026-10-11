@@ -1058,6 +1058,28 @@ run of typed answers:
   through `provideOpenQuestionBulk()`; the bar sticks to the bottom of the list
   and only exists while something is unsaved.
 
+**The two kinds must not look alike (2026-10-11).** For two days both were the
+same card: a question with an open text box under it, in one list on the brief
+and on one page titled "Questions for you". He kept answering the employer's
+questions as though they were his. Nothing wrong had been saved (0 of 80
+employer questions carried an answer when this was fixed), but only because he
+caught it each time.
+
+- **An employer question has no box.** It is a thing to go and ask, drawn as a
+  line on a list (no card, a stone rule down the side, "Ask the employer"). The
+  box only exists after **Record their answer**, and then it says "Their answer,
+  not yours", its placeholder is "They said…" and the button is "Save their
+  answer". A recorded one reads "They said …".
+- **A question about him keeps the form**: chips and an open box, waiting.
+- **The brief has two sections**, "Questions for you" then "To ask the
+  employer", each with a line saying what it is. They were one list.
+- **`/about-you` has two tabs**, About you (the default) and To ask employers,
+  with separate ledes and separate answered lists. Both stay mounted
+  (`v-show`), so a draft in the other tab is not lost by switching.
+
+The affordance is the fix, more than the labels: a label was already there
+("For the employer") and an empty box beside it won.
+
 On `/about-you` the employer questions are grouped by where the posting
 stands, unapplied first: before applying a question is a reason to hold off,
 after applying it is something for the first call. Dismissed, closed and

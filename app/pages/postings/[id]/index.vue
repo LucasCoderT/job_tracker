@@ -709,7 +709,7 @@ const toggleStatus = (event: Event) => statusMenu.value?.toggle(event)
 // ---- open questions the evaluation raised ----
 const openAbout = computed(() => data.value?.open?.about ?? [])
 const openEmployer = computed(() => data.value?.open?.employer ?? [])
-const openLeft = computed(() => [...openAbout.value, ...openEmployer.value].filter((q) => !q.answeredAt).length)
+const aboutLeft = computed(() => openAbout.value.filter((q) => !q.answeredAt).length)
 // Offered, never done for him: a re-evaluation is a full run on the Mac.
 const openSaved = ref(false)
 // Saving one answer must not disturb the others. This used to refetch the
@@ -1156,14 +1156,28 @@ const buildHint = computed(() =>
                    answer it. Until 2026-10-09 the note above was all there
                    was: it asked, and nothing could reply. -->
               <template v-if="openAbout.length || openEmployer.length">
-                <div class="eval-sec">
-                  <h3>Open questions <span class="mono">· {{ openLeft ? `${openLeft} to answer` : 'all answered' }}</span></h3>
-                  <NuxtLink to="/about-you" class="linkish oq-link">All questions</NuxtLink>
-                </div>
-                <div class="oq-list">
-                  <OpenQuestionRow v-for="q in openAbout" :key="q.id" kind="about" :q="q" bare @saved="onOpenSaved('about', $event)" @removed="onOpenRemoved('about', $event)" />
-                  <OpenQuestionRow v-for="q in openEmployer" :key="q.id" kind="employer" :q="q" bare @saved="onOpenSaved('employer', $event)" @removed="onOpenRemoved('employer', $event)" />
-                </div>
+                <!-- Two sections, never one list. Mixed together, with the same
+                     box under each, the employer's questions got answered as
+                     though they were his. -->
+                <template v-if="openAbout.length">
+                  <div class="eval-sec">
+                    <h3>Questions for you <span class="mono">· {{ aboutLeft ? `${aboutLeft} to answer` : 'all answered' }}</span></h3>
+                    <NuxtLink to="/about-you" class="linkish oq-link">All questions</NuxtLink>
+                  </div>
+                  <p class="oq-sec-hint">About your own experience. Answered once, and every later evaluation and pack reads it.</p>
+                  <div class="oq-list">
+                    <OpenQuestionRow v-for="q in openAbout" :key="q.id" kind="about" :q="q" bare @saved="onOpenSaved('about', $event)" @removed="onOpenRemoved('about', $event)" />
+                  </div>
+                </template>
+                <template v-if="openEmployer.length">
+                  <div class="eval-sec">
+                    <h3>To ask the employer <span class="mono">· {{ openEmployer.length }}</span></h3>
+                  </div>
+                  <p class="oq-sec-hint">Only they can answer these. Nothing to fill in until they have.</p>
+                  <div class="oq-list employer">
+                    <OpenQuestionRow v-for="q in openEmployer" :key="q.id" kind="employer" :q="q" bare @saved="onOpenSaved('employer', $event)" @removed="onOpenRemoved('employer', $event)" />
+                  </div>
+                </template>
                 <OpenQuestionSaveAll :count="openBulk.count.value" :busy="openBulk.busy.value" :note="openBulk.note.value" @save="openBulk.saveAll" />
                 <p v-if="openSaved" class="oq-after" role="status">
                   Saved. This evaluation was written without it.

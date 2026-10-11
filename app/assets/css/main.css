@@ -1619,3 +1619,34 @@ body.p-overflow-hidden { padding-right: calc(clamp(16px, 4vw, 48px) + var(--p-sc
   .oq-draft { margin-left: 0; flex-basis: 100%; }
   .oq-saveall .p-button { min-height: 44px; }
 }
+
+/* ---- Two kinds of open question that must not look alike (2026-10-11) ---- */
+/* About him: a card with a form in it. For the employer: a line on a list of
+   things to ask, no fill, a stone rule down the side, and no box until asked. */
+.oq.employer { background: transparent; border: 0; border-left: 2px solid var(--stone); border-radius: 0; padding: 4px 0 4px 14px; }
+.oq.employer .oq-kind { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+.oq.employer .oq-kind .pi { font-size: 11px; }
+.oq-list.employer { gap: 16px; }
+.oq-record {
+  font: inherit; font-size: 12.5px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 11px; border-radius: 7px; background: transparent; color: var(--muted); border: 1px dashed var(--panel-edge);
+}
+.oq-record:hover { color: var(--text); border-color: var(--muted); }
+.oq-record:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.oq-record .pi { font-size: 11px; }
+.oq-whose { margin: 10px 0 0; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+.oq-whose strong { color: var(--text); font-weight: 600; }
+.oq-said { flex: none; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.oq-sec-hint { margin: 0 0 2px; font-size: 12.5px; color: var(--muted); max-width: 64ch; }
+.about-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 14px; }
+.about-tab {
+  font: inherit; font-size: 13.5px; cursor: pointer; display: inline-flex; align-items: baseline; gap: 9px;
+  padding: 8px 14px; border-radius: 10px; background: transparent; color: var(--muted); border: 1px solid var(--panel-edge);
+}
+.about-tab:hover { color: var(--text); }
+.about-tab.on { color: var(--text); background: var(--panel); border-color: var(--amber); font-weight: 600; }
+.about-tab .n { font-size: 12px; font-weight: 400; color: var(--muted); }
+.about-tab:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+@media (max-width: 880px) {
+  .oq-record, .about-tab { min-height: 44px; }
+}

@@ -62,6 +62,14 @@ function drop(kind: 'about' | 'employer', id: string) {
 
 const bulk = provideOpenQuestionBulk()
 
+// Two tabs, one kind each. On one page under one title ("Questions for you")
+// the employer's questions read as his to answer.
+const tab = ref<'about' | 'employer'>('about')
+const TABS = computed(() => [
+  { key: 'about' as const, label: 'About you', n: toAnswer.value.length, unit: 'to answer' },
+  { key: 'employer' as const, label: 'To ask employers', n: employerOpen.value.length, unit: 'open' },
+])
+
 // ---- something no evaluation has asked ----
 const addTopic = ref('')
 const addAnswer = ref('')
@@ -94,10 +102,20 @@ async function add() {
       </div>
     </header>
 
-    <p class="about-lede">
+    <nav class="about-tabs" aria-label="Kind of question">
+      <button v-for="t in TABS" :key="t.key" type="button" class="about-tab" :class="{ on: tab === t.key }" :aria-pressed="tab === t.key" @click="tab = t.key">
+        {{ t.label }}<span class="n mono">{{ t.n }} {{ t.unit }}</span>
+      </button>
+    </nav>
+
+    <p v-if="tab === 'about'" class="about-lede">
       What the evaluations could not tell from your CV. Answer one here and every later evaluation, CV and cover letter
       reads it, so it is not asked again. A CV or letter may repeat only what you wrote, so write it the way you would
       say it.
+    </p>
+    <p v-else class="about-lede">
+      Things only an employer can tell you: the real band, whether Alberta is eligible, how on-call runs. They are not
+      yours to answer. When one of them does, record what they said against that posting.
     </p>
 
     <div v-if="pending && !data" class="skel" aria-busy="true" aria-label="Loading questions">
@@ -106,7 +124,7 @@ async function add() {
     <PrimeMessage v-else-if="error" severity="error" :closable="false">Could not load the questions.</PrimeMessage>
 
     <template v-else>
-      <PrimeCard class="sec">
+      <PrimeCard v-show="tab === 'about'" class="sec">
         <template #content>
           <h2>To answer <span class="mono">· {{ toAnswer.length }}</span></h2>
           <p v-if="!toAnswer.length" class="muted small" style="margin: 10px 0 0">
@@ -118,22 +136,23 @@ async function add() {
         </template>
       </PrimeCard>
 
-      <PrimeCard v-if="employerOpen.length" class="sec">
+      <PrimeCard v-show="tab === 'employer'" class="sec">
         <template #content>
-          <h2>To find out from employers <span class="mono">· {{ employerOpen.length }}</span></h2>
+          <h2>To ask <span class="mono">· {{ employerOpen.length }}</span></h2>
+          <p v-if="!employerOpen.length" class="muted small" style="margin: 10px 0 0">Nothing to ask anyone right now.</p>
           <template v-for="g in employerGroups" :key="g.key">
             <h3 class="oq-group">
               {{ g.label }} <span class="mono">· {{ g.rows.length }}</span>
               <span v-if="g.hint" class="oq-group-hint">{{ g.hint }}</span>
             </h3>
-            <div class="oq-list">
+            <div class="oq-list employer">
               <OpenQuestionRow v-for="q in g.rows" :key="q.id" kind="employer" :q="q" @saved="put('employer', $event)" @removed="drop('employer', $event)" />
             </div>
           </template>
         </template>
       </PrimeCard>
 
-      <PrimeCard class="sec">
+      <PrimeCard v-show="tab === 'about'" class="sec">
         <template #content>
           <h2>Add something no evaluation has asked</h2>
           <div class="about-add">
@@ -147,15 +166,24 @@ async function add() {
         </template>
       </PrimeCard>
 
-      <PrimeCard v-if="answered.length || employerDone.length" class="sec">
+      <PrimeCard v-if="answered.length" v-show="tab === 'about'" class="sec">
         <template #content>
-          <h2>Answered <span class="mono">· {{ answered.length + employerDone.length }}</span></h2>
+          <h2>Answered <span class="mono">· {{ answered.length }}</span></h2>
           <div class="oq-list">
             <OpenQuestionRow v-for="q in answered" :key="q.id" kind="about" :q="q" @saved="put('about', $event)" @removed="drop('about', $event)" />
+          </div>
+        </template>
+      </PrimeCard>
+
+      <PrimeCard v-if="employerDone.length" v-show="tab === 'employer'" class="sec">
+        <template #content>
+          <h2>What they told you <span class="mono">· {{ employerDone.length }}</span></h2>
+          <div class="oq-list employer">
             <OpenQuestionRow v-for="q in employerDone" :key="q.id" kind="employer" :q="q" @saved="put('employer', $event)" @removed="drop('employer', $event)" />
           </div>
         </template>
       </PrimeCard>
+
       <OpenQuestionSaveAll :count="bulk.count.value" :busy="bulk.busy.value" :note="bulk.note.value" @save="bulk.saveAll" />
     </template>
   </div>
