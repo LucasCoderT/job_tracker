@@ -1965,6 +1965,44 @@ seconds after a `DELETE` can still answer 200. `jd-store.ts`'s "deleted while
 we were fetching" guard is subject to exactly this. Don't diagnose delete bugs
 inside that window — check the namespace with `wrangler kv key get --remote`.
 
+## An unchanged push writes nothing (2026-10-12)
+
+The Workers Paid plan was taken on 2026-09-18 for a month, to measure what the
+site uses and then decide whether to go back to free. The measurement, over 23
+full days: KV writes were over the free plan's 1,000 a day on 16 of them
+(median 1,503, worst 4,611). Nothing else came close. Reads peaked at 26,262
+of 100,000, lists at 97 of 1,000, Worker requests at 8,853 of 100,000 across
+all four sites on the account.
+
+Nearly all of it was one thing. career-ops re-pushes every report it holds
+(about 225 postings) each morning at 07:15 and again after every evaluation
+run, and each of those pushes cost two writes for a record that had not
+changed:
+
+- **The meta was rewritten to move `updatedAt`.** `putMeta` skipped the index
+  for an unchanged record but still wrote the record.
+- **A push carrying a JD stamped `jdCapturedAt` with the time of the push**,
+  whether or not the text was new. That made the record differ from the stored
+  one, so the "unchanged" test never passed and the index was patched as well.
+  This is what undid the 2026-09-18 saving five days later, when the index
+  rule became "patch unless identical apart from `updatedAt`".
+
+Now `putMeta` with a `previous` writes nothing when only `updatedAt` would
+move, and JD provenance is stamped when the text arrives or changes, not on
+each re-push. On a quiet Sunday the day's writes were 1,075, of which about
+110 fell outside the push hour, so that is roughly where a normal day should
+land.
+
+`updatedAt` on a posting therefore means the last time something about it
+changed. Nothing reads it as "last pushed", and the EI week has never been
+allowed to use it.
+
+The numbers came from Cloudflare's GraphQL analytics API
+(`kvOperationsAdaptiveGroups`, by `date` or `datetimeMinute` and
+`actionType`), which the wrangler login can read. Grouping by minute is what
+found this: the writes sat in five-minute blocks of about 90 a minute, at the
+times the Mac's log says it pushed.
+
 ## A tab that outlives a deploy (2026-10-07)
 
 "500 · Importing a module script failed" after two deploys in one morning. The

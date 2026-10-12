@@ -134,7 +134,7 @@ export async function getMeta(kv: KVNamespace, id: string): Promise<PostingMeta 
  */
 const INDEX_IGNORED = new Set<string>(['updatedAt'])
 
-const needsIndexPatch = (previous: PostingMeta, next: PostingMeta) => {
+export const metaChanged = (previous: PostingMeta, next: PostingMeta) => {
   for (const k of new Set([...Object.keys(previous), ...Object.keys(next)])) {
     if (INDEX_IGNORED.has(k)) continue
     const a = (previous as Record<string, unknown>)[k]
@@ -151,26 +151,26 @@ const needsIndexPatch = (previous: PostingMeta, next: PostingMeta) => {
 /**
  * Store a meta, and keep the listing index in step.
  *
- * Pass `previous` to opt into skipping the index write when nothing a consumer
- * branches on has changed. That halves the cost of a producer push, which is
- * the bulk of the traffic: the evaluation worker alone pushes 72 times a day
- * and never changes a significant field, because `mergePosting` refuses to let
- * a producer touch state, pack or artifacts in the first place.
+ * Pass `previous` to opt into writing nothing at all when the record is the
+ * same apart from `updatedAt`. That is most producer traffic: career-ops
+ * re-pushes every report it holds after each evaluation run and again every
+ * morning, about 225 records a time, and `mergePosting` will not let a push
+ * touch state, pack or artifacts. Until 2026-10-12 such a push still wrote the
+ * meta to move its timestamp, which was most of 1,500 writes a day.
  *
- * Omit it and the index is always patched — the safe default, and what every
- * site-initiated mutation does. A brand-new record (`previous` null) always
- * patches too, or the morning's postings would not appear until the hourly
- * rebuild.
+ * Omit it and both the meta and the index are written: the safe default, and
+ * what every site-initiated mutation does. A brand-new record (`previous`
+ * null) is always written too, or the morning's postings would not appear
+ * until the hourly rebuild.
  */
 export async function putMeta(
   kv: KVNamespace,
   meta: PostingMeta,
   previous?: PostingMeta | null,
 ): Promise<void> {
+  if (previous && !metaChanged(previous, meta)) return
   await kv.put(metaKey(meta.id), JSON.stringify(meta))
-  if (previous === undefined || previous === null || needsIndexPatch(previous, meta)) {
-    await postingIndex.upsert(kv, meta)
-  }
+  await postingIndex.upsert(kv, meta)
 }
 
 export async function getJD(kv: KVNamespace, id: string): Promise<string | null> {

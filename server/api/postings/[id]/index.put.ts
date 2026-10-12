@@ -14,7 +14,7 @@ import type { PostingDetail } from '../../../../shared/types'
 import { postingContext, now } from '../../../utils/posting-route'
 import {
   getMeta, putMeta, getJD, putJD, getAnalysis, putAnalysis,
-  mergePosting, cleanAnalysis, postingIdFor,
+  mergePosting, cleanAnalysis, postingIdFor, metaChanged,
 } from '../../../utils/postings'
 import { MAX_JD, wantsCapture, captureForPosting, inBackground } from '../../../utils/jd-store'
 import { announce } from '../../../utils/realtime'
@@ -49,12 +49,18 @@ export default defineEventHandler(async (event): Promise<PostingDetail> => {
   // first is the right trade by two orders of magnitude.
   if (typeof body.jd === 'string' && body.jd.trim()) {
     const next = body.jd.slice(0, MAX_JD)
-    if ((await getJD(ctx.kv, ctx.id)) !== next) await putJD(ctx.kv, ctx.id, next)
+    const changed = (await getJD(ctx.kv, ctx.id)) !== next
+    if (changed) await putJD(ctx.kv, ctx.id, next)
     meta.hasJD = true
-    // The archived JD from an evaluation is the best copy there is.
-    meta.jdSource = 'career-ops'
-    meta.jdCapturedAt = stamp
-    meta.jdError = null
+    // The archived JD from an evaluation is the best copy there is. Its
+    // provenance is stamped when the text arrives, not on every re-push of the
+    // same text: a fresh `jdCapturedAt` each time made an unchanged posting
+    // look changed, and cost a meta and an index write per push.
+    if (changed || !existing?.jdSource || existing?.jdError) {
+      meta.jdSource = 'career-ops'
+      meta.jdCapturedAt = stamp
+      meta.jdError = null
+    }
   } else {
     meta.hasJD = existing?.hasJD ?? false
   }
@@ -75,9 +81,11 @@ export default defineEventHandler(async (event): Promise<PostingDetail> => {
     meta.hasAnalysis = existing?.hasAnalysis ?? false
   }
 
-  // `existing` opts this path into skipping the index write when the record is
-  // unchanged apart from its timestamp — which is most pushes, since
-  // mergePosting will not let a producer touch state, pack or artifacts.
+  // `existing` opts this path into writing nothing when the record is unchanged
+  // apart from its timestamp, which is most pushes, since mergePosting will
+  // not let a producer touch state, pack or artifacts. The stored timestamp
+  // is then the true one, so that is what goes back.
+  if (existing && !metaChanged(existing, meta)) meta.updatedAt = existing.updatedAt
   await putMeta(ctx.kv, meta, existing)
 
   // Tell the open pages, but only when this push actually brought something.
